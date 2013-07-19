@@ -1,7 +1,0 @@
-function im = sinepic(sz, f, varargin)
-
-
-x = 1:sz;
-y = sin(2 * pi * f .* x);
-im = repmat(y,1,sz);
-imagesc(im);

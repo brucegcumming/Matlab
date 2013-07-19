@@ -1,6 +1,0 @@
-#!/usr/local/bin/perl
-
-open(MAT,"|matlab");
-while(<>)
-{
-}

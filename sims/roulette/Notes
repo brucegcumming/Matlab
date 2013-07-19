@@ -1,9 +1,0 @@
-Seems to me that it should be easy to sort out whats going wrong with Rayleigh test on the raw data. There are only two steps - calculate the vector length, and do the resampling. Maybe the error happens when I turn the smoothed distribution into anlges, which would generate an error in vector length.
-
-I get a vector length of 0.637. If I generate more angles from the distribution I get 0.455 which may be closer to the truth?
-
-This is based on one complete circle being 200 of your units, and that the distribution was made from 1000 samples. Right?
-
-Assuming all this is true, then the only question his how often a uniform distribution generates r > 0.455, which I have at 46 times per 1000, so p < 0.046.
-
-So, where do we differ.

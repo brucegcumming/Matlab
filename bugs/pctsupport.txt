@@ -1,0 +1,1403 @@
+===============Client Information==================
+MATLAB determined the following hostname and port range
+Hostname: NEIK2C36BC53P
+Portrange: 27370  27470
+JAVA has determined the following hostnames for the machine
+Hostname: NEIK2C36BC53P
+Full Hostname: NEIK2C36BC53P.nei.nih.gov
+IP Address: 137.187.109.132
+Hostname as returned by: system('hostname') NEIK2C36BC53P
+
+Obtaining ver
+----------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+MATLAB Version: 7.14.0.739 (R2012a)
+MATLAB License Number: 359834
+Operating System: Microsoft Windows 7 Version 6.1 (Build 7601: Service Pack 1)
+Java Version: Java 1.6.0_17-b04 with Sun Microsystems Inc. Java HotSpot(TM) 64-Bit Server VM mixed mode
+-------------------------------------------------------------------------------------------------------
+MATLAB                                                Version 7.14       (R2012a)
+Curve Fitting Toolbox                                 Version 3.2.1      (R2012a)
+Image Processing Toolbox                              Version 8.0        (R2012a)
+Optimization Toolbox                                  Version 6.2        (R2012a)
+Parallel Computing Toolbox                            Version 6.0        (R2012a)
+Signal Processing Toolbox                             Version 6.17       (R2012a)
+Statistics Toolbox                                    Version 8.0        (R2012a)
+
+Obtaining MATLAB Path
+----------------------------------------------------------
+
+		MATLABPATH
+
+	Z:\bgc\matlab
+	C:\Users\bgc\Documents\MATLAB
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\demos
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\graph2d
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\graph3d
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\graphics
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\plottools
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\scribe
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\specgraph
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\uitools
+	C:\Program Files\MATLAB\R2012a\toolbox\local
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\general
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\ops
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\lang
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\elmat
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\randfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\elfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\specfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\matfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\datafun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\polyfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\funfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\sparfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\strfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\iofun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\timefun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\datatypes
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\verctrl
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\codetools
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\helptools
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\winfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\winfun\NET
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\hds
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\guide
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\datamanager
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\optimfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\audiovideo
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\comparisons
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\curvefit
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\splines
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\cftoolgui
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\sftoolgui
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\curvefitdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\distcomp
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\user
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\mpi
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\parallel
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\parallel\util
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\lang
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\cluster
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\pctdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\images\colorspaces
+	C:\Program Files\MATLAB\R2012a\toolbox\images\images
+	C:\Program Files\MATLAB\R2012a\toolbox\images\imuitools
+	C:\Program Files\MATLAB\R2012a\toolbox\images\iptformats
+	C:\Program Files\MATLAB\R2012a\toolbox\images\iptutils
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\imagesci
+	C:\Program Files\MATLAB\R2012a\toolbox\images\imdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\instrument
+	C:\Program Files\MATLAB\R2012a\toolbox\sam\m3i
+	C:\Program Files\MATLAB\R2012a\toolbox\optim\optim
+	C:\Program Files\MATLAB\R2012a\toolbox\optim\optimdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\asynciolib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\coder\coder
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\general
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\graphics
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\graphics\utils
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\graphics\plotoptions
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\dastudio
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\filterdesignlib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\imageslib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\optimlib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\rptgen
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\siglib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\spcuilib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\statslib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\testmeaslib\general
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\testmeaslib\graphics
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\signal
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\sigtools
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\sptoolgui
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\sigdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\simulink
+	C:\Program Files\MATLAB\R2012a\toolbox\stats\stats
+	C:\Program Files\MATLAB\R2012a\toolbox\stats\classreg
+	C:\Program Files\MATLAB\R2012a\toolbox\stats\statsdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\system
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\timeseries
+	Z:\group\matlab
+
+Obtaining information about startup.m
+----------------------------------------------------------
+Z:\bgc\matlab\startup.m
+C:\Users\bgc\Documents\MATLAB\startup.m  % Shadowed 
+
+Obtaining information about pathdef.m
+----------------------------------------------------------
+C:\Program Files\MATLAB\R2012a\toolbox\local\pathdef.m
+
+Obtaining information about GPUs
+This may take a few minutes
+----------------------------------------------------------
+CUDA Driver Version
+
+ans =
+
+8.17.12.9670 (296.70)
+
+gpuDeviceCount
+
+ans =
+
+     1
+
+List all gpuDevices
+gpuDevice(1)
+{Warning: The selected GPU device only has Compute Capability 1.0 and is therefore not supported. To learn more about supported
+GPU devices, see <a href="matlab:web('http://www.mathworks.com/gpudevice','-browser')">www.mathworks.com/gpudevice</a>.} 
+{> In C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu\+parallel\+internal\+gpu\selectDevice.p>selectDevice at 8
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu\+parallel\+gpu\@GPUDevice\GPUDevice.m',44,1)">GPUDevice.GPUDevice>GPUDevice.select at 44</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu\gpuDevice.m',21,1)">gpuDevice at 21</a>
+  In <a href="matlab: opentoline('Z:\bgc\matlab\bugs\pctsupportAPI2.m',463,1)">pctsupportAPI2>iGatherLocalSystemInformation at 463</a>
+  In <a href="matlab: opentoline('Z:\bgc\matlab\bugs\pctsupportAPI2.m',24,1)">pctsupportAPI2 at 24</a>} 
+
+ans = 
+
+  <a href="matlab:help parallel.gpu.CUDADevice">parallel.gpu.CUDADevice</a> <a href="matlab:help handle">handle</a>
+  Package: parallel.gpu
+
+  Properties:
+                      Name: 'Quadro FX 4600'
+                     Index: 1
+         ComputeCapability: '1.0'
+            SupportsDouble: 0
+             DriverVersion: 4.2000
+        MaxThreadsPerBlock: 512
+          MaxShmemPerBlock: 16384
+        MaxThreadBlockSize: [512 512 64]
+               MaxGridSize: [65535 65535]
+                 SIMDWidth: 32
+               TotalMemory: 805306368
+                FreeMemory: NaN
+       MultiprocessorCount: 12
+              ClockRateKHz: 1200000
+               ComputeMode: 'Default'
+      GPUOverlapsTransfers: 0
+    KernelExecutionTimeout: 1
+          CanMapHostMemory: 0
+           DeviceSupported: 0
+            DeviceSelected: 1
+
+  <a href="matlab:methods('parallel.gpu.CUDADevice')">Methods</a>, <a href="matlab:events('parallel.gpu.CUDADevice')">Events</a>, <a href="matlab:superclasses('parallel.gpu.CUDADevice')">Superclasses</a>
+
+WARNING: When using remote desktop or using workers managed by MJS
+on Windows Vista/Windows 7, GPUs attached to display, and not running
+TCC drivers will not be visible. (Sol # 1-FVMBP3)
+
+This is a windows machine
+Obtaining hostname (hostname)
+----------------------------------------------------------
+NEIK2C36BC53P
+
+Obtaining environment
+----------------------------------------------------------
+ALLUSERSPROFILE=C:\ProgramData
+APPDATA=C:\Users\bgc\AppData\Roaming
+asl.log=Destination=file
+BURN_AUTOPLAY=C:\Program Files (x86)\Roxio\OEM\Roxio Burn\
+CLASSPATH=.;C:\Program Files (x86)\Java\jre6\lib\ext\QTJava.zip
+CommonProgramFiles=C:\Program Files\Common Files
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+CommonProgramW6432=C:\Program Files\Common Files
+COMPUTERNAME=NEIK2C36BC53P
+ComSpec=C:\Windows\system32\cmd.exe
+DEFLOGDIR=C:\ProgramData\McAfee\DesktopProtection
+EMC_AUTOPLAY=C:\Program Files (x86)\Common Files\Roxio Shared\OEM\
+FP_NO_HOST_CHECK=NO
+HOMEDRIVE=C:
+HOMEPATH=\Users\bgc
+LOCALAPPDATA=C:\Users\bgc\AppData\Local
+LOGONSERVER=\\NIHDCHUB10
+MATLAB_ARCH=win64
+NUMBER_OF_PROCESSORS=4
+OS=Windows_NT
+Path=C:\Program Files\MATLAB\R2012a\bin\win64;C:\Program Files\Legato\nsr\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files (x86)\Common Files\Roxio Shared\DLLShared\;C:\Program Files (x86)\Common Files\Roxio Shared\OEM\DLLShared\;C:\Program Files (x86)\Common Files\Roxio Shared\OEM\DLLShared\;C:\Program Files (x86)\Common Files\Roxio Shared\OEM\12.0\DLLShared\;C:\Program Files (x86)\Roxio\OEM\AudioCore\;C:\Program Files (x86)\WinMerge;C:\Program Files (x86)\QuickTime\QTSystem\;C:\Program Files\MATLAB\R2012a\bin;C:\Program Files (x86)\MATLAB\R2007b\bin;C:\Program Files (x86)\MATLAB\R2007b\bin\win32
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+PROCESSOR_ARCHITECTURE=AMD64
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 44 Stepping 2, GenuineIntel
+PROCESSOR_LEVEL=6
+PROCESSOR_REVISION=2c02
+ProgramData=C:\ProgramData
+ProgramFiles=C:\Program Files
+ProgramFiles(x86)=C:\Program Files (x86)
+ProgramW6432=C:\Program Files
+PROMPT=$P$G
+PSModulePath=C:\Windows\system32\WindowsPowerShell\v1.0\Modules\
+PUBLIC=C:\Users\Public
+QTJAVA=C:\Program Files (x86)\Java\jre6\lib\ext\QTJava.zip
+RCAUTOPLAY=C:\Program Files (x86)\Roxio\OEM\Roxio Central 5\
+SESSIONNAME=Console
+SystemDrive=C:
+SystemRoot=C:\Windows
+TEMP=C:\Users\bgc\AppData\Local\Temp\2
+TMP=C:\Users\bgc\AppData\Local\Temp\2
+USERDNSDOMAIN=NIH.GOV
+USERDOMAIN=NIH
+USERNAME=bgc
+USERPROFILE=C:\Users\bgc
+VSEDEFLOGDIR=C:\ProgramData\McAfee\DesktopProtection
+windir=C:\Windows
+windows_tracing_flags=3
+windows_tracing_logfile=C:\BVTBin\Tests\installpackage\csilogfile.log
+
+Obtaining routing table (netstat -r)
+----------------------------------------------------------
+===========================================================================
+Interface List
+ 11...18 03 73 4b c8 b1 ......Broadcom NetXtreme 57xx Gigabit Controller
+  1...........................Software Loopback Interface 1
+===========================================================================
+
+IPv4 Route Table
+===========================================================================
+Active Routes:
+Network Destination        Netmask          Gateway       Interface  Metric
+          0.0.0.0          0.0.0.0    137.187.108.1  137.187.109.132     10
+        127.0.0.0        255.0.0.0         On-link         127.0.0.1    306
+        127.0.0.1  255.255.255.255         On-link         127.0.0.1    306
+  127.255.255.255  255.255.255.255         On-link         127.0.0.1    306
+    137.187.108.0    255.255.254.0         On-link   137.187.109.132    266
+  137.187.109.132  255.255.255.255         On-link   137.187.109.132    266
+  137.187.109.255  255.255.255.255         On-link   137.187.109.132    266
+        224.0.0.0        240.0.0.0         On-link         127.0.0.1    306
+        224.0.0.0        240.0.0.0         On-link   137.187.109.132    266
+  255.255.255.255  255.255.255.255         On-link         127.0.0.1    306
+  255.255.255.255  255.255.255.255         On-link   137.187.109.132    266
+===========================================================================
+Persistent Routes:
+  None
+
+IPv6 Route Table
+===========================================================================
+Active Routes:
+ If Metric Network Destination      Gateway
+  1    306 ::1/128                  On-link
+  1    306 ff00::/8                 On-link
+===========================================================================
+Persistent Routes:
+  None
+
+Obtaining information about network connections and associated programs (netstat -ab)
+----------------------------------------------------------
+The requested operation requires elevation.
+
+Obtaining protocol statistics (netstat -s)
+----------------------------------------------------------
+
+IPv4 Statistics
+
+  Packets Received                   = 122830862
+  Received Header Errors             = 0
+  Received Address Errors            = 12141
+  Datagrams Forwarded                = 0
+  Unknown Protocols Received         = 60
+  Received Packets Discarded         = 180340
+  Received Packets Delivered         = 122821232
+  Output Requests                    = 54680954
+  Routing Discards                   = 0
+  Discarded Output Packets           = 268
+  Output Packet No Route             = 0
+  Reassembly Required                = 0
+  Reassembly Successful              = 0
+  Reassembly Failures                = 0
+  Datagrams Successfully Fragmented  = 0
+  Datagrams Failing Fragmentation    = 0
+  Fragments Created                  = 0
+
+IPv6 Statistics
+
+  Packets Received                   = 0
+  Received Header Errors             = 0
+  Received Address Errors            = 0
+  Datagrams Forwarded                = 0
+  Unknown Protocols Received         = 0
+  Received Packets Discarded         = 0
+  Received Packets Delivered         = 161
+  Output Requests                    = 170
+  Routing Discards                   = 0
+  Discarded Output Packets           = 0
+  Output Packet No Route             = 0
+  Reassembly Required                = 0
+  Reassembly Successful              = 0
+  Reassembly Failures                = 0
+  Datagrams Successfully Fragmented  = 0
+  Datagrams Failing Fragmentation    = 0
+  Fragments Created                  = 0
+
+ICMPv4 Statistics
+
+                            Received    Sent
+  Messages                  182         792       
+  Errors                    0           0         
+  Destination Unreachable   3           684       
+  Time Exceeded             0           0         
+  Parameter Problems        0           0         
+  Source Quenches           0           0         
+  Redirects                 0           0         
+  Echo Replies              2           106       
+  Echos                     150         2         
+  Timestamps                9           0         
+  Timestamp Replies         0           0         
+  Address Masks             9           0         
+  Address Mask Replies      0           0         
+  Router Solicitations      0           0         
+  Router Advertisements     0           0         
+  Type 37                   37          9         
+
+ICMPv6 Statistics
+
+                            Received    Sent
+  Messages                  0           0         
+  Errors                    0           0         
+  Destination Unreachable   0           0         
+  Packet Too Big            0           0         
+  Time Exceeded             0           0         
+  Parameter Problems        0           0         
+  Echos                     0           0         
+  Echo Replies              0           0         
+  MLD Queries               0           0         
+  MLD Reports               0           0         
+  MLD Dones                 0           0         
+  Router Solicitations      0           0         
+  Router Advertisements     0           0         
+  Neighbor Solicitations    0           0         
+  Neighbor Advertisements   0           0         
+  Redirects                 0           0         
+  Router Renumberings       0           0         
+
+TCP Statistics for IPv4
+
+  Active Opens                        = 15264
+  Passive Opens                       = 5519
+  Failed Connection Attempts          = 498
+  Reset Connections                   = 10552
+  Current Connections                 = 21
+  Segments Received                   = 123589307
+  Segments Sent                       = 55181115
+  Segments Retransmitted              = 33235
+
+TCP Statistics for IPv6
+
+  Active Opens                        = 0
+  Passive Opens                       = 0
+  Failed Connection Attempts          = 0
+  Reset Connections                   = 0
+  Current Connections                 = 0
+  Segments Received                   = 0
+  Segments Sent                       = 0
+  Segments Retransmitted              = 0
+
+UDP Statistics for IPv4
+
+  Datagrams Received    = 211145
+  No Ports              = 32358
+  Receive Errors        = 147925
+  Datagrams Sent        = 95432
+
+UDP Statistics for IPv6
+
+  Datagrams Received    = 161
+  No Ports              = 0
+  Receive Errors        = 0
+  Datagrams Sent        = 161
+
+Obtaining network configuration (ipconfig)
+----------------------------------------------------------
+
+Windows IP Configuration
+
+
+Ethernet adapter Local Area Connection:
+
+   Connection-specific DNS Suffix  . : nei.nih.gov
+   IPv4 Address. . . . . . . . . . . : 137.187.109.132
+   Subnet Mask . . . . . . . . . . . : 255.255.254.0
+   Default Gateway . . . . . . . . . : 137.187.108.1
+
+Obtaining network configuration (netsh interface ip show config)
+----------------------------------------------------------
+
+Configuration for interface "Local Area Connection"
+    DHCP enabled:                         Yes
+    IP Address:                           137.187.109.132
+    Subnet Prefix:                        137.187.108.0/23 (mask 255.255.254.0)
+    Default Gateway:                      137.187.108.1
+    Gateway Metric:                       0
+    InterfaceMetric:                      10
+    DNS servers configured through DHCP:  156.40.70.10
+                                          156.40.74.10
+    Register with which suffix:           Primary only
+    WINS servers configured through DHCP: 156.40.70.20
+                                          156.40.74.20
+
+Configuration for interface "Loopback Pseudo-Interface 1"
+    DHCP enabled:                         No
+    IP Address:                           127.0.0.1
+    Subnet Prefix:                        127.0.0.0/8 (mask 255.0.0.0)
+    InterfaceMetric:                      50
+    Statically Configured DNS Servers:    None
+    Register with which suffix:           Primary only
+    Statically Configured WINS Servers:   None
+
+
+----------------------------------------------------------
+There are following cluster profiles on this system
+	local
+
+	localfour
+
+	localsix
+
+	localtwo
+
+The default cluster profile is: local
+
+============Beginning Cluster Profile Tests===========
+
+myCluster = 
+
+ Local Cluster Information
+ =========================
+
+                         Profile: local
+                        Modified: false
+                            Host: NEIK2C36BC53P
+                      NumWorkers: 8
+              JobStorageLocation: C:\Users\bgc\AppData\Roaming\MathWorks\MATLAB\local_cluster_jobs\R2012a
+               ClusterMatlabRoot: C:\Program Files\MATLAB\R2012a
+                 OperatingSystem: windows
+
+ - Assigned Jobs
+
+                  Number Pending: 0
+                   Number Queued: 0
+                  Number Running: 0
+                 Number Finished: 0
+
+
+===============Worker Information==================
+----------------------------------------------------------
+MATLAB determined the following hostname and port range
+Hostname: NEIK2C36BC53P
+Portrange: 27370  27470
+JAVA has determined the following hostnames for the machine
+Hostname: NEIK2C36BC53P
+Full Hostname: NEIK2C36BC53P.nei.nih.gov
+IP Address: 137.187.109.132
+Hostname as returned by: system('hostname') NEIK2C36BC53P
+
+Obtaining ver
+----------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+MATLAB Version: 7.14.0.739 (R2012a)
+MATLAB License Number: 359834
+Operating System: Microsoft Windows 7 Version 6.1 (Build 7601: Service Pack 1)
+Java Version: Java 1.6.0_17-b04 with Sun Microsystems Inc. Java HotSpot(TM) 64-Bit Server VM mixed mode
+-------------------------------------------------------------------------------------------------------
+MATLAB                                                Version 7.14       (R2012a)
+Curve Fitting Toolbox                                 Version 3.2.1      (R2012a)
+Image Processing Toolbox                              Version 8.0        (R2012a)
+Optimization Toolbox                                  Version 6.2        (R2012a)
+Parallel Computing Toolbox                            Version 6.0        (R2012a)
+Signal Processing Toolbox                             Version 6.17       (R2012a)
+Statistics Toolbox                                    Version 8.0        (R2012a)
+
+Obtaining MATLAB Path
+----------------------------------------------------------
+
+		MATLABPATH
+
+	C:\Users\bgc\AppData\Local\Temp\2\tp0a98036a_b19f_4f83_86f3_192dc332c8a7rp6164
+	Z:\bgc\matlab
+	C:\Users\bgc\Documents\MATLAB
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\demos
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\graph2d
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\graph3d
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\graphics
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\plottools
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\scribe
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\specgraph
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\uitools
+	C:\Program Files\MATLAB\R2012a\toolbox\local
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\general
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\ops
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\lang
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\elmat
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\randfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\elfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\specfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\matfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\datafun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\polyfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\funfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\sparfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\strfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\iofun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\timefun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\datatypes
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\verctrl
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\codetools
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\helptools
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\winfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\winfun\NET
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\hds
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\guide
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\datamanager
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\optimfun
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\audiovideo
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\comparisons
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\curvefit
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\splines
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\cftoolgui
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\sftoolgui
+	C:\Program Files\MATLAB\R2012a\toolbox\curvefit\curvefitdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\distcomp
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\user
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\mpi
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\parallel
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\parallel\util
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\lang
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\cluster
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu
+	C:\Program Files\MATLAB\R2012a\toolbox\distcomp\pctdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\images\colorspaces
+	C:\Program Files\MATLAB\R2012a\toolbox\images\images
+	C:\Program Files\MATLAB\R2012a\toolbox\images\imuitools
+	C:\Program Files\MATLAB\R2012a\toolbox\images\iptformats
+	C:\Program Files\MATLAB\R2012a\toolbox\images\iptutils
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\imagesci
+	C:\Program Files\MATLAB\R2012a\toolbox\images\imdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\instrument
+	C:\Program Files\MATLAB\R2012a\toolbox\sam\m3i
+	C:\Program Files\MATLAB\R2012a\toolbox\optim\optim
+	C:\Program Files\MATLAB\R2012a\toolbox\optim\optimdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\asynciolib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\coder\coder
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\general
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\graphics
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\graphics\utils
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\controllib\graphics\plotoptions
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\dastudio
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\filterdesignlib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\imageslib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\optimlib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\rptgen
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\siglib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\spcuilib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\statslib
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\testmeaslib\general
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\testmeaslib\graphics
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\signal
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\sigtools
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\sptoolgui
+	C:\Program Files\MATLAB\R2012a\toolbox\signal\sigdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\shared\simulink
+	C:\Program Files\MATLAB\R2012a\toolbox\stats\stats
+	C:\Program Files\MATLAB\R2012a\toolbox\stats\classreg
+	C:\Program Files\MATLAB\R2012a\toolbox\stats\statsdemos
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\system
+	C:\Program Files\MATLAB\R2012a\toolbox\matlab\timeseries
+	Z:\group\matlab
+
+Obtaining information about startup.m
+----------------------------------------------------------
+Z:\bgc\matlab\startup.m
+C:\Users\bgc\Documents\MATLAB\startup.m  % Shadowed 
+
+Obtaining information about pathdef.m
+----------------------------------------------------------
+C:\Program Files\MATLAB\R2012a\toolbox\local\pathdef.m
+
+Obtaining information about GPUs
+This may take a few minutes
+----------------------------------------------------------
+CUDA Driver Version
+
+ans =
+
+8.17.12.9670 (296.70)
+
+gpuDeviceCount
+
+ans =
+
+     1
+
+List all gpuDevices
+gpuDevice(1)
+{Warning: The selected GPU device only has Compute Capability 1.0 and is
+therefore not supported. To learn more about supported GPU devices, see
+<a href="matlab:web('http://www.mathworks.com/gpudevice','-browser')">www.mathworks.com/gpudevice</a>.} 
+{> In C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu\+parallel\+internal\+gpu\selectDevice.p>selectDevice at 8
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu\+parallel\+gpu\@GPUDevice\GPUDevice.m',44,1)">GPUDevice.GPUDevice>GPUDevice.select at 44</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\gpu\gpuDevice.m',21,1)">gpuDevice at 21</a>
+  In <a href="matlab: opentoline('C:\Users\bgc\AppData\Local\Temp\2\tp0a98036a_b19f_4f83_86f3_192dc332c8a7rp6164\pctsupportAPI2.m',463,1)">pctsupportAPI2>iGatherLocalSystemInformation at 463</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\private\dctEvaluateFunction.m',23,1)">distcomp\private\dctEvaluateFunction>iEvaluateWithNoErrors at 23</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\private\dctEvaluateFunction.m',7,1)">distcomp\private\dctEvaluateFunction at 7</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\private\dctEvaluateTask.m',281,1)">distcomp\private\dctEvaluateTask>iEvaluateTask/nEvaluateTask at 281</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\private\dctEvaluateTask.m',134,1)">distcomp\private\dctEvaluateTask>iEvaluateTask at 134</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\private\dctEvaluateTask.m',58,1)">distcomp\private\dctEvaluateTask at 58</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\distcomp_evaluate_filetask.m',161,1)">distcomp_evaluate_filetask>iDoTask at 161</a>
+  In <a href="matlab: opentoline('C:\Program Files\MATLAB\R2012a\toolbox\distcomp\distcomp_evaluate_filetask.m',64,1)">distcomp_evaluate_filetask at 64</a>} 
+
+ans = 
+
+  <a href="matlab:help parallel.gpu.CUDADevice">parallel.gpu.CUDADevice</a> <a href="matlab:help handle">handle</a>
+  Package: parallel.gpu
+
+  Properties:
+                      Name: 'Quadro FX 4600'
+                     Index: 1
+         ComputeCapability: '1.0'
+            SupportsDouble: 0
+             DriverVersion: 4.2000
+        MaxThreadsPerBlock: 512
+          MaxShmemPerBlock: 16384
+        MaxThreadBlockSize: [512 512 64]
+               MaxGridSize: [65535 65535]
+                 SIMDWidth: 32
+               TotalMemory: 805306368
+                FreeMemory: NaN
+       MultiprocessorCount: 12
+              ClockRateKHz: 1200000
+               ComputeMode: 'Default'
+      GPUOverlapsTransfers: 0
+    KernelExecutionTimeout: 1
+          CanMapHostMemory: 0
+           DeviceSupported: 0
+            DeviceSelected: 1
+
+  <a href="matlab:methods('parallel.gpu.CUDADevice')">Methods</a>, <a href="matlab:events('parallel.gpu.CUDADevice')">Events</a>, <a href="matlab:superclasses('parallel.gpu.CUDADevice')">Superclasses</a>
+
+WARNING: When using remote desktop or using workers managed by MJS
+on Windows Vista/Windows 7, GPUs attached to display, and not running
+TCC drivers will not be visible. (Sol # 1-FVMBP3)
+
+This is a windows machine
+Obtaining hostname (hostname)
+----------------------------------------------------------
+NEIK2C36BC53P
+
+Obtaining environment
+----------------------------------------------------------
+ALLUSERSPROFILE=C:\ProgramData
+APPDATA=C:\Users\bgc\AppData\Roaming
+asl.log=Destination=file
+BURN_AUTOPLAY=C:\Program Files (x86)\Roxio\OEM\Roxio Burn\
+CLASSPATH=.;C:\Program Files (x86)\Java\jre6\lib\ext\QTJava.zip
+CommonProgramFiles=C:\Program Files\Common Files
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+CommonProgramW6432=C:\Program Files\Common Files
+COMPUTERNAME=NEIK2C36BC53P
+ComSpec=C:\Windows\system32\cmd.exe
+DEFLOGDIR=C:\ProgramData\McAfee\DesktopProtection
+EMC_AUTOPLAY=C:\Program Files (x86)\Common Files\Roxio Shared\OEM\
+FP_NO_HOST_CHECK=NO
+HOMEDRIVE=C:
+HOMEPATH=\Users\bgc
+KMP_HANDLE_SIGNALS=0
+LOCALAPPDATA=C:\Users\bgc\AppData\Local
+LOGONSERVER=\\NIHDCHUB10
+MATLAB_ARCH=win64
+MDCE_DECODE_FUNCTION=parallel.internal.decode.localSingleTask
+MDCE_JOB_LOCATION=Job2
+MDCE_PID_TO_WATCH=5684
+MDCE_STORAGE_CONSTRUCTOR=makeFileStorageObject
+MDCE_STORAGE_LOCATION=PC%7BC%3A%5CUsers%5Cbgc%5CAppData%5CRoaming%5CMathWorks%5CMATLAB%5Clocal_cluster_jobs%5CR2012a%7D%3AUNIX%7B%7D%3A
+MDCE_TASK_LOCATION=Job2/Task1
+MDCE_USE_ML_LICENSING=true
+NUMBER_OF_PROCESSORS=4
+OS=Windows_NT
+Path=C:\Program Files\MATLAB\R2012a\bin\win64;C:\Program Files\Legato\nsr\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files (x86)\Common Files\Roxio Shared\DLLShared\;C:\Program Files (x86)\Common Files\Roxio Shared\OEM\DLLShared\;C:\Program Files (x86)\Common Files\Roxio Shared\OEM\DLLShared\;C:\Program Files (x86)\Common Files\Roxio Shared\OEM\12.0\DLLShared\;C:\Program Files (x86)\Roxio\OEM\AudioCore\;C:\Program Files (x86)\WinMerge;C:\Program Files (x86)\QuickTime\QTSystem\;C:\Program Files\MATLAB\R2012a\bin;C:\Program Files (x86)\MATLAB\R2007b\bin;C:\Program Files (x86)\MATLAB\R2007b\bin\win32
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+PROCESSOR_ARCHITECTURE=AMD64
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 44 Stepping 2, GenuineIntel
+PROCESSOR_LEVEL=6
+PROCESSOR_REVISION=2c02
+ProgramData=C:\ProgramData
+ProgramFiles=C:\Program Files
+ProgramFiles(x86)=C:\Program Files (x86)
+ProgramW6432=C:\Program Files
+PROMPT=$P$G
+PSModulePath=C:\Windows\system32\WindowsPowerShell\v1.0\Modules\
+PUBLIC=C:\Users\Public
+QTJAVA=C:\Program Files (x86)\Java\jre6\lib\ext\QTJava.zip
+RCAUTOPLAY=C:\Program Files (x86)\Roxio\OEM\Roxio Central 5\
+SESSIONNAME=Console
+SystemDrive=C:
+SystemRoot=C:\Windows
+TEMP=C:\Users\bgc\AppData\Local\Temp\2
+TMP=C:\Users\bgc\AppData\Local\Temp\2
+USERDNSDOMAIN=NIH.GOV
+USERDOMAIN=NIH
+USERNAME=bgc
+USERPROFILE=C:\Users\bgc
+VSEDEFLOGDIR=C:\ProgramData\McAfee\DesktopProtection
+windir=C:\Windows
+windows_tracing_flags=3
+windows_tracing_logfile=C:\BVTBin\Tests\installpackage\csilogfile.log
+__KMP_REGISTERED_LIB_6164=0000000021308D10-cafeada9-libiomp5md.dll
+
+Obtaining routing table (netstat -r)
+----------------------------------------------------------
+===========================================================================
+Interface List
+ 11...18 03 73 4b c8 b1 ......Broadcom NetXtreme 57xx Gigabit Controller
+  1...........................Software Loopback Interface 1
+===========================================================================
+
+IPv4 Route Table
+===========================================================================
+Active Routes:
+Network Destination        Netmask          Gateway       Interface  Metric
+          0.0.0.0          0.0.0.0    137.187.108.1  137.187.109.132     10
+        127.0.0.0        255.0.0.0         On-link         127.0.0.1    306
+        127.0.0.1  255.255.255.255         On-link         127.0.0.1    306
+  127.255.255.255  255.255.255.255         On-link         127.0.0.1    306
+    137.187.108.0    255.255.254.0         On-link   137.187.109.132    266
+  137.187.109.132  255.255.255.255         On-link   137.187.109.132    266
+  137.187.109.255  255.255.255.255         On-link   137.187.109.132    266
+        224.0.0.0        240.0.0.0         On-link         127.0.0.1    306
+        224.0.0.0        240.0.0.0         On-link   137.187.109.132    266
+  255.255.255.255  255.255.255.255         On-link         127.0.0.1    306
+  255.255.255.255  255.255.255.255         On-link   137.187.109.132    266
+===========================================================================
+Persistent Routes:
+  None
+
+IPv6 Route Table
+===========================================================================
+Active Routes:
+ If Metric Network Destination      Gateway
+  1    306 ::1/128                  On-link
+  1    306 ff00::/8                 On-link
+===========================================================================
+Persistent Routes:
+  None
+
+Obtaining information about network connections and associated programs (netstat -ab)
+----------------------------------------------------------
+The requested operation requires elevation.
+
+Obtaining protocol statistics (netstat -s)
+----------------------------------------------------------
+
+IPv4 Statistics
+
+  Packets Received                   = 122837164
+  Received Header Errors             = 0
+  Received Address Errors            = 12141
+  Datagrams Forwarded                = 0
+  Unknown Protocols Received         = 60
+  Received Packets Discarded         = 180357
+  Received Packets Delivered         = 122827546
+  Output Requests                    = 54683609
+  Routing Discards                   = 0
+  Discarded Output Packets           = 268
+  Output Packet No Route             = 0
+  Reassembly Required                = 0
+  Reassembly Successful              = 0
+  Reassembly Failures                = 0
+  Datagrams Successfully Fragmented  = 0
+  Datagrams Failing Fragmentation    = 0
+  Fragments Created                  = 0
+
+IPv6 Statistics
+
+  Packets Received                   = 0
+  Received Header Errors             = 0
+  Received Address Errors            = 0
+  Datagrams Forwarded                = 0
+  Unknown Protocols Received         = 0
+  Received Packets Discarded         = 0
+  Received Packets Delivered         = 161
+  Output Requests                    = 170
+  Routing Discards                   = 0
+  Discarded Output Packets           = 0
+  Output Packet No Route             = 0
+  Reassembly Required                = 0
+  Reassembly Successful              = 0
+  Reassembly Failures                = 0
+  Datagrams Successfully Fragmented  = 0
+  Datagrams Failing Fragmentation    = 0
+  Fragments Created                  = 0
+
+ICMPv4 Statistics
+
+                            Received    Sent
+  Messages                  182         792       
+  Errors                    0           0         
+  Destination Unreachable   3           684       
+  Time Exceeded             0           0         
+  Parameter Problems        0           0         
+  Source Quenches           0           0         
+  Redirects                 0           0         
+  Echo Replies              2           106       
+  Echos                     150         2         
+  Timestamps                9           0         
+  Timestamp Replies         0           0         
+  Address Masks             9           0         
+  Address Mask Replies      0           0         
+  Router Solicitations      0           0         
+  Router Advertisements     0           0         
+  Type 37                   37          9         
+
+ICMPv6 Statistics
+
+                            Received    Sent
+  Messages                  0           0         
+  Errors                    0           0         
+  Destination Unreachable   0           0         
+  Packet Too Big            0           0         
+  Time Exceeded             0           0         
+  Parameter Problems        0           0         
+  Echos                     0           0         
+  Echo Replies              0           0         
+  MLD Queries               0           0         
+  MLD Reports               0           0         
+  MLD Dones                 0           0         
+  Router Solicitations      0           0         
+  Router Advertisements     0           0         
+  Neighbor Solicitations    0           0         
+  Neighbor Advertisements   0           0         
+  Redirects                 0           0         
+  Router Renumberings       0           0         
+
+TCP Statistics for IPv4
+
+  Active Opens                        = 15268
+  Passive Opens                       = 5519
+  Failed Connection Attempts          = 498
+  Reset Connections                   = 10555
+  Current Connections                 = 18
+  Segments Received                   = 123595561
+  Segments Sent                       = 55183748
+  Segments Retransmitted              = 33237
+
+TCP Statistics for IPv6
+
+  Active Opens                        = 0
+  Passive Opens                       = 0
+  Failed Connection Attempts          = 0
+  Reset Connections                   = 0
+  Current Connections                 = 0
+  Segments Received                   = 0
+  Segments Sent                       = 0
+  Segments Retransmitted              = 0
+
+UDP Statistics for IPv4
+
+  Datagrams Received    = 211197
+  No Ports              = 32361
+  Receive Errors        = 147939
+  Datagrams Sent        = 95459
+
+UDP Statistics for IPv6
+
+  Datagrams Received    = 161
+  No Ports              = 0
+  Receive Errors        = 0
+  Datagrams Sent        = 161
+
+Obtaining network configuration (ipconfig)
+----------------------------------------------------------
+
+Windows IP Configuration
+
+
+Ethernet adapter Local Area Connection:
+
+   Connection-specific DNS Suffix  . : nei.nih.gov
+   IPv4 Address. . . . . . . . . . . : 137.187.109.132
+   Subnet Mask . . . . . . . . . . . : 255.255.254.0
+   Default Gateway . . . . . . . . . : 137.187.108.1
+
+Obtaining network configuration (netsh interface ip show config)
+----------------------------------------------------------
+
+Configuration for interface "Local Area Connection"
+    DHCP enabled:                         Yes
+    IP Address:                           137.187.109.132
+    Subnet Prefix:                        137.187.108.0/23 (mask 255.255.254.0)
+    Default Gateway:                      137.187.108.1
+    Gateway Metric:                       0
+    InterfaceMetric:                      10
+    DNS servers configured through DHCP:  156.40.70.10
+                                          156.40.74.10
+    Register with which suffix:           Primary only
+    WINS servers configured through DHCP: 156.40.70.20
+                                          156.40.74.20
+
+Configuration for interface "Loopback Pseudo-Interface 1"
+    DHCP enabled:                         No
+    IP Address:                           127.0.0.1
+    Subnet Prefix:                        127.0.0.0/8 (mask 255.0.0.0)
+    InterfaceMetric:                      50
+    Statically Configured DNS Servers:    None
+    Register with which suffix:           Primary only
+    Statically Configured WINS Servers:   None
+
+
+----------------------------------------------------------
+
+----------------------------------------------------------
+MATLAB determined the following hostname and port range
+Hostname: NEIK2C36BC53P
+Portrange: 27370  27470
+JAVA has determined the following hostnames for the machine
+Hostname: NEIK2C36BC53P
+Full Hostname: NEIK2C36BC53P.nei.nih.gov
+IP Address: 137.187.109.132
+Hostname as returned by: system('hostname') NEIK2C36BC53P
+
+Testing connectivity with hostname returned by pctconfig
+----------------------------------------------------------
+Attempting to test connectivity with hostname = NEIK2C36BC53P
+ 
+s =
+ 
+ServerSocket[addr=0.0.0.0/0.0.0.0,port=0,localport=27420]
+ 
+ 
+ns =
+ 
+Socket[addr=/137.187.109.132,port=65456,localport=27420]
+ 
+ 
+ans =
+ 
+137.187.109.132
+ 
+
+ans =
+
+       65456
+
+----------------------------------------------------------
+successfully received connection from a worker
+Information about the task
+----------------------------------------------------------
+
+ans = 
+
+ Task ID 1 from Job 3 Information
+ ================================
+
+                State: finished
+             Function: @remoteTestConnectivityBackToClinet
+            StartTime: Thu Aug 02 08:12:21 EDT 2012
+     Running Duration: 0 days 0h 0m 4s
+
+ - Task Result Properties
+
+      ErrorIdentifier: 
+         ErrorMessage: 
+
+Task Command Window Output: 
+
+My hostname is: NEIK2C36BC53P
+
+Attempting to perform nslookup on host: NEIK2C36BC53P
+----------------------------------------------------------
+Server:  nihddns.nih.gov
+Address:  156.40.70.10
+
+Name:    NEIK2C36BC53P.nih.gov
+Address:  2002:89bb:6cf3::89bb:6cf3
+
+
+----------------------------------------------------------
+Attempting to perform ping on host: NEIK2C36BC53P
+----------------------------------------------------------
+
+Pinging NEIK2C36BC53P.nei.nih.gov [137.187.109.132] with 32 bytes of data:
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+
+Ping statistics for 137.187.109.132:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 0ms, Maximum = 0ms, Average = 0ms
+
+Attempting to connect back to the client using:
+hostname: NEIK2C36BC53P, portNumber: 27420
+----------------------------------------------------------
+ 
+sa =
+ 
+NEIK2C36BC53P/137.187.109.132:27420
+ 
+ 
+s =
+ 
+Socket[unconnected]
+ 
+Connection attempt succeeded
+----------------------------------------------------------
+
+Successfully connected back to client using hostname provided by pctconfig
+
+Testing connectivity with hostname returned by java
+----------------------------------------------------------
+Attempting to test connectivity with hostname = NEIK2C36BC53P
+ 
+s =
+ 
+ServerSocket[addr=0.0.0.0/0.0.0.0,port=0,localport=27420]
+ 
+ 
+ns =
+ 
+Socket[addr=/137.187.109.132,port=65465,localport=27420]
+ 
+ 
+ans =
+ 
+137.187.109.132
+ 
+
+ans =
+
+       65465
+
+----------------------------------------------------------
+successfully received connection from a worker
+Information about the task
+----------------------------------------------------------
+
+ans = 
+
+ Task ID 1 from Job 4 Information
+ ================================
+
+                State: finished
+             Function: @remoteTestConnectivityBackToClinet
+            StartTime: Thu Aug 02 08:12:37 EDT 2012
+     Running Duration: 0 days 0h 0m 4s
+
+ - Task Result Properties
+
+      ErrorIdentifier: 
+         ErrorMessage: 
+
+Task Command Window Output: 
+
+My hostname is: NEIK2C36BC53P
+
+Attempting to perform nslookup on host: NEIK2C36BC53P
+----------------------------------------------------------
+Server:  nihddns.nih.gov
+Address:  156.40.70.10
+
+Name:    NEIK2C36BC53P.nih.gov
+Address:  2002:89bb:6cf3::89bb:6cf3
+
+
+----------------------------------------------------------
+Attempting to perform ping on host: NEIK2C36BC53P
+----------------------------------------------------------
+
+Pinging NEIK2C36BC53P.nei.nih.gov [137.187.109.132] with 32 bytes of data:
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+
+Ping statistics for 137.187.109.132:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 0ms, Maximum = 0ms, Average = 0ms
+
+Attempting to connect back to the client using:
+hostname: NEIK2C36BC53P, portNumber: 27420
+----------------------------------------------------------
+ 
+sa =
+ 
+NEIK2C36BC53P/137.187.109.132:27420
+ 
+ 
+s =
+ 
+Socket[unconnected]
+ 
+Connection attempt succeeded
+----------------------------------------------------------
+
+Successfully connected back to client using hostname provided by java
+
+Testing connectivity with full hostname returned by java
+----------------------------------------------------------
+Attempting to test connectivity with hostname = NEIK2C36BC53P.nei.nih.gov
+ 
+s =
+ 
+ServerSocket[addr=0.0.0.0/0.0.0.0,port=0,localport=27420]
+ 
+ 
+ns =
+ 
+Socket[addr=/137.187.109.132,port=65468,localport=27420]
+ 
+ 
+ans =
+ 
+137.187.109.132
+ 
+
+ans =
+
+       65468
+
+----------------------------------------------------------
+successfully received connection from a worker
+Information about the task
+----------------------------------------------------------
+
+ans = 
+
+ Task ID 1 from Job 5 Information
+ ================================
+
+                State: finished
+             Function: @remoteTestConnectivityBackToClinet
+            StartTime: Thu Aug 02 08:12:52 EDT 2012
+     Running Duration: 0 days 0h 0m 4s
+
+ - Task Result Properties
+
+      ErrorIdentifier: 
+         ErrorMessage: 
+
+Task Command Window Output: 
+
+My hostname is: NEIK2C36BC53P
+
+Attempting to perform nslookup on host: NEIK2C36BC53P.nei.nih.gov
+----------------------------------------------------------
+Server:  nihddns.nih.gov
+Address:  156.40.70.10
+
+Name:    NEIK2C36BC53P.nei.nih.gov
+Address:  137.187.109.132
+
+
+----------------------------------------------------------
+Attempting to perform ping on host: NEIK2C36BC53P.nei.nih.gov
+----------------------------------------------------------
+
+Pinging NEIK2C36BC53P.nei.nih.gov [137.187.109.132] with 32 bytes of data:
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+
+Ping statistics for 137.187.109.132:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 0ms, Maximum = 0ms, Average = 0ms
+
+Attempting to connect back to the client using:
+hostname: NEIK2C36BC53P.nei.nih.gov, portNumber: 27420
+----------------------------------------------------------
+ 
+sa =
+ 
+NEIK2C36BC53P.nei.nih.gov/137.187.109.132:27420
+ 
+ 
+s =
+ 
+Socket[unconnected]
+ 
+Connection attempt succeeded
+----------------------------------------------------------
+
+Successfully connected back to client using full hostname provided by java
+
+Testing connectivity with IP address returned by java
+----------------------------------------------------------
+Attempting to test connectivity with hostname = 137.187.109.132
+ 
+s =
+ 
+ServerSocket[addr=0.0.0.0/0.0.0.0,port=0,localport=27420]
+ 
+ 
+ns =
+ 
+Socket[addr=/137.187.109.132,port=65471,localport=27420]
+ 
+ 
+ans =
+ 
+137.187.109.132
+ 
+
+ans =
+
+       65471
+
+----------------------------------------------------------
+successfully received connection from a worker
+Information about the task
+----------------------------------------------------------
+
+ans = 
+
+ Task ID 1 from Job 6 Information
+ ================================
+
+                State: finished
+             Function: @remoteTestConnectivityBackToClinet
+            StartTime: Thu Aug 02 08:13:07 EDT 2012
+     Running Duration: 0 days 0h 0m 4s
+
+ - Task Result Properties
+
+      ErrorIdentifier: 
+         ErrorMessage: 
+
+Task Command Window Output: 
+
+My hostname is: NEIK2C36BC53P
+
+Attempting to perform nslookup on host: 137.187.109.132
+----------------------------------------------------------
+Server:  nihddns.nih.gov
+Address:  156.40.70.10
+
+Name:    neik2c36bc53p.nei.nih.gov
+Address:  137.187.109.132
+
+
+----------------------------------------------------------
+Attempting to perform ping on host: 137.187.109.132
+----------------------------------------------------------
+
+Pinging 137.187.109.132 with 32 bytes of data:
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+
+Ping statistics for 137.187.109.132:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 0ms, Maximum = 0ms, Average = 0ms
+
+Attempting to connect back to the client using:
+hostname: 137.187.109.132, portNumber: 27420
+----------------------------------------------------------
+ 
+sa =
+ 
+/137.187.109.132:27420
+ 
+ 
+s =
+ 
+Socket[unconnected]
+ 
+Connection attempt succeeded
+----------------------------------------------------------
+
+Successfully connected back to client using full hostname provided by java
+
+Testing connectivity with hostname returned by system('hostname')
+----------------------------------------------------------
+Attempting to test connectivity with hostname = NEIK2C36BC53P
+ 
+s =
+ 
+ServerSocket[addr=0.0.0.0/0.0.0.0,port=0,localport=27420]
+ 
+ 
+ns =
+ 
+Socket[addr=/137.187.109.132,port=65474,localport=27420]
+ 
+ 
+ans =
+ 
+137.187.109.132
+ 
+
+ans =
+
+       65474
+
+----------------------------------------------------------
+successfully received connection from a worker
+Information about the task
+----------------------------------------------------------
+
+ans = 
+
+ Task ID 1 from Job 7 Information
+ ================================
+
+                State: finished
+             Function: @remoteTestConnectivityBackToClinet
+            StartTime: Thu Aug 02 08:13:22 EDT 2012
+     Running Duration: 0 days 0h 0m 4s
+
+ - Task Result Properties
+
+      ErrorIdentifier: 
+         ErrorMessage: 
+
+Task Command Window Output: 
+
+My hostname is: NEIK2C36BC53P
+
+Attempting to perform nslookup on host: NEIK2C36BC53P
+----------------------------------------------------------
+Server:  nihddns.nih.gov
+Address:  156.40.70.10
+
+Name:    NEIK2C36BC53P.nih.gov
+Address:  2002:89bb:6cf3::89bb:6cf3
+
+
+----------------------------------------------------------
+Attempting to perform ping on host: NEIK2C36BC53P
+----------------------------------------------------------
+
+Pinging NEIK2C36BC53P.nei.nih.gov [137.187.109.132] with 32 bytes of data:
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+Reply from 137.187.109.132: bytes=32 time<1ms TTL=128
+
+Ping statistics for 137.187.109.132:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 0ms, Maximum = 0ms, Average = 0ms
+
+Attempting to connect back to the client using:
+hostname: NEIK2C36BC53P, portNumber: 27420
+----------------------------------------------------------
+ 
+sa =
+ 
+NEIK2C36BC53P/137.187.109.132:27420
+ 
+ 
+s =
+ 
+Socket[unconnected]
+ 
+Connection attempt succeeded
+----------------------------------------------------------
+
+Successfully connected back to client using hostname returned by system('hostname')
+
+----------------------------------------------------------

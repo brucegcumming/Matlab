@@ -1,0 +1,34 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	clear;
+	const = .6;
+	frequency = 4;
+	filtersize = 128;
+	sd = const * filtersize/frequency;
+	freq = frequency;
+
+	stim_high_cycles = 4; %number of cycles per filtersize - other will be * .75
+	rf_disparity = 0; %range -filtersize/4 -> +filtersize/4
+
+	[rlc, rls, rrc, rrs] = Setup_gabor_rfs(rf_disparity, filtersize, sd, freq);
+	
+	subplot(2,1,1);
+	plot(rlc);
+	subplot(2,1,2);
+	plot(rrc);	
+	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+size = 128;
+x = 1:size;
+
+f = Cycles2const(2,size);
+s = sin(f .* x);
+c = 0.8 * cos(f .* x);
+plot(s);
+figure
+plot(c); 
+sc = s + c;
+figure
+plot(sc);
+d2 = sc .^ 2;
+plot(d2);
+

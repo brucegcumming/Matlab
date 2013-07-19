@@ -1,0 +1,10 @@
+ /Applications/MATLAB_R2011b.app/Contents/MacOS/MATLAB_maci64                 
+dyld: Library not loaded: libtbb.dylib
+  Referenced from: /Applications/MATLAB_R2011b.app/bin/maci64/./libut.dylib
+  Reason: image not found
+Trace/BPT trap
+
+MATLAB:dispatcher:loadLibrary Can't load '/Applications/MATLAB_R2011b.app/bin/maci64/libmwmathdsp.dylib': dlopen(/Applications/MATLAB_R2011b.app/bin/maci64/libmwmathdsp.dylib, 1): Library not loaded: libtbb.dylib
+  Referenced from: /Applications/MATLAB_R2011b.app/bin/maci64/libmwmathdsp.dylib
+  Reason: image not found.
+Caught MathWorks::System::FatalException

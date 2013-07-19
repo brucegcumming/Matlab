@@ -1,0 +1,156 @@
+function r = crosscorr()
+%Makes 2d Gabor patch and performs 2d cross-correlation
+%in the Fourier domain..
+
+xsize = 100;
+ysize = 100;
+
+
+%Gabor Parameters.
+%1  horz offset
+%2  vert offset
+%3  frequency in cpd.
+%4  phase relative to mean position
+%5  orientation clockwise from horizontal
+%6  sd perpendicular to bars
+%7  sd parallel to bars
+%8  peak amplitude
+%9  mean 
+
+sf = 2;
+sdh = 0.2;
+sdv = 0.2;
+
+asymfilter =  [0 0 sf 0    45 sdh sdv 0.5 0.0];%defines params for this Gabor
+hsymfilter =  [0 0 sf 0    90 sdh sdv 0.5 0.0];	
+vsymfilter =  [0 0 sf 0    0 sdh sdv 0.5 0.0];	
+bsymfilter =  [0.176 0 sf 0    45 sdh sdv 0.5 0.0];
+csymfilter =  [0 0 sf -1.57    45 sdh sdv 0.5 0.0];
+barsymfilter =  [0 0 sf -1.57    45 sdh 20 0.5 0.0];
+barasymfilter =  [0 0 sf 0    45 sdh 20 0.5 0.0];
+afiltershape = GFilter2 (xsize,ysize,asymfilter);%routine to create Gabor
+afiltershape = afiltershape -mean(mean(afiltershape));
+bfiltershape = GFilter2 (xsize,ysize,bsymfilter);
+bfiltershape = bfiltershape -mean(mean(bfiltershape));
+cfiltershape = GFilter2 (xsize,ysize,csymfilter);
+cfiltershape = cfiltershape -mean(mean(cfiltershape));
+hfiltershape = GFilter2 (xsize,ysize,hsymfilter);
+hfiltershape = hfiltershape -mean(mean(hfiltershape));
+vfiltershape = GFilter2 (xsize,ysize,vsymfilter);
+vfiltershape = vfiltershape -mean(mean(vfiltershape));
+barfiltershape = GFilter2 (xsize*2,ysize*2,barsymfilter);
+barfiltershape = barfiltershape -mean(mean(barfiltershape));
+abarfiltershape = GFilter2 (xsize*2,ysize*2,barasymfilter);
+abarfiltershape = abarfiltershape -mean(mean(abarfiltershape));
+fhandle = figure; %create new figure
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+afourtr = fft2 (afiltershape);	%2d fast fourier transform
+hfourtr = fft2 (hfiltershape);	%2d fast fourier transform
+vfourtr = fft2 (vfiltershape);	%2d fast fourier transform
+bfourtr = fft2 (bfiltershape);	%2d fast fourier transform
+cfourtr = fft2 (cfiltershape);	%2d fast fourier transform
+ofourtr = fft2 (barfiltershape);	%2d fast fourier transform
+oafourtr = fft2 (abarfiltershape);	%2d fast fourier transform
+
+
+fourtr_ccorr = vfourtr.*conj(vfourtr);
+aucorr = ifft2 (fourtr_ccorr);		%inverse fft
+aucorr = real (aucorr);			%sometimes v.small complex 
+					%parts left from roundoff
+aucorr = fftshift (aucorr);		%shift so zero displacement is
+subplot (2,3,1);	
+draw (aucorr,-99,-99);			%draw auto correlation
+set(gca,'Ytick',[]);
+set(gca,'Xtick',[]);
+line([ 50 50], [0 100], 'Color', 'black');
+line([ 0 100], [50 50], 'Color', 'black');
+ylabel('Vertical Disparity');
+title ('a) Vertical RF');
+
+fourtr_ccorr = hfourtr.*conj(hfourtr);
+aucorr = ifft2 (fourtr_ccorr);		%inverse fft
+aucorr = real (aucorr);			%sometimes v.small complex 
+					%parts left from roundoff
+aucorr = fftshift (aucorr);		%shift so zero displacement is
+subplot (2,3,2);	
+draw (aucorr,-99,-99);			%draw auto correlation
+set(gca,'Ytick',[]);
+set(gca,'Xtick',[]);
+line([ 50 50], [0 100], 'Color', 'black');
+line([ 0 100], [50 50], 'Color', 'black');
+text(50,-30,'Zero phase and zero position disparity RDS stimulus','HorizontalAlignment','center');
+title ('b) Horizontal RF');
+
+fourtr_ccorr = afourtr.*conj(afourtr);
+aucorr = ifft2 (fourtr_ccorr);		%inverse fft
+aucorr = real (aucorr);			%sometimes v.small complex 
+					%parts left from roundoff
+aucorr = fftshift (aucorr);		%shift so zero displacement is
+subplot (2,3,3);	
+draw (aucorr,-99,-99);			%draw auto correlation
+set(gca,'Ytick',[]);
+set(gca,'Xtick',[]);
+line([ 50 50], [0 100], 'Color', 'black');
+line([ 0 100], [50 50], 'Color', 'black');
+title ('c) Diagonal RF');
+
+
+fourtr_ccorr = afourtr.*conj(bfourtr);
+aucorr = ifft2 (fourtr_ccorr);		%inverse fft
+aucorr = real (aucorr);			%sometimes v.small complex 
+					%parts left from roundoff
+aucorr = fftshift (aucorr);		%shift so zero displacement is
+subplot (2,3,4);	
+draw (aucorr,-99,-99);			%draw auto correlation
+set(gca,'Ytick',[]);
+set(gca,'Xtick',[]);
+line([ 50 50], [0 100], 'Color', 'black');
+line([ 0 100], [50 50], 'Color', 'black');
+title ('d) Postion Shift');
+
+fourtr_ccorr = afourtr.*conj(cfourtr);	%multiply by its own complex conjugate
+aucorr = ifft2 (fourtr_ccorr);		%inverse fft
+aucorr = real (aucorr);			%sometimes v.small complex 
+					%parts left from roundoff
+aucorr = fftshift (aucorr);		%shift so zero displacement is
+subplot (2,3,5);	
+draw (aucorr,-99,-99);			%draw auto correlation
+set(gca,'Ytick',[]);
+set(gca,'Xtick',[]);
+line([ 50 50], [0 100], 'Color', 'black');
+line([ 0 100], [50 50], 'Color', 'black');
+xlabel('Horizontal Disparity');
+title ('e) Phase Shift');
+text(-20,-30,'RDS stimulus','HorizontalAlignment','center');
+
+fourtr_ccorr = oafourtr.*conj(ofourtr);	%multiply by its own complex conjugate
+aucorr = ifft2 (fourtr_ccorr);		%inverse fft
+aucorr = real (aucorr);			%sometimes v.small complex 
+					%parts left from roundoff
+aucorr = fftshift (aucorr);		%shift so zero displacement is
+aucorr2 = aucorr(xsize/2:3*xsize/2,ysize/2:3*ysize/2);
+subplot (2,3,6);	
+draw (aucorr2,-99,-99);			%draw auto correlation
+set(gca,'Ytick',[]);
+set(gca,'Xtick',[]);
+line([ 50 50], [0 100], 'Color', 'black');
+line([ 0 100], [50 50], 'Color', 'black');
+title ('f) Phase Shift');
+text(50,-30,'Bar stimulus','HorizontalAlignment','center');
+text(-40,150,'"Orthogonal"','Rotation', 45);
+text(-20,145,'Disparity','Rotation', 45);
+arrow([-20 120], [ 100 0]);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%r = aucorr;				%return autocorrelation
+
+
+
+
+
+
+

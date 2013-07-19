@@ -1,0 +1,22 @@
+prefix = '\\lsr-bgc1/bgc/data/dufus/psych/';
+alldata = [];
+side = 'R';
+
+for j =1:100;
+  prop(j).xmin = -1;
+  prop(j).xmax = 1;
+  prop(j).nmin = 10;
+  prop(j).sdk = 10;
+  prop(j).sd = []; %force reading of only one sd
+  prop(j).title = [];
+end
+
+nplot = 1;
+alln = 1;
+prop(alln).file = 'Oct21';
+
+
+alln = alln +1;
+prop(alln).file = 'Oct21';
+
+makesummaries;

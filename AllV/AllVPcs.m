@@ -4193,6 +4193,10 @@ end
         else
             DataClusters{p}.Evec = ClusterDetails{p}.Evec;
         end
+        if ~isfield(DataClusters{p}.Evec,'chspk')
+            cprintf('blue','probe %d Evec missing chspk\n',p);
+            DataClusters{p}.Evec.chspk = DataClusters{p}.chspk;
+        end
     end
     DATA.xy{1} = xys{p};
     if savexy

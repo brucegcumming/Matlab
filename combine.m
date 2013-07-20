@@ -651,7 +651,7 @@ elseif strncmpi(name,'setexp',6)
         PlotCellList(DATA);
     end
     if strncmp(DATA.filetype,'Grid',4) && playspk 
-        if DATA.usenev
+        if DATA.state.usensx
            DATA = ReadGridFile(DATA);
             DATA.plot.useprobe = zeros(size(DATA.probelist));
         else
@@ -1472,12 +1472,14 @@ function DATA = ReadGridFile(DATA)
        end
    end
    idx = BuildGridIndex(datdir, DATA.Expts, 'reindex');
+   DATA.grididx = idx;
    id = find(idx.expt == DATA.currentexpt);
    bid = id;
    for j = 1:length(id)
        nfiles{j} = [datdir '/' idx.names{id(j)}];
    end
-   if length(bid) > 1
+   if DATA.state.usensx == 1 %using ns5 for spikes
+   elseif length(bid) > 1
        DATA = ReadGridFiles(DATA,nfiles, 'toff',idx.toff(bid));
    elseif length(bid) == 1
        DATA = ReadGridFiles(DATA,nfiles, 'toff',idx.toff(bid));
@@ -11332,7 +11334,7 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
     if DATA.state.somespikes == 2
 %if usenex == 2 it means reading spikes from NEV files. For now, can read these every time
         if (length(DATA.AllClusters) < eid || length(DATA.AllClusters{eid}) < pid)...
-                || DATA.state.usensx == 2 
+                || DATA.state.usensx == 1 
             if strncmp(DATA.filetype,'Grid',4)
                 DATA =  GetNS5Spikes(DATA, DATA.currentexpt,  pid);
             end

@@ -1,0 +1,89 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%show animation of receptive fields
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+clear;
+
+const = .8;
+freq = 4;
+samples = 128;
+sd = const * samples/freq;
+
+
+for i=-samples/2:samples/2
+[lc,ls,rc,rs] = Setup_gabor_rfs(i,samples,sd,freq);
+leftcos = [leftcos;lc];
+leftsin = [leftsin;ls];
+rightcos = [rightcos;rc];
+rightsin = [rightsin;rs];
+end
+figure(4);
+for i=1:samples
+subplot(2,1,1);
+plot(leftcos(i,:));
+hold on;
+plot(rightcos(i,:));
+hold off;
+subplot(2,1,2);
+plot(leftsin(i,:));
+hold on;
+plot(rightsin(i,:));
+hold off;
+pause(0.5);           
+end     
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%check gabor rfs
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+clear;
+
+const = .5;
+freq = 4;
+samples = 128;
+sd = const * samples/freq;
+[lc,ls,rc,rs] = Setup_gabor_rfs(0,samples,sd,freq);
+subplot(2,1,1);
+plot(lc);
+hold on;
+plot(rc);
+hold off;
+subplot(2,1,2);
+plot(rs);
+hold on;
+plot(ls);
+hold off;
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%test rds stimuli
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+clear
+[leftstim, rightstim]=Stim_rds_1d(-2,16)
+subplot(2,1,1);
+plot(leftstim);           
+title('leftstim');
+subplot(2,1,2);
+plot(rightstim);           
+title('rightstim');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%	
+%3f + 4f stimulus
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+clear
+for i= 1:32
+    [l,r] = stim_sine4f3f(0,32,4,i);
+    subplot(2,1,1);
+    plot(l)
+    subplot(2,1,2);
+    plot(r)
+    pause(0.2);
+end
+
+[l,r] = Stim_sine43(3,128,4,1);
+    subplot(2,1,1);
+    plot(l)
+    subplot(2,1,2);
+    plot(r)
+    pause(0.2);

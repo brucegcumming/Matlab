@@ -1,0 +1,675 @@
+function [out, n] = runonline(list, varargin)
+
+% Basic list -running GUI.
+% Two other functions required separately are
+%
+% doentry (id, OTTF) does requested action (plot,fit, etc) on selected file
+% setselect(OTTF) options setting panel.
+%
+% all the state variables are stored in the top figure, in OTTF
+
+
+global TOPTAG;
+if isempty(TOPTAG)
+    TOPTAG = 'runonlineTOPlevel';
+end
+
+j = 1;
+while j < nargin
+    if ischar(varargin{j})
+    if strncmpi(varargin{j},'Tag',3)
+        TOPTAG = varargin{j+1};
+        j = j+1;
+    elseif strncmpi(varargin{j},'function',7)
+        OTTF.xfunc = varargin{j+1};
+        j = j+1;
+    end
+end
+    j = j+1;
+end
+
+
+if(isempty(findobj('Tag',TOPTAG)))
+  if ~exist('list','var') | isempty(list)
+    list = './cedtlist.mall';
+else
+   % TOPTAG = list;
+  end
+    OTTF.tag.top = TOPTAG;
+     OTTF.tag.fig = 'OTTFDataPlot';
+     OTTF.tag.extra = 'OTTFExtraPlot';
+     OTTF.tag.figb = 'OTTFDataBPlot';
+     OTTF.tag.pop = 'OTTFPopPlot';
+     OTTF.tag.select = 'OTTFSelections';
+     OTTF.listtag = 'OTTFlist';
+     out = InitOTTF(list, OTTF, varargin{:});
+else
+     top = findobj('Tag',TOPTAG);
+     OTTF = get(top,'UserData');
+ end
+ 
+ if strcmpi(list,'getstate')
+     out = OTTF;
+     it = findobj('Tag',OTTF.listtag);
+     n = get(it, 'value');
+     return;    
+elseif strmatch('store',list)
+     top = findobj('Tag',TOPTAG);
+     set(top,'UserData',varargin{1});
+ elseif strmatch('Refresh',list)
+     OTTF.dir = get(findobj('Tag','Prefix'),'String');
+     id = findstr(OTTF.dir,'/');
+     if isempty(id)
+         system(['rsh lsr-bgc1 rc2tab ' OTTF.dir '/*rc*']);    
+     else
+         odir = OTTF.dir(id(1):end);
+         system(['rsh lsr-bgc1 rc2tab ' odir '/*rc*']);    
+     end
+     OTTF = relist(OTTF);
+     runonline('store',OTTF);
+ elseif strmatch('loadone',list)
+  LoadOTTFData(OTTF.fstrings{OTTF.id});
+elseif strmatch(list,'load')
+  LoadAllData;
+elseif strmatch(list,'Mark')
+    OTTF.data.marked(OTTF.id) = 1;
+    set(findobj('Tag',TOPTAG),'UserData',OTTF);
+elseif strmatch(list,'UnMark')
+    OTTF.data.marked(OTTF.id) = 0;
+    set(findobj('Tag',TOPTAG),'UserData',OTTF);
+    RePlot(OTTF);
+elseif strmatch(list,'PrintMarkList')
+    idx = find(OTTF.data.marked > 0);
+    fprintf('%s\n',OTTF.fstrings{idx});
+
+elseif strmatch(list,'close')
+  exit_ottf(OTTF);
+elseif strmatch(list,'popselect')
+  OTTF.cntrlbox = setselect(OTTF,OTTF.tag.select);
+  if ~isempty(OTTF.cntrlbox) && isfield(OTTF,'xfunc')
+     feval(OTTF.xfunc,'setselect');
+ end
+elseif strmatch(list,'TouchPoint')
+    j = varargin{2};
+    GetFigure(OTTF.tag.extra);
+    fprintf('%s\n',OTTF.fstrings{j});
+    if OTTF.plot.labels(j) > 0
+        delete(OTTF.plot.labels(j));
+        OTTF.plot.labels(j) = 0;
+    else
+        OTTF.plot.labels(j) = text(OTTF.plot.allx(j),OTTF.plot.ally(j),splitpath(OTTF.fstrings{j}));
+    end
+    OTTF.id = j;
+    set(findobj('Tag',TOPTAG),'UserData',OTTF);
+    doentry(j,OTTF);
+elseif strmatch(list,'popplot')
+    GetFigure(OTTF.tag.extra);
+    hold off;
+ for j = 1:length(OTTF.fstrings)
+     if exist(OTTF.fstrings{j},'file')
+         load(OTTF.fstrings{j});
+         quality = CheckSpike(Expt,'noplot');
+         plot(quality(1),quality(3),'o','buttondownfcn',['runonline(''TouchPoint'',gcf,' num2str(j) ')']);
+         OTTF.plot.allx(j) = quality(1);
+         OTTF.plot.ally(j) = quality(3);
+         OTTF.plot.labels(j) = 0;
+         plot(OTTF.plot.allx(j),OTTF.plot.ally(j),'o','buttondownfcn',['runonline(''TouchPoint'',gcf,' num2str(j) ')']);
+         if(OTTF.state.verbose)
+             fprintf('%s: %.2f %.2f\n',OTTF.fstrings{j},quality(1),quality(3));
+         end
+         hold on;
+     end
+ end
+elseif strmatch(list,'next')
+     it = findobj(gcf, 'Tag',OTTF.listtag);
+     n = get(it, 'value');
+     if n < length(OTTF.listids);
+       n = n+1;
+       set(it, 'value',n);
+       doentry(OTTF.listids(n),OTTF,'setid');
+     end
+elseif strmatch(list,'prev')
+     it = findobj(gcf, 'Tag',OTTF.listtag);
+     n = get(it, 'value');
+     if n > 1
+       n = n-1;
+       set(it, 'value',n);
+       doentry(OTTF.listids(n),OTTF,'setid');
+     end
+elseif strmatch(list,'update')
+     OTTF.prefix = get(findobj('Tag','Prefix'),'String');
+     OTTF.plot.legendpos = get(findobj('Tag','LegendPos'),'value') -1;
+     OTTF.state.verbose = get(findobj('Tag','Verbose'),'value');
+     OTTF.plot.combine = get(findobj('Tag','Combine'),'value');
+     OTTF.plot.reverse = get(findobj('Tag','Reverse'),'value');
+     OTTF.plot.autoplot = get(findobj('Tag','Autoplot'),'value');
+     if ~isempty(findobj('Tag','ForceZero'))
+         OTTF.plot.forcezero = get(findobj('Tag','ForceZero'),'value');
+         OTTF.plot.smoothing = get(findobj('Tag','Smooth'),'value');
+     end
+     runonline('store',OTTF);
+     if OTTF.plot.autoplot
+         PlotCurrent;
+     end
+
+elseif strmatch(list,'setplot')
+     SetPlotTypes;
+     if OTTF.plot.autoplot
+         PlotCurrent;
+     end
+elseif strmatch(list,'setentry')
+    if OTTF.plot.autoplot
+        PlotCurrent;
+    end
+elseif strmatch(list,'Plot')
+    PlotCurrent;
+elseif strmatch(list,'relist')
+     listtype= get(findobj('Tag','ListType'),'value');
+     relist(listtype);
+end
+
+
+function RePlot(OTTF)
+
+GetFigure(OTTF.tag.extra);
+hold off;
+for j = 1:length(OTTF.plot.allx)
+    plot(OTTF.plot.allx(j),OTTF.plot.ally(j),'o','buttondownfcn',['runonline(''TouchPoint'',gcf,' num2str(j) ')']);
+    hold on;
+end
+
+function doentry(id, OTTF,varargin)
+   
+j = 1;
+while(j < nargin - 1)
+    if strncmpi(varargin{j},'setid',5)
+        OTTF.id = id;
+    end
+    j = j+1;
+end
+
+argon = {};
+   if get(findobj('Tag','LFP'),'value')
+       argon = {argon{:} {'lfp'}};
+   end
+   if get(findobj('Tag','ShowN'),'value')
+       argon = {argon{:} {'ShowN'}};
+   end
+
+  if get(findobj('Tag','Pcolor'),'value')
+       argon = {argon{:} {'pcolor'}};
+   end
+
+   if strncmpi('rates',OTTF.plot.onetype,5)
+        argon = {argon{:} {'rates'}};
+    end
+    if strncmp('SDF',OTTF.plot.onetype,3)
+        argon = {argon{:} {'sdf'} {'showsum'}};
+    end
+
+   GetFigure(OTTF.tag.fig);
+ if strmatch(OTTF.plot.onetype,'Spike')
+     load(OTTF.fstrings{id});
+     CheckSpike(Expt);
+
+ elseif strmatch(OTTF.plot.onetype,'VHDisp')
+     data = PlotExpt(OTTF.fstrings{id},'legendpos',OTTF.plot.legendpos,argon{:});
+     theta = pi/2 - (GetEval(data.Data,'Ro') * pi/180);
+     xi = data.x;
+     yi = data.y;
+     if OTTF.plot.smoothing
+         xi = linspace(min(data.x),max(data.x),range(data.x)/40);
+         yi = linspace(min(data.y),max(data.y),range(data.y)/40);
+         [xxi, yyi] = meshgrid(xi,yi);
+         xinc = 0.1;
+         yinc = 0.1;
+         %Gauassian smoothing interpolation instead
+         if(xinc < yinc)
+             smoothing = yinc/2;
+         else
+             smoothing = xinc/2;
+         end
+         zi = Interpf(X,Y,Z,xxi,yyi,1,smoothing);
+     end
+         data.dx = data.x .* cos(theta) + data.y * sin(theta);
+         data.dy = data.y * cos(theta) - data.x * sin(theta);
+         [X,Y,Z] = fillpmesh(data.dx,data.dy,data.means);
+         hold off;
+     pcolor(X,Y,Z);
+     if OTTF.plot.forcezero
+         zlim = caxis;
+         caxis([0 zlim(2)]);
+     end
+     colorbar;
+     axis('image');
+     OTTF.data.plotdata{id} = data; 
+     title(splitpath(OTTF.data.plotdata{id}.name));
+ elseif isfield(OTTF,'xfunc')
+     OTTF = feval(OTTF.xfunc,'DATA',OTTF,varargin{:});
+     OTTF.test = 1;
+ else
+     np = 1;
+     if OTTF.plot.combine
+         for j = 1:length(id)
+             mafile = strrep(OTTF.fstrings{id(j)},'.st','.ma');
+             exps{np} = ReadOnline(mafile);
+             np = np+1;
+         end
+         Expt = AddExpts(exps{:});
+         argon = CheckExpt(Expt,argon);
+         hold off
+         if(Expt.isrc)
+             PlotRevCor(Expt,'sdfw',100,argon{:});
+         elseif(OTTF.plot.reverse)
+             OTTF.data.plotdata{id(j)} = PlotRates(Expt, Expt.Stimvals.e2, 'type2',Expt.Stimvals.et, 'legendpos',OTTF.plot.legendpos,argon{:});
+         else
+             OTTF.data.plotdata{id(j)} = PlotRates(Expt, Expt.Stimvals.et, 'type2',Expt.Stimvals.e2, 'legendpos',OTTF.plot.legendpos,argon{:});
+         end
+     else
+         alltitle = [];
+         for j = 1:length(id)
+             mafile = strrep(OTTF.fstrings{id(j)},'.st','.ma');
+             Expt = ReadOnline(mafile);
+             argon = CheckExpt(Expt,argon);
+             if np > 1
+                 hold on;
+             else
+                 hold off;
+             end
+             OTTF.data.plotdata{id(j)} = PlotRates(Expt, Expt.Stimvals.et, 'type2',Expt.Stimvals.e2, 'legendpos',OTTF.plot.legendpos,argon{:});
+             alltitle = [alltitle sprintf('%s\n',OTTF.data.plotdata{id(j)}.title)];
+             np = np+1;
+         end
+         title(alltitle)
+     end
+ end
+ runonline('store',OTTF);
+
+
+
+ function args = CheckExpt(Expt,args)
+
+     if Expt.Stimvals.st == 2 || Expt.Stimvals.st == 15  %% RDS or RLS
+         args = {args{:} 'Uncorr'};
+     end
+     if strmatch(Expt.Stimvals.et,'sf')
+         args = {args{:} 'LogX'};
+     end
+
+
+     function PlotCurrent()
+         [OTTF, n] = runonline('getstate');
+
+         doentry(OTTF.listids(n),OTTF,'setid');
+
+         function SetPlotTypes()
+             %SetPlotTypes looks at the values of the menus for selecting
+             %plot types, and records them in OTTF for use elsewhere
+
+             OTTF = runonline('getstate');
+
+             it = findobj('Tag','plottype');
+             type = get(it, 'value');
+             str = get(it, 'String');
+             OTTF.plot.onetype = strrep(str(type,:),' ',''); %The string shown on the menu.
+
+             it = findobj('Tag','extraplot');
+             if ~isempty(it)
+                 type = get(it, 'value');
+                 str = get(it, 'String');
+                 OTTF.plot.extraplot = strrep(str(type,:),' ',''); %The string shown on the menu.
+             end
+             doentry(OTTF.id,OTTF);
+             runonline('store',OTTF);
+
+
+             function LoadAllData()
+                 global OTTF;
+
+                 for j = 1:length(OTTF.fstrings)
+                     fprintf('%s',OTTF.fstrings{j});
+                     LoadOTTFData(OTTF.fstrings{j});
+                 end
+
+                 function CloseTag(tag)
+                     it = findobj('Tag',tag);
+                     if ~isempty(it)
+                         close(it);
+                     end
+
+
+                     function exit_ottf(OTTF)
+                         names = fieldnames(OTTF.tag);
+                         for j = 1:length(names)
+                             eval(['CloseTag(OTTF.tag.' names{j} ');']);
+                         end
+                         return;
+
+
+                         function OTTF = relist(OTTF)
+
+
+                             lso = dir(OTTF.dir);
+                             sts = regexp({lso.name},'.st[0-9]*$');
+                             OTTF.strings = {};
+                             for j = 1:length({lso.name})
+                                 if ~isempty(sts{j})
+                                     if isfield(OTTF,'strings') & ~isempty(OTTF.strings)
+                                         OTTF.strings = {OTTF.strings{:} lso(j).name};
+                                     else
+                                         OTTF.strings{1} = lso(j).name;
+                                     end
+                                 end
+                             end
+
+                             for j = 1:length(OTTF.strings)
+                                 OTTF.fstrings{j} = [OTTF.dir '/' OTTF.strings{j}];
+                                 e = ReadOnline(OTTF.fstrings{j},'Header');
+                                 OTTF.strings{j} = sprintf('%s %.1f %.1f',OTTF.strings{j},e.Stimvals.ns,e.Stimvals.nr);
+                                 if isfield(e.Stimvals,'pt') & e.Stimvals.pt > 1
+                                     OTTF.strings{j} = [OTTF.strings{j} sprintf(' %dRC',e.Stimvals.nf+1)];
+                                 end
+                                 OTTF.listids(j) = j;
+                             end
+
+                             lst = findobj('Tag',OTTF.listtag);
+                             set(lst, 'String',OTTF.strings,'value',1);
+
+                             function OTTF = InitOTTF(odir, OTTF, varargin)
+                                 global bgcfileprefix;
+
+                                 if ~exist(odir,'dir')
+                                     fprintf('No Dir %s',odir);
+                                     return;
+                                 end
+
+                                 lso = dir(odir);
+                                 sts = regexp({lso.name},'.st[0-9]*$');
+                                 mas =  regexp({lso.name},'.rc[0-9]*$');
+                                 if isfield(OTTF,'strings')
+                                     OTTF = rmfield(OTTF,'strings');
+                                 end
+                                 for j = 1:length({lso.name})
+                                     if ~isempty(sts{j})
+                                         name = lso(j).name;
+                                     elseif ~isempty(mas{j})
+                                         %%
+                                         %% Cannot execute dos commands (like rsh) if cwd is a network drive.
+                                         %% So have to run this from a non-network drive, and give the full
+                                         %% network path.  Need to strip off the hostname bit before rshing to
+                                         %% bgc1
+                                         name = strrep(lso(j).name,'.ma','.st');
+                                         if ~isempty(strmatch(name,{lso.name}))
+                                             name = [];
+                                         elseif ispc
+                                             id = findstr(odir,'/');
+                                             ndir = odir(id(1):end);
+                                             system(['rsh lsr-bgc1 rc2tab ' ndir '/' lso(j).name]);
+                                         else
+                                             system(['rc2tab ' odir '/' lso(j).name]);
+                                         end
+                                     else
+                                         name = [];
+                                     end
+                                 end
+
+                                 OTTF.dir = odir;
+                                 OTTF = relist(OTTF);
+
+
+                                 if ~isempty(bgcfileprefix)
+                                     OTTF.prefix = bgcfileprefix;
+                                 else
+                                     OTTF.prefix = '';
+                                 end
+OTTF.listids = 1:length(OTTF.fstrings);
+OTTF.state.showonset= 0;
+OTTF.state.minsacs = 1;
+OTTF.state.minspikes = 1;
+OTTF.state.mintrials = 1;
+OTTF.state.minsacsize = 0.1;
+OTTF.state.maxsacsize = 1.0;
+OTTF.state.addedspikes = 0;
+OTTF.state.invertspikes = 0;
+OTTF.state.rebuild = 0;
+OTTF.state.verbose = 0;
+OTTF.state.includeratio = 0.5;
+OTTF.state.dirw = 0.5;
+OTTF.plot.onetype = 'Saccade';
+OTTF.plot.tftype = 1;
+OTTF.plot.sizetype = 1;
+OTTF.plot.poptype = 1;
+OTTF.plot.sdfsmooth = 150;
+OTTF.plot.sdftype = 'exp';
+OTTF.plot.legendtype = 1;
+OTTF.plot.sdfstart = -5000;
+OTTF.plot.sdfend = 5000;
+OTTF.plot.sdfstep = 20;
+OTTF.plot.legendpos = 2;
+OTTF.plot.extraplot = 'None';
+OTTF.plot.forcezero = 0;
+OTTF.plot.autoplot = 0;
+OTTF.plot.smoothing = 0;
+OTTF.plot.combine = 1;
+OTTF.plot.reverse = 0;
+
+
+j = 1;
+while(j < nargin-1)
+    if strncmpi(varargin{j},'prefix',5)
+        j = j+1
+        OTTF.prefix = varargin{j};
+    elseif strncmpi(varargin{j},'verbose',5)
+        j = j+1
+        OTTF.state.verbose = 1;
+    end
+    j = j+1;
+end
+
+
+if ~isempty(OTTF.prefix)
+    for j = 1:length(OTTF.fstrings)
+        OTTF.fstrings{j} = [OTTF.prefix OTTF.fstrings{j}];
+    end
+end
+
+for j = 1:length(OTTF.fstrings)
+    OTTF.data.marked(j) = 0;
+end
+
+idx = findstr(odir,'/');
+if isempty(idx)
+  idx = findstr(odir,'\\');
+end
+if isempty(idx)
+  listname = odir;
+else
+  listname = odir(idx(end)+1:end);
+end
+
+  scrsz = get(0,'Screensize');
+  boxw = 270;
+  cntrl_box = figure('Position', [100 scrsz(4)-320 boxw 280],...
+       'NumberTitle', 'off', 'Tag',OTTF.tag.top,'Name',sprintf('OTTF %s (%d)',listname,length(OTTF.fstrings)));
+  lst = uicontrol(gcf, 'Style','listbox','String',OTTF.strings,...
+      'Max',10,...
+		'Callback', ' runonline(''setentry'')','Tag',OTTF.listtag,...
+		'Position',[10 10 250 150]);
+
+  SPACE = 3;
+  VSPACE = 10;
+  cw = 10;
+
+  bp(1) = SPACE; bp(2) = 160; bp(3) = 40; bp(4) = 22;
+  uicontrol(gcf,'Style', 'pushbutton', 'Callback', ' runonline(''next'')',...
+'String', '>>', 'Position', bp);
+
+  bp(1) = bp(1) + bp(3)+SPACE;
+  uicontrol(gcf,'Style', 'pushbutton', 'Callback', ' runonline(''prev'')',...
+'String', '<<', 'Position', bp);
+
+
+
+bp(1) = bp(1) + bp(3)+SPACE;
+bp(3) = 40;
+uicontrol(gcf,'Style', 'pushbutton', 'Callback', ' runonline(''Refresh'')',...
+'String', 'Refresh', 'Position', bp);
+bp(1) = bp(1) + bp(3)+SPACE;
+bp(3) = 40;
+uicontrol(gcf,'Style', 'pushbutton', 'Callback', ' runonline(''Plot'')',...
+'String', 'Plot', 'Position', bp);
+bp(1) = bp(1)+bp(3)+SPACE;
+bp(3) = 70;
+uicontrol(gcf,'style','pop','string','Counts|Rates|SDF', ...
+    'Callback', ' runonline(''setplot'')', 'Tag','plottype',...
+    'position',bp,'value',1);
+
+
+bp(1) = SPACE;
+bp(2) = bp(2)+bp(4)+VSPACE;
+bp(3) = boxw-SPACE;
+uicontrol(gcf,'Style', 'edit', 'Callback', 'runonline(''Refresh'')',...
+'String', OTTF.dir, 'Tag', 'Prefix','Position', bp);
+
+
+    bp(1) = SPACE; bp(3) = 25; bp(2) = bp(2) + bp(4)+VSPACE; bp(4) = 22;
+bp(3) = 50;
+  uicontrol(gcf,'Style', 'checkbox','Callback', ' runonline(''update'')',...
+'String', 'Auto', 'Tag', 'Autoplot', 'Position', bp,'value',OTTF.plot.autoplot);
+
+
+  bp(1) = bp(1)+bp(3)+SPACE;
+  uicontrol(gcf,'Style', 'checkbox','Callback', ' runonline(''update'')',...
+'String', 'ShowN', 'Tag', 'ShowN', 'Position', bp);
+
+bp(1) = bp(1)+bp(3)+SPACE;
+bp(3) = 6*cw;
+  uicontrol(gcf,'Style', 'checkbox',...
+'String', 'Pcolor', 'Tag', 'Pcolor', 'Position', bp);
+
+bp(1) = bp(1)+bp(3)+SPACE;
+  uicontrol(gcf,'Style', 'checkbox','Callback', ' runonline(''update'')',...
+'String', 'Verbose', 'Tag', 'Verbose', 'Position', bp);
+
+bp(1) = bp(1)+bp(3)+SPACE;
+  uicontrol(gcf,'Style', 'checkbox','Callback', ' runonline(''update'')',...
+'String', 'Combine', 'Tag', 'Combine', 'Position', bp);
+bp(1) = SPACE;
+bp(2) = bp(2)+bp(4)+SPACE;
+  uicontrol(gcf,'Style', 'checkbox','Callback', ' runonline(''update'')',...
+'String', 'Reverse', 'Tag', 'Reverse', 'Position', bp);
+
+  bp(1) = bp(1) +bp(3) + SPACE;
+  uicontrol(gcf,'Style', 'text','String','Legend','Position', bp);
+  bp(1) = bp(1) +bp(3) + SPACE;
+  bp(3) = 70;
+  uicontrol(gcf,'style','pop','string','Auto|UR|UL|LL|LR|Off|None', ...
+		    'Callback', ' runonline(''update'')', 'Tag','LegendPos',...
+		    'position',bp);
+  
+  x = 10; y = 180;
+
+  hm = uimenu(gcf,'Label','Mark');
+  uimenu(hm,'Label','&Mark','Callback','runonline(''Mark'')');
+  uimenu(hm,'Label','UnMark','Callback','runonline(''UnMark'')');
+  uimenu(hm,'Label','List','Callback','runonline(''PrintMark'')');
+  uimenu(hm,'Label','UnMark All','Callback','runonline(''UnMarkAll'')');
+  uimenu(hm,'Label','Load One','Callback',' runonline(''loadone'')');
+  uimenu(hm,'Label','Load All','Callback',' runonline(''load'')');
+  uimenu(hm,'Label','Close','Callback',' runonline(''close'')');
+  hm = uimenu(gcf,'Label','Options');
+  uimenu(hm,'Label','Options','Callback',' runonline(''popselect'')');
+  set(gcf,'Menubar','none');
+  hm = uimenu(gcf,'Label','&Next','Callback','runonline(''next'');');
+
+OTTF.figid.mainplot = figure('Tag',OTTF.tag.fig,'Position',[300 scrsz(4)-470 512 ...
+		    400]);
+OTTF.id = 1;
+set(cntrl_box,'UserData',OTTF);
+
+function data = Condense(res)
+
+
+data.sf = res.x;
+data.n = res.n;
+data.eye = res.y;
+data.count = res.means;
+data.sd = res.sd;
+data.name = res.name;
+data.extras = res.extras;
+data.width = GetEVal(res.Data,'wi');
+data.height = GetEVal(res.Data,'hi');
+data.ori = GetEVal(res.Data,'or');
+data.x = GetEVal(res.Data,'xo');
+data.y = GetEVal(res.Data,'yo');
+
+
+fz = GetEval(res.Data,'fz');
+if isnan(fz)
+    fz = 72.24;
+end
+dur = mean([res.Data.Trials.End] - [res.Data.Trials.Start]);
+data.duration = round(dur * fz/10000) * 1000/fz;
+
+
+function OTTF = GetSimple(OTTF, varargin)
+
+
+[a, b, names] = textread('../tf/simplelist','%f %f %s');
+
+for j = 1:length(OTTF.fstrings)
+    name = splitpath(OTTF.fstrings{j});
+    OTTF.data.sxcx(j) = NaN;
+    for k = 1:length(names)
+        if strncmp(names{k},name,11)
+            OTTF.data.sxcx(j) = b(k);
+        end
+    end
+end
+runonline('store',OTTF);
+
+
+function cntrl_box = setselect(OTTF, tag)
+
+cntrl_box = [];
+
+if isempty(findobj('Tag',tag))
+    
+    if isempty(OTTF.plot.forcezero)
+        OTTF.plot.forcezero = 0;
+    end
+    if isempty(OTTF.plot.autoplot)
+        OTTF.plot.autoplot = 0;
+    end
+    if isempty(OTTF.plot.smoothing)
+        OTTF.plot.smoothing = 0;
+    end
+
+  SPACE = 5;
+  VSPACE = 2;
+  h = 220;
+  scrsz = get(0,'Screensize');
+ wsc = scrsz(3) /1000;
+  cntrl_box = figure('Position', [200 scrsz(4)-(h+30)*wsc 280*wsc h*wsc], 'Menubar', 'none',...
+       'NumberTitle', 'off', 'Tag',tag,'Name','Section Criteria');
+
+   cw = 16;
+   ch = 18;
+   bh = 18*wsc;
+   bp(1) = SPACE;
+   bp(2) = ch+VSPACE;
+   bp(3) = cw*7;
+   bp(4) = ch;
+  
+  uicontrol(gcf,'Style', 'CheckBox','String','Force Zero','Position', bp,...
+      'Tag','ForceZero','Callback','runonline(''update'')','value',OTTF.plot.forcezero);
+  bp(1) = bp(1) + bp(3) + SPACE;
+  bp(3) = cw*5;
+    uicontrol(gcf,'Style', 'CheckBox','String','Smooth','Position', bp,...
+      'Tag','Smooth','Callback','runonline(''update'')','value',OTTF.plot.smoothing);
+
+  OTTF.wsc = wsc;
+  OTTF.cntrlbox = cntrl_box;
+  OTTF.selectlast = bp(2);
+  runonline('store',OTTF);
+end

@@ -1,0 +1,550 @@
+%!PS-Adobe-3.0 
+%%Creator: MATLAB, The Mathworks, Inc.
+%%Title: /home/bgc/matlab/duf025.ps
+%%CreationDate: 02/28/ 1  22:18:58
+%%DocumentNeededFonts: Helvetica
+%%DocumentProcessColors: Cyan Magenta Yellow Black
+%%LanguageLevel: 2
+%%Pages: (atend)
+%%BoundingBox: (atend)
+%%EndComments
+
+%%BeginProlog
+
+% MathWorks dictionary
+/MathWorks 160 dict begin
+
+% definition operators
+/bdef {bind def} bind def
+/ldef {load def} bind def
+/xdef {exch def} bdef
+/xstore {exch store} bdef
+
+% operator abbreviations
+/c  /clip ldef
+/cc /concat ldef
+/cp /closepath ldef
+/gr /grestore ldef
+/gs /gsave ldef
+/mt /moveto ldef
+/np /newpath ldef
+/cm /currentmatrix ldef
+/sm /setmatrix ldef
+/rc {rectclip} bdef
+/rf {rectfill} bdef
+/rm /rmoveto ldef
+/rl /rlineto ldef
+/s /show ldef
+/sc {setcmykcolor} bdef
+/sr /setrgbcolor ldef
+/sg /setgray ldef
+/w /setlinewidth ldef
+/j /setlinejoin ldef
+/cap /setlinecap ldef
+
+% page state control
+/pgsv () def
+/bpage {/pgsv save def} bdef
+/epage {pgsv restore} bdef
+/bplot /gsave ldef
+/eplot {stroke grestore} bdef
+
+% orientation switch
+/portraitMode 	0 def
+/landscapeMode 	1 def
+
+% coordinate system mappings
+/dpi2point 0 def
+
+% font control
+/FontSize 0 def
+/FMS {
+	/FontSize xstore		%save size off stack
+	findfont
+	[FontSize 0 0 FontSize neg 0 0]
+	makefont
+	setfont
+	}bdef
+
+/reencode {
+exch dup where
+{pop load} {pop StandardEncoding} ifelse
+exch
+dup 3 1 roll
+findfont dup length dict begin
+  { 1 index /FID ne {def}{pop pop} ifelse } forall
+  /Encoding exch def
+  currentdict
+end
+definefont pop
+} bdef
+
+/isroman {
+findfont /CharStrings get
+/Agrave known
+} bdef
+
+/FMSR {
+3 1 roll 1 index
+dup isroman
+{reencode} {pop pop} ifelse
+exch FMS
+} bdef
+
+/csm {
+	1 dpi2point div -1 dpi2point div scale
+	neg translate
+	landscapeMode eq {90 rotate} if
+	} bdef
+
+% line types: solid, dotted, dashed, dotdash
+/SO { [] 0 setdash } bdef
+/DO { [.5 dpi2point mul 4 dpi2point mul] 0 setdash } bdef
+/DA { [6 dpi2point mul] 0 setdash } bdef
+/DD { [.5 dpi2point mul 4 dpi2point mul 6 dpi2point mul 4 dpi2point mul] 0 setdash } bdef
+
+% macros for lines and objects
+/L {
+	lineto
+	stroke
+	} bdef
+/MP {
+	3 1 roll moveto
+	1 sub {rlineto} repeat
+	} bdef
+/AP {
+	{rlineto} repeat
+	} bdef
+/PP {
+	closepath eofill
+	} bdef
+/DP {
+	closepath stroke
+	} bdef
+/MR {
+	4 -2 roll moveto
+	dup  0 exch rlineto
+	exch 0 rlineto
+	neg  0 exch rlineto
+	closepath
+	} bdef
+/FR {
+	MR stroke
+	} bdef
+/PR {
+	MR fill
+	} bdef
+/L1i {
+	{ currentfile picstr readhexstring pop } image
+	} bdef
+
+/tMatrix matrix def
+/MakeOval {
+	newpath
+	tMatrix currentmatrix pop
+	translate scale
+	0 0 1 0 360 arc
+	tMatrix setmatrix
+	} bdef
+/FO {
+	MakeOval
+	stroke
+	} bdef
+/PO {
+	MakeOval
+	fill
+	} bdef
+
+/PD {
+	currentlinecap 1 setlinecap 3 1 roll 2 copy moveto lineto stroke setlinecap
+	} bdef
+
+/FA {
+	newpath
+	tMatrix currentmatrix pop
+	translate scale
+	0 0 1 5 -2 roll arc
+	tMatrix setmatrix
+	stroke
+	} bdef
+/PA {
+	newpath
+	tMatrix currentmatrix pop
+	translate 0 0 moveto scale
+	0 0 1 5 -2 roll arc
+	closepath
+	tMatrix setmatrix
+	fill
+	} bdef
+
+/FAn {
+	newpath
+	tMatrix currentmatrix pop
+	translate scale
+	0 0 1 5 -2 roll arcn
+	tMatrix setmatrix
+	stroke
+	} bdef
+/PAn {
+	newpath
+	tMatrix currentmatrix pop
+	translate 0 0 moveto scale
+	0 0 1 5 -2 roll arcn
+	closepath
+	tMatrix setmatrix
+	fill
+	} bdef
+
+/vradius 0 def
+/hradius 0 def
+/lry 0 def
+/lrx 0 def
+/uly 0 def
+/ulx 0 def
+/rad 0 def
+
+/MRR {
+	/vradius xdef
+	/hradius xdef
+	/lry xdef
+	/lrx xdef
+	/uly xdef
+	/ulx xdef
+	newpath
+	tMatrix currentmatrix pop
+	ulx hradius add uly vradius add translate
+	hradius vradius scale
+	0 0 1 180 270 arc 
+	tMatrix setmatrix
+	lrx hradius sub uly vradius add translate
+	hradius vradius scale
+	0 0 1 270 360 arc
+	tMatrix setmatrix
+	lrx hradius sub lry vradius sub translate
+	hradius vradius scale
+	0 0 1 0 90 arc
+	tMatrix setmatrix
+	ulx hradius add lry vradius sub translate
+	hradius vradius scale
+	0 0 1 90 180 arc
+	tMatrix setmatrix
+	closepath
+	} bdef
+/FRR {
+	MRR stroke } bdef
+/PRR {
+	MRR fill } bdef
+
+/MlrRR {
+	/lry xdef
+	/lrx xdef
+	/uly xdef
+	/ulx xdef
+	/rad lry uly sub 2 div def
+	newpath
+	tMatrix currentmatrix pop
+	ulx rad add uly rad add translate
+	rad rad scale
+	0 0 1 90 270 arc
+	tMatrix setmatrix
+	lrx rad sub lry rad sub translate
+	rad rad scale
+	0 0 1 270 90 arc
+	tMatrix setmatrix
+	closepath
+	} bdef
+/FlrRR {
+	MlrRR stroke } bdef
+/PlrRR {
+	MlrRR fill } bdef
+
+/MtbRR {
+	/lry xdef
+	/lrx xdef
+	/uly xdef
+	/ulx xdef
+	/rad lrx ulx sub 2 div def
+	newpath
+	tMatrix currentmatrix pop
+	ulx rad add uly rad add translate
+	rad rad scale
+	0 0 1 180 360 arc
+	tMatrix setmatrix
+	lrx rad sub lry rad sub translate
+	rad rad scale
+	0 0 1 0 180 arc
+	tMatrix setmatrix
+	closepath
+	} bdef
+/FtbRR {
+	MtbRR stroke } bdef
+/PtbRR {
+	MtbRR fill } bdef
+
+currentdict end def
+%%EndProlog
+
+%%BeginSetup
+MathWorks begin
+
+0 cap
+
+end
+%%EndSetup
+
+%%Page: 1 1
+%%BeginPageSetup
+%%PageBoundingBox:    65   210   543   589
+MathWorks begin
+bpage
+%%EndPageSetup
+
+%%BeginObject: obj1
+bplot
+
+/dpi2point 12 def
+portraitMode 0216 7344 csm
+
+  571   273  5738  4541 rc
+93 dict begin %Colortable dictionary
+/c0 { 0 0 0 sr} bdef
+/c1 { 1 1 1 sr} bdef
+/c2 { 1 0 0 sr} bdef
+/c3 { 0 1 0 sr} bdef
+/c4 { 0 0 1 sr} bdef
+/c5 { 1 1 0 sr} bdef
+/c6 { 1 0 1 sr} bdef
+/c7 { 0 1 1 sr} bdef
+c0
+1 j
+1 sg
+   0    0 6918 5185 rf
+6 w
+0 4224 5360 0 0 -4224 899 4613 4 MP
+PP
+-5360 0 0 4224 5360 0 0 -4224 899 4613 5 MP stroke
+4 w
+DO
+SO
+6 w
+0 sg
+ 899 4613 mt 6259 4613 L
+ 899  389 mt 6259  389 L
+ 899 4613 mt  899  389 L
+6259 4613 mt 6259  389 L
+ 899 4613 mt 6259 4613 L
+ 899 4613 mt  899  389 L
+1346 4613 mt 1346 4559 L
+1346  389 mt 1346  443 L
+%%IncludeResource: font Helvetica
+/Helvetica /ISOLatin1Encoding 120 FMSR
+
+1193 4759 mt 
+(-0.5) s
+1792 4613 mt 1792 4559 L
+1792  389 mt 1792  443 L
+1639 4759 mt 
+(-0.4) s
+2239 4613 mt 2239 4559 L
+2239  389 mt 2239  443 L
+2086 4759 mt 
+(-0.3) s
+2686 4613 mt 2686 4559 L
+2686  389 mt 2686  443 L
+2533 4759 mt 
+(-0.2) s
+3132 4613 mt 3132 4559 L
+3132  389 mt 3132  443 L
+2979 4759 mt 
+(-0.1) s
+3579 4613 mt 3579 4559 L
+3579  389 mt 3579  443 L
+3546 4759 mt 
+(0) s
+4026 4613 mt 4026 4559 L
+4026  389 mt 4026  443 L
+3943 4759 mt 
+(0.1) s
+4472 4613 mt 4472 4559 L
+4472  389 mt 4472  443 L
+4389 4759 mt 
+(0.2) s
+4919 4613 mt 4919 4559 L
+4919  389 mt 4919  443 L
+4836 4759 mt 
+(0.3) s
+5366 4613 mt 5366 4559 L
+5366  389 mt 5366  443 L
+5283 4759 mt 
+(0.4) s
+5812 4613 mt 5812 4559 L
+5812  389 mt 5812  443 L
+5729 4759 mt 
+(0.5) s
+ 899 4613 mt  953 4613 L
+6259 4613 mt 6205 4613 L
+ 628 4657 mt 
+(-0.4) s
+ 899 3909 mt  953 3909 L
+6259 3909 mt 6205 3909 L
+ 628 3953 mt 
+(-0.2) s
+ 899 3205 mt  953 3205 L
+6259 3205 mt 6205 3205 L
+ 798 3249 mt 
+(0) s
+ 899 2501 mt  953 2501 L
+6259 2501 mt 6205 2501 L
+ 698 2545 mt 
+(0.2) s
+ 899 1797 mt  953 1797 L
+6259 1797 mt 6205 1797 L
+ 698 1841 mt 
+(0.4) s
+ 899 1093 mt  953 1093 L
+6259 1093 mt 6205 1093 L
+ 698 1137 mt 
+(0.6) s
+ 899  389 mt  953  389 L
+6259  389 mt 6205  389 L
+ 698  433 mt 
+(0.8) s
+ 899 4613 mt 6259 4613 L
+ 899  389 mt 6259  389 L
+ 899 4613 mt  899  389 L
+6259 4613 mt 6259  389 L
+gs 899 389 5361 4225 rc
+
+% Quadrilateral Solid Rendering Routines
+MathWorks begin
+/X0 0 def /Y0 0 def /X1 0 def /Y1 0 def /X2 0 def /Y2 0 def
+/AX 0 def /AY 0 def /CX 0 def /CY 0 def /DX 0 def /DY 0 def
+/C30 0 def /C0 0 def /C10 0 def /C20 0 def /C4 0 def
+/M 0 def /N 0 def
+/min { 2 copy gt { exch } if pop } bdef
+/max { 2 copy lt { exch } if pop } bdef
+/triangle_xfd { /Y2 xdef /X2 xdef
+          /Y1 xdef /X1 xdef /Y0 xdef /X0 xdef} bdef
+/xfd {/AX X1 X0 sub def /AY Y1 Y0 sub def
+/CX X2 X0 sub def /CY Y2 Y0 sub def
+/DX X0 def /DY Y0 def} bdef
+0 0 0 0 0 0 triangle_xfd xfd 
+/triangle_cl {np DX DY mt AX AY rl CX AX sub CY AY sub rl cp c np} bdef
+/triangle_tf {[ AX AY CX CY DX DY ] cc} bdef
+/triangle_det { AX CY mul AY CX mul ne } bdef
+/NI 16 def	% NI can be 4 (draft), 8 (medium) , or 16 (high-res)
+/log2N NI log 2 log div neg cvi def
+/N1 NI 1 sub def  /N2 NI NI mul def  /N21 N2 1 sub def
+/CS 0.255 N1 div def  /C4S CS N1 div def
+/quad_interp_cd {3 index 2 copy sub CS mul /C30 xdef 0.255 mul /C0 xdef
+            4 2 roll 2 copy sub neg CS mul /C10 xdef
+            sub sub sub C4S mul /C4 xdef} bdef
+            0 0 0 0 quad_interp_cd
+/quad_interp_fcn {cvi dup N1 and exch log2N bitshift 2 copy
+  mul C4 mul exch C10 mul add exch C30 mul add C0 add cvi} bdef
+/quad_interp_image{ 0 1 N21 { 1 index exch dup quad_interp_fcn put } for pop} bdef
+/triangle_interp_cd {2 index sub CS mul /C20 xdef        1 index sub CS mul /C10 xdef        0.255 mul /C0 xdef} bdef
+0 0 0 triangle_interp_cd
+/triangle_interp_fcn {cvi dup N1 and exch log2N bitshift
+     C20 mul exch C10 mul add C0 add cvi 
+     dup 0 lt {pop 0} if dup 255 gt {pop 255} if} bdef
+/triangle_interp_image{ 0 1 N21 { 1 index exch dup triangle_interp_fcn put } for pop} bdef
+/read_image {currentfile /ASCII85Decode filter
+             /RunLengthDecode filter exch readstring pop pop} bdef
+/quad_im_str N2 string def  /intr_str N2 string def
+/quad_img {N M 8 [ N 0 0 M 0 0 ] quad_im_str image} bdef
+/triangle_render_g {gs xfd triangle_cl triangle_tf triangle_det { quad_img } if gr} bdef
+/itg {/N NI def /M NI def /quad_im_str intr_str def
+      triangle_interp_cd quad_im_str triangle_interp_image triangle_xfd triangle_render_g} bdef
+/txg {/N xdef /M xdef triangle_xfd /quad_im_str N M mul string def 
+      quad_im_str read_image triangle_render_g} bdef
+end	% MathWorks dictionary
+899 4613 1792 4613 1792 3909 96 82 552 itg
+899 4613 899 3909 1792 3909 96 813 552 itg
+899 3909 1792 3909 1792 3205 813 552 742 itg
+899 3909 899 3205 1792 3205 813 742 742 itg
+899 3205 1792 3205 1792 2501 742 742 631 itg
+899 3205 899 2501 1792 2501 742 146 631 itg
+899 2501 1792 2501 1792 1797 146 631 552 itg
+899 2501 899 1797 1792 1797 146 515 552 itg
+899 1797 1792 1797 1792 1093 515 552 110 itg
+899 1797 899 1093 1792 1093 515 146 110 itg
+899 1093 1792 1093 1792 389 146 110 183 itg
+899 1093 899 389 1792 389 146 183 183 itg
+1792 4613 2686 4613 2686 3909 82 146 331 itg
+1792 4613 1792 3909 2686 3909 82 552 331 itg
+1792 3909 2686 3909 2686 3205 552 331 742 itg
+1792 3909 1792 3205 2686 3205 552 742 742 itg
+1792 3205 2686 3205 2686 2501 742 742 336 itg
+1792 3205 1792 2501 2686 2501 742 631 336 itg
+1792 2501 2686 2501 2686 1797 631 336 631 itg
+1792 2501 1792 1797 2686 1797 631 552 631 itg
+1792 1797 2686 1797 2686 1093 552 631 478 itg
+1792 1797 1792 1093 2686 1093 552 110 478 itg
+1792 1093 2686 1093 2686 389 110 478 220 itg
+1792 1093 1792 389 2686 389 110 183 220 itg
+2686 4613 3579 4613 3579 3909 146 294 96 itg
+2686 4613 2686 3909 3579 3909 146 331 96 itg
+2686 3909 3579 3909 3579 3205 331 96 699 itg
+2686 3909 2686 3205 3579 3205 331 742 699 itg
+2686 3205 3579 3205 3579 2501 742 699 168 itg
+2686 3205 2686 2501 3579 2501 742 336 168 itg
+2686 2501 3579 2501 3579 1797 336 168 168 itg
+2686 2501 2686 1797 3579 1797 336 631 168 itg
+2686 1797 3579 1797 3579 1093 631 168 294 itg
+2686 1797 2686 1093 3579 1093 631 478 294 itg
+2686 1093 3579 1093 3579 389 478 294 404 itg
+2686 1093 2686 389 3579 389 478 220 404 itg
+3579 4613 4472 4613 4472 3909 294 220 294 itg
+3579 4613 3579 3909 4472 3909 294 96 294 itg
+3579 3909 4472 3909 4472 3205 96 294 82 itg
+3579 3909 3579 3205 4472 3205 96 699 82 itg
+3579 3205 4472 3205 4472 2501 699 82 825 itg
+3579 3205 3579 2501 4472 2501 699 168 825 itg
+3579 2501 4472 2501 4472 1797 168 825 889 itg
+3579 2501 3579 1797 4472 1797 168 168 889 itg
+3579 1797 4472 1797 4472 1093 168 889 478 itg
+3579 1797 3579 1093 4472 1093 168 294 478 itg
+3579 1093 4472 1093 4472 389 294 478 515 itg
+3579 1093 3579 389 4472 389 294 404 515 itg
+4472 4613 5366 4613 5366 3909 220 404 103 itg
+4472 4613 4472 3909 5366 3909 220 294 103 itg
+4472 3909 5366 3909 5366 3205 294 103 146 itg
+4472 3909 4472 3205 5366 3205 294 82 146 itg
+4472 3205 5366 3205 5366 2501 82 146 331 itg
+4472 3205 4472 2501 5366 2501 82 825 331 itg
+4472 2501 5366 2501 5366 1797 825 331 552 itg
+4472 2501 4472 1797 5366 1797 825 889 552 itg
+4472 1797 5366 1797 5366 1093 889 552 220 itg
+4472 1797 4472 1093 5366 1093 889 478 220 itg
+4472 1093 5366 1093 5366 389 478 220 68 itg
+4472 1093 4472 389 5366 389 478 515 68 itg
+5366 4613 6259 4613 6259 3909 404 146 294 itg
+5366 4613 5366 3909 6259 3909 404 103 294 itg
+5366 3909 6259 3909 6259 3205 103 294 183 itg
+5366 3909 5366 3205 6259 3205 103 146 183 itg
+5366 3205 6259 3205 6259 2501 146 183 367 itg
+5366 3205 5366 2501 6259 2501 146 331 367 itg
+5366 2501 6259 2501 6259 1797 331 367 68 itg
+5366 2501 5366 1797 6259 1797 331 552 68 itg
+5366 1797 6259 1797 6259 1093 552 68 75 itg
+5366 1797 5366 1093 6259 1093 552 220 75 itg
+5366 1093 6259 1093 6259 389 220 75 61 itg
+5366 1093 5366 389 6259 389 220 68 61 itg
+gr
+
+
+end
+
+eplot
+%%EndObject
+
+epage
+end
+
+showpage
+
+%%Trailer
+%%BoundingBox:    65   210   543   589
+%%Pages: 001
+%%EOF

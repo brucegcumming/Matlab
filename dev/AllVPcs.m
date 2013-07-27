@@ -606,6 +606,8 @@ if isstruct(V)
         elseif isfield(Vall,'matfile')
 %If there are separate .smr files for each Expt, use LoadExpt. If one .smr file for all
 %(Utah recordings), use LoadExptA.
+%Im not sure hwen onefile ever exists. But in practice drops down to exit(Vall.matfile
+%Could be that this is an error in the order of the arguments to strrep
             onefile = strrep(Vall.matfile,'.mat',['Expt' num2str(Vall.exptno) '.mat']);
             if exist(onefile,'file')
                 DATA.Expt = LoadExptA(DATA,onefile,0);
@@ -1437,7 +1439,7 @@ if reclassifyall == 2
                 try
                 res{j} = AllVPcs(Vall, 'tchan', ispk(j), passonargs{:},'reclassify',args{:});
                 catch ME
-                    cprintf('errors','AllVPCs ERROR!! %s\n',ME.message);
+                    cprintf('errors','AllVPCs ERROR!!! %s\n',ME.message);
                     res{j}.err = ME.message;
                     t = mygetCurrentTask();
                     res{j}.workerid = t.ID;
@@ -3975,7 +3977,8 @@ function DATA = GetGuiState(DATA, F)
     DATA.clustericon = X.clustericon;
     DATA.quickcutmode = X.quickcutmode;
     DATA.comparecell = X.comparecell;
-
+    DATA.toplevel = X.toplevel;
+    
     for f = {'handles' 'loadedClusterDetails' 'DataType' 'Expt' 'probeswitchmode'...
             'plotexptfit' 'logname' 'auto' 'checkclusters' 'profiling' 'ptsz'...
             'setspkrate' 'Comments' 'plot' 'LastClusters' 'gui' 'clplot'}
@@ -5038,6 +5041,8 @@ if DATA.csd
         csd = diff(AllV,1,1);
         evspace = 2;
     end
+    chspk = chspk -1;
+    chspk = chspk(chspk > 0 & chspk <= size(csd,1));
     TV = csd(chspk(1),:,uid);
     for j = 2:length(chspk)
         TV = cat(2,TV,csd(chspk(j),:,uid));
@@ -5804,6 +5809,12 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
     else
         ClusterDetails{p}.crit = NaN;
     end
+    meanvfile = [DATA.datadir '/Expt' num2str(DATA.exptno) 'meanV.mat'];
+    if ~exist(meanvfile)
+        FullV = rmfield(Vall,'V');
+        fprintf('Saving %s\n',meanvfile);
+        save(meanvfile,'FullV');
+    end
     if savexy && isfield(DATA,'xy')
         if DATA.savetrigger
             ClusterDetails{p}.rV = DATA.rV;
@@ -5903,7 +5914,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
             FullVData = [];
         end
     else
-        f = {'meanV', 'submean', 'usealltrials' 'builddate' 'samper' 'missedtrials' 'blklen' 'blkstart'};
+        f = {'submean', 'usealltrials' 'builddate' 'samper' 'missedtrials' 'blklen' 'blkstart'};
         for j = 1:length(f)
             if isfield(Vall,f{j})
             FullVData.(f{j}) = Vall.(f{j});
@@ -5917,6 +5928,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
             end
         end
     end
+    FullVData = rmfields(FullVData,'meanV'); %just in case - lots of space
     if savexy > 0
         save(dname,'ClusterDetails','FullVData');
     end
@@ -8715,7 +8727,12 @@ function [Expt, matfile] = LoadExpt(DATA, ei)
             smrname = regexprep(smrname,'online/lemM([0-9]*).*','$0/daeM$1');
         else %for file moved to unusual directories
             monk = GetMonkeyName(DATA.name);
-            smrname = regexprep(DATA.name,'/M([0-9]*).*',['$0/' monk 'M$1']);
+            prefix = regexprep(DATA.name,'.*M([0-9]*).*','M$1');
+            if isdir(DATA.name)
+                smrname = [DATA.name '/' monk prefix '.' num2str(DATA.exptno) 'mat'];
+            else
+                smrname = regexprep(DATA.name,'/M([0-9]*).*',['$0/' monk 'M$1']);
+            end
         end
         exfile = [smrname '.' num2str(ei) 'idx.mat'];
         matfile = [smrname '.' num2str(ei) '.mat'];
@@ -8784,14 +8801,14 @@ function Expt = LoadExptA(DATA, exfile, ei)
         if ei == 0
             load(exfile);
         else
-        [Trials, Expts] = APlaySpkFile(exfile,'noerrs','nospikes',aargs{:});
-        if length(Expts) == 1
-            Expt = Expts{1};
-        elseif length(Expts) < ei 
-            return;
-        else
-            Expt = Expts{ei};
-        end
+            [Trials, Expts] = APlaySpkFile(exfile,'noerrs','nospikes',aargs{:});
+            if length(Expts) == 1
+                Expt = Expts{1};
+            elseif length(Expts) < ei
+                return;
+            else
+                Expt = Expts{ei};
+            end
         end
         if ~isfield(Expt.Header,'expname')
             Expt.Header.expname = Expt2Name(Expt);
@@ -11750,7 +11767,7 @@ set(DATA.toplevel,'UserData',DATA);
                          nm=nm+1;
                          MeanSpike.othermeans{nm} = DataClusters{p-1}.TemplateUsed;
                      end
-                     if p < DATA.nprobes && isfield(DataClusters{p+1},'TemplateUsed') && ~isempty(DataClusters{p+1}.TemplateUsed)
+                     if p < length(DataClusters) && isfield(DataClusters{p+1},'TemplateUsed') && ~isempty(DataClusters{p+1}.TemplateUsed)
                          nm=nm+1;
                          MeanSpike.othermeans{nm} = DataClusters{p+1}.TemplateUsed;
                      end

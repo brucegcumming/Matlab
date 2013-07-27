@@ -18,7 +18,7 @@ if (strmatch(Expt.Stimvals.e2,'Dc') & strmatch(Expt.Stimvals.et,{'dx', 'Pd'})) .
         if ~isempty(Expt.Trials(j).Start & ~isempty(Expt.Trials(j).(sv)))
             Expt.Trials(j).Start = Expt.Trials(j).Start(1);
             Expt.Trials(j).End = Expt.Trials(j).End(end);
-            if ~strcmp(eb,'e0');
+            if ~strcmp(eb,'e0') && isfield(Expt.Trials,eb);
                 Expt.Trials(j).(eb) = Expt.Trials(j).(eb)(end);
             end
             x = Expt.Trials(j).(ea)(end);

@@ -26,3 +26,7 @@ while stop == 0
     end
     stop = get(stoph,'value');
 end
+fclose(s);
+delete(s);
+
+

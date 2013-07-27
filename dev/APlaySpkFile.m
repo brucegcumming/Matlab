@@ -33,6 +33,7 @@ ustimmarkname = '';
 ustimmarkch = [];
 mainsch = [];
 stimlvl = [];
+stimchange = [];
 logfid = 0;
 fixup = 1;
 UstimV = 0;
@@ -1083,6 +1084,8 @@ if ~mkidx
         ve = mean(Expt.Trials.ve);
         Expt.Trials.ve(end:length(Expt.Trials.End)) = ve;
     end
+    Expt.Trials = AddStimValsFromFile(strrep(name,'.mat','.SetStim'),Expt.Trials);
+
     if isfield(Expts,'firsttrial')
             if timeoffset
         argon = {argon{:} 'timeoffset' timeoffset};
@@ -1177,7 +1180,10 @@ else
     ustimes = [];
 end
 
-
+if isempty(stimlvl.level)
+    cprintf('errors','Empty StimOn/Off\n');
+    return;
+end
 if fixup(1) && stimlvl.level(end) == 1 && stimlvl.level(1) == 0
     stimlvl.times = stimlvl.times(1:end-1);
     stimlvl.level = stimlvl.level(1:end-1);
@@ -1571,13 +1577,15 @@ if length(fsid) == length(bsid)
                     Trials.delay(j) = frametimes(id(1)) - Trials.Start(j);
                     Trials.Start(j) = frametimes(id(1));
                     Trials.FalseStart(j) = 0;
+                    ff = 1;
                 else
                     Trials.FalseStart(j) = 1;
                     Trials.delay(j) = NaN;
+                    ff = id(1);
                 end
 
           
-          id = find(frametimes > Trials.End(j));
+          id = find(frametimes(ff:end) > Trials.End(j))+ff-1;
           if ~isempty(id) & frametimes(id(1))-Trials.End(j) < 500
               Trials.endelay(j) = Trials.End(j) - frametimes(id(1));
               Trials.End(j) = frametimes(id(1));
@@ -1594,7 +1602,9 @@ if length(fsid) == length(bsid)
               Trials.rwtimes(j,1:length(id)) = rwtimes(id);
           end
       end
+      if mod(j,100) == 0
       waitbar(j/length(fstimes));
+      end
   end
   delete(waitbar(1));
   drawnow;
@@ -2067,7 +2077,7 @@ for j = 1:length(aText.text)
                 Stimulus.(Stimulus.et) = a(1);
             end
             if isfield(Stimulus,'e2')
-                if strmatch(Stimulus.e2,'backMov')
+                if sum(strcmp(Stimulus.e2,{'backMov' 'Dc'}))
                     Stimulus.(Stimulus.e2) = a(2);
                 end
             end
@@ -2246,6 +2256,8 @@ for j = 1:length(aText.text)
                 Expts(ix).xovals = sscanf(txt(6:end),'%f');            
             end
             end
+        elseif strncmp(txt,'dx:',3)
+            Trials.dxseq{trial} = sscanf(txt(4:end),'%f');
         elseif strncmp(txt,'mtei=',5)
             if isfield(Expts,'firsttrial') & isfield(Expts,'lasttrial')
                 lastix = ix;
@@ -2485,6 +2497,7 @@ for j = 1:length(aText.text)
             lasttook = took;
         end
         if isfield(Stimulus,'st')
+            Stimulus.inexpt = inexpt;
         Trials = SetTrial(Stimulus, Trials, trial, ntrials);
         Stimulus.CorLoop = 0;
         Stimulus.uf = '';
@@ -2517,7 +2530,9 @@ for j = 1:length(aText.text)
     elseif t > Trials.Start(trial) && instim == 0 && aText.codes(j,4) ~= 2
         instim = 1;
     end
-    waitbar(j/length(aText.text));
+    if mod(j,100) == 0
+        waitbar(j/length(aText.text));
+    end
 end
 delete(waitbar(1));
 drawnow;
@@ -2786,6 +2801,7 @@ if mkidx == 1
     iExpts = Expts;
 end
 
+Trials = AddStimsFromFile(strrep(name,'.mat','.SetStim'),Trials);
 
 
 if isfield(Expts,'firsttrial')
@@ -2828,6 +2844,25 @@ if fid > 0
     end
 end
 
+function Trials = AddStimValsFromFile(name, Trials)
+fid = fopen(name,'r');
+if fid > 0
+    mycprintf('blue','Reading Stimulus Properties from %s\n',name);
+    a = textscan(fid,'id%d %s','delimiter','\n');
+    tid = a{1};
+    s = a{2};
+    for j = 1:length(a{1})
+        id = find(Trials.id  == a{1}(j));
+        if length(id) ==1
+            x = sscanf(s{j}(4:end),'%f');
+            if strncmp(s{j},'dx:',3)
+                Trials.dxvals{id} = x;
+            elseif strncmp(s{j},'ce:',3)
+                Trials.cevals{id} = x;
+            end
+        end
+    end
+end
 
 function SaveExpts(name, Expts)
 %make separate files for each expt on disk so that can access in parallel
@@ -2892,10 +2927,16 @@ function [aText, Text] = AddText(AddTxtFile, aText, Text)
 %Add text reads lines of the form
 %t txt
 %where t is in seconds, not timestamps
+%Addts these to the txt record.
+%
+%can also add Stimulus Values by id with
+%idxxxx str
+
 [a,b,c] = fileparts(AddTxtFile);
 if ~strcmp(c,'.txt')
     return;
 end
+SpkDefs;
 fid = fopen(AddTxtFile,'r');
 if fid > 0
     a = textscan(fid,'%d %s','delimiter','\n');
@@ -2946,6 +2987,9 @@ if fid > 0
             aText.text = {aText.text{1:id} txt aText.text{id+1:end}};
             aText.times = [aText.times(1:id); t(j); aText.times(id+1:end)];
             aText.codes = [aText.codes(1:id,:); 0 0 0 0; aText.codes(id+1:end,:)];
+            if strcmp(txt,'EndExpt')
+                aText.codes(id(end)+1,1) = ENDEXPT;
+            end              
         end
         end
         if ~isempty(txt)
@@ -3137,6 +3181,18 @@ ids = [ids find(strcmp('ex3val',fn))];
 %ids = [ids strmatch('imse',fn)];
 state.tt = TimeMark(state.tt,'Set Fields');
 
+%do not include PhaseSeq here - has special cases
+seqstrs = {'Seedseq' 'dxvals' 'cevals'};
+seqvars = {};
+for j = 1:length(seqstrs)
+    id = find(strcmp(seqstrs{j},fn));
+    if ~isempty(id)
+        ids = [ids id];
+        seqvars = {seqvars{:} fn{id}};
+    end
+end
+
+
 fn = fn(setdiff([1:length(fn)],ids));
 for nf = 1:length(fn)
     if iscell(AllTrials.(fn{nf}))
@@ -3176,6 +3232,7 @@ phasevals(2:4) = [pi pi/4 3*pi/4];
 lphasevals = [0 pi pi 0]; %%see binoc.c SetRandomPhase();
 rphasevals = [0 pi 0 pi];
 for nx = 1:length(AllExpts)
+    Idx.exptno = nexpts;
     state.tt = TimeMark(state.tt,sprintf('Expt %d',nx));
     clear Trials;
     
@@ -3247,6 +3304,7 @@ for nx = 1:length(AllExpts)
 %  problem is that we don't rebuilds Spkid if set s probe != 1, so save
 %  Spkid no good
  %      
+        fastseq = 0;
         for nf = 1:length(fn)
             if iscell(AllTrials.(fn{nf}))
                 if strcmp(fn{nf},'uStimt')
@@ -3372,6 +3430,9 @@ for nx = 1:length(AllExpts)
         end
         if strfind(Trials(k).OptionCode,'+fS')
             seqtrial = seqtrial+1;
+            fastseq = 1;
+        else
+            fastseq = 0;
         end
         if strfind(Trials(k).OptionCode,'+cr')
             crtrial = crtrial+1;
@@ -3392,8 +3453,19 @@ for nx = 1:length(AllExpts)
         if isfield(Trials,'Fr')
             frpt = Trials(k).Fr;
         end
+        %If just changing im seed slowly, don't mess wiht end/start
+        if frpt > 1 && fastseq == 0
+            frpt = 1;
+        end
 % for image seqs, Stimseq records the order of seeds, and there will not
 % be a conversion to stimulus type
+       needseq = 0;
+       for ns = 1:length(seqvars)
+           if length(AllTrials.(seqvars{ns}){igood(k)}) > 1
+               Trials(k).(seqvars{ns}) = AllTrials.(seqvars{ns}){igood(k)};
+               needseq = length(Trials(k).(seqvars{ns}));
+           end
+       end
         if isfield(AllTrials,'Seedseq') && length(AllTrials.Seedseq{igood(k)}) > 1
             Trials(k).Seedseq = AllTrials.Seedseq{igood(k)};
         end
@@ -3484,7 +3556,7 @@ for nx = 1:length(AllExpts)
 %combinations
         elseif isfield(AllTrials,'Stimseq') && AllTrials.ve(end) < 4.85 && ...
                 ~isempty(AllTrials.Stimseq{igood(k)}) && ...
-                ~isempty(strfind(Trials(k).OptionCode,'+fS')) && ...
+                fastseq && ...
              max(AllTrials.Stimseq{igood(k)}) > length(Expt.e1vals)
          extras = sum(Expt.e1vals < -999);
          evid = AllTrials.Stimseq{igood(k)}-extras;
@@ -3532,6 +3604,9 @@ for nx = 1:length(AllExpts)
             end
             serrid = [serrid k];
             end
+        elseif needseq
+            Trials(k).Start = Trials(k).Start + [0:needseq-1]' .* frameperiod * frpt;
+            Trials(k).End = Trials(k).Start + frameperiod * frpt;            
         end
         if isfield(AllTrials,'rptframes') && ~isempty(AllTrials.rptframes{igood(k)})
             Trials(k).rptframes = AllTrials.rptframes{igood(k)};
@@ -3556,12 +3631,20 @@ for nx = 1:length(AllExpts)
         end
     end
 
-    if mean(nframes > 2) && state.alltrials == 0
+%some expts may have nfr > 2 on some trials, nut not other
+%e.g. image tuning exps (seedseq ->nfr > 2) with interleaved blanks.
+%only trim for missing sequence if its really an fastseq expt
+    if seqtrial > nt/2 && mean(nframes) > 2
+        fastseq = 1;
+    else
+        fastseq = 0;
+    end
+    if fastseq && state.alltrials == 0
        id = find(nframes > 1);
        Trials = Trials(id);
        bid = find(nframes  ==1);
        if length(bid) > 2
-           fprintf('Removing %d Trials becuase no RC sequence\n',length(bid));
+           Idx = AddError(Idx, 'Ex %d Removing %d Trials becuase no RC sequence\n',nexpts,length(bid));
        end
     end
     if nu == 0  && isfield(Trials,'uStimt')
@@ -3571,6 +3654,20 @@ for nx = 1:length(AllExpts)
             Trials = rmfield(Trials,'uStim');
     end
 
+    if isfield(Trials,'inexpt') && sum([Trials.inexpt] ==0 > 0)
+       bid = find([Trials.inexpt] == 0);
+       id = find([Trials.inexpt] > 0);
+       ids = unique([Trials(bid).id]);
+       if ~isempty(bid)
+           Idx.t = Trials(bid(1)).Start(1);
+           if length(ids) <= 1
+               Trials = Trials(id);
+               Idx = AddError(Idx, 'Ex %d Removing %d Trials becuase not in Expt\n',nexpts,length(bid));
+           else
+               Idx = AddError(Idx, 'Ex %d Has  %d Trials not in Expt\n,',nexpts,length(bid));
+           end
+       end
+    end
 
     id = [];
     if isfield(Trials,'delay')
@@ -3709,6 +3806,13 @@ for nx = 1:length(AllExpts)
 %     if strmatch(et,'Dc')
 %         ors = cat(2,Expt.Trials.or);
 %     end
+    if isfield(Idx,'errexpt')
+        id = find(Idx.errexpt == nexpts);
+        if ~isempty(id)
+            Expt.errs.msg = Idx.errs(id);
+            Expt.errs.t = Idx.errtimes(id);
+        end
+    end
         Expts{nexpts} = Expt;
     nexpts = nexpts+1;
     end
@@ -3851,14 +3955,35 @@ else
     questdlg(sprintf('Can''t Write %s',ufl),'test','OK','OK');
 end
 
-function Idx = AddError(err,Idx, show)
+function Idx = AddError(err, varargin)
 
+if ischar(err) %% old style
+    Idx = varargin{1}
+    show = varargin{2};
+else
+    Idx = err;
+    err = sprintf(varargin{:});
+    
+    if isfield(Idx,'state')
+        show = Idx.state.showerrs;
+    else
+        show = 0;
+    end
+end
+        
 if ~isfield(Idx,'errs') | isempty(strmatch(err,Idx.errs)) 
     if show
         msgbox(err,'APlaySpkFile Error!!','modal');
     end
     mycprintf('errors',[err '\n']);
     Idx.errs = {Idx.errs{:} err};
+    nerr = length(Idx.errs);
+    if isfield(Idx,'t')
+        Idx.errtimes(nerr) = Idx.t;
+    end
+    if isfield(Idx,'exptno')
+        Idx.errexpt(nerr) = Idx.exptno;
+    end
     Idx.newerrs = Idx.newerrs+1;
 else
     mycprintf('errors',[err '\n']);

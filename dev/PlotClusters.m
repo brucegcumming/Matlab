@@ -4180,7 +4180,7 @@ end
 if exist(dname)
 load(dname);
 else
-    fprintf('Can''t find %s\n',dname);
+    mycprintf('errors','Can''t find %s\n',dname);
     ClusterDetails = [];
     return;
 end
@@ -8794,7 +8794,7 @@ function DATA = LoadAll(a,b, type, varargin)
                             if msgmode == 1
                             errordlg(sprintf('Cluster %d Ex %d missing',k,j),'ClusterError','modal');
                             end
-                            fprintf('Cluster %d Ex %d missing\n',k,j);
+                            mycprintf('errors','Cluster %d Ex %d missing\n',k,exptno(j));
                         end
                         if size(AutoClusters,1) >= j && size(AutoClusters,2) >= k && ~isempty(AutoClusters{j}{k})
                             Clusters{j}{k} = AutoClusters{j}{k};
@@ -11513,7 +11513,7 @@ end
 eid = CellToMat(Clusters,'exptid');
 [a,b] = find(eid ==0);
 for j = 1:length(a)
-    fprintf('Cluster E%dP%d exptid = 0!!!!!\n',a(j),b(j));
+    fprintf('Cluster E%d(id%d)P%d exptid = 0!!!!!\n',exptno(a(j)),a(j),b(j));
     Clusters{a(j)}{b(j)}.exptid = a(j);
 end
 pid = CellToMat(Clusters,'probe');

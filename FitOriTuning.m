@@ -34,6 +34,7 @@ state.maxamp = 0;
 state.posamp = 0;
 state.period = 360;
 state.wrap = 1;
+state.meanlimit = [];
 
 j = 1;
 while j <= nargin -2

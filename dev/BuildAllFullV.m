@@ -439,7 +439,7 @@ end
 if ismember(X.recalc, [4 5]) %just make FullV
     return;
 end
-Expt = LoadExpt(path, ex, X.recalc > 1, X.logfid, exptargs);
+Expt = LoadExpt(FullV.matfile, ex, X.recalc > 1, X.logfid, exptargs);
 if isfield(Expt,'Trials')
 ts = Expt.Trials(1).Start./10000;
 te = Expt.Trials(end).End./10000;
@@ -500,6 +500,13 @@ version = 1.0;
 probelist = unique([probes.probe]);
 ts = now;
 id = find([probes.suffix] == ex);
+matfile = [];
+for j = 1:length(id)
+    mfiles{j} = regexprep(probes(id(j)).file,'\.spkblk[0-9]*\.mat','.mat');
+    mfiles{j} = regexprep(mfiles{j},'A.([0-9]*).mat','.$1.mat');
+end
+mfiles = unique(mfiles);
+matfile = [path '/' mfiles{1}];
 FullV = PlotSpikeC(probes(id),5,'probes',probelist,'sumv','submean','makev','lastblk',lastblk,'prefix',path);
 if isdir(path)
     FullV.name = path;
@@ -508,6 +515,7 @@ FullV.exptno = ex;
 FullV.buildtime = mytoc(ts);
 FullV.builddate = now;
 FullV.buildversion = version;
+FullV.matfile = matfile;
 
 if isfield(FullV,'error') && FullV.error > 0
     return;
@@ -555,21 +563,26 @@ end
 
 function Ex = LoadExpt(name, ei, rebuild, logfid, varargin)
         Ex = [];
-        if regexp(name,'lem/M[0-9]*')
-            smrname = regexprep(name,'lem/M([0-9]*)','$0/lemM$1');
-            smrname = regexprep(smrname,'online/lemM([0-9]*)','$0/lemM$1');
-            smrname = regexprep(smrname,'/$','');
-        elseif regexp(name,'dae/M[0-9]*')
-            smrname = regexprep(name,'dae/M([0-9]*)','$0/daeM$1');
-            smrname = regexprep(smrname,'online/daeM([0-9]*)','$0/daeM$1');
-            smrname = regexprep(smrname,'/$','');
-        elseif regexp(name,'ica/M[0-9]*')
-            smrname = regexprep(name,'ica/M([0-9]*)','$0/icaM$1');
-            smrname = regexprep(smrname,'online/iacM([0-9]*)','$0/icaM$1');
-            smrname = regexprep(smrname,'/$','');
+        if isdir(name)
+            if regexp(name,'lem/M[0-9]*')
+                smrname = regexprep(name,'lem/M([0-9]*)','$0/lemM$1');
+                smrname = regexprep(smrname,'online/lemM([0-9]*)','$0/lemM$1');
+                smrname = regexprep(smrname,'/$','');
+            elseif regexp(name,'dae/M[0-9]*')
+                smrname = regexprep(name,'dae/M([0-9]*)','$0/daeM$1');
+                smrname = regexprep(smrname,'online/daeM([0-9]*)','$0/daeM$1');
+                smrname = regexprep(smrname,'/$','');
+            elseif regexp(name,'ica/M[0-9]*')
+                smrname = regexprep(name,'ica/M([0-9]*)','$0/icaM$1');
+                smrname = regexprep(smrname,'online/iacM([0-9]*)','$0/icaM$1');
+                smrname = regexprep(smrname,'/$','');
+            end
+            exfile = [smrname '.' num2str(ei) 'idx.mat'];
+            matfile = [smrname '.' num2str(ei) '.mat'];
+       elseif exist(name,'file')
+                matfile = name;
+                exfile = strrep(matfile,'.mat','idx.mat');
         end
-        exfile = [smrname '.' num2str(ei) 'idx.mat'];
-        matfile = [smrname '.' num2str(ei) '.mat'];
         if exist(matfile) && (~exist(exfile,'file') || rebuild)
             PrintMsg(logfid,'Building %s\n',exfile);
             APlaySpkFile(matfile,'bysuffix','noerrs', varargin{:});

@@ -970,7 +970,7 @@ elseif strncmpi(name,'showdprime',9)
     dp = CalcDprime(DATA,1,'xparam',46,'yparam',44); %spk var/sqrt(energy)
     fprintf('Dp = %.3f\n',dp);
 elseif strncmpi(name,'savelfp',7) || strncmpi(name,'makelfp',7)
-    outname = get(DATA.saveitem,'s tring');
+    outname = get(DATA.saveitem,'string');
     Expt = DATA.Expt;
     Expt.Header.CombineDate = now;
     if DATA.datafilename(2) == ':'

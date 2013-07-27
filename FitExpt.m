@@ -223,7 +223,7 @@ elseif strmatch(dat.type{1},{'or'}) & length(dat.type) > 1 & strmatch(dat.type{2
         if range(x) > 270
             r(1) = MeanVector(y,x);
             r(2) = MeanVector(y,x,'double');
-            if abs(r(2)) > abs(r(1))
+            if abs(r(2)) > abs(r(1)) %not directional but wide ragne
                 period = 180;
                 specialfit = 1;
             else

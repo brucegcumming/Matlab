@@ -596,6 +596,10 @@ end
             btype = [];
         end
     end
+    if ~isfield(Expt.Trials,btype)
+        mycprintf('error','Expt.Trials has no field %s\n',btype);
+        btype = [];
+    end
 %NB NOT types. So that it matches PlotExpt
     result.type{1} = type;
     result.type{2} = btype;
@@ -617,8 +621,10 @@ end
     if isfield(Expt.Trials,'Spikes') & ~plotlfp
     res.spksum = 0;
     for j = 1:length(Expt.Trials)
+        len(j) = length(Expt.Trials(j).(type));
+        if len(j) > 0
         Expt.Trials(j).eval = Expt.Trials(j).(type)(end);
-        len(j) = eval(['length(Expt.Trials(j).' type ');']);
+        end
         res.spksum = res.spksum + length(Expt.Trials(j).Spikes);
     end
 
@@ -678,7 +684,7 @@ end
     end
     lastf = tlen;
     for j = 1:length(Expt.Trials)
-        if ~isempty(btype) & length(Expt.Trials(j).(btype)) == 1
+        if ~isempty(btype) & isfield(Expt.Trials,btype) & length(Expt.Trials(j).(btype)) == 1
             Expt.Trials(j).(btype)(1:tlen,1) = Expt.Trials(j).(btype);
         end
         if len(j) < tlen

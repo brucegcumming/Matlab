@@ -33,7 +33,7 @@ if ~isempty(toplevel)
     DATA = get(toplevel,'UserData');
   end
 else
-
+    DATA.monkeynames = {'duf' 'ruf' 'ica' 'lem'};
     DATA.tags.toplevel = tag;
     DATA.plot.area = 1;
     DATA.plot.labelpts = 1;
@@ -205,6 +205,11 @@ if nargin
                 j = j+1;
             end
         end
+    elseif iscell(varargin{j})
+        DATA.map = rflist2map(DATA, varargin{j});
+        DATA.monkey = DATA.map.monkey;
+        DATA.map = ReadAllPens(DATA.map,DATA.map.monkeyname,'reload');
+        init = 1;
     end
 end
 
@@ -341,7 +346,9 @@ if init & isempty(toplevel)
   uimenu(hm,'Label','UnMark','Callback',[' PlotMap(' top ',''unmarkpen'');']);
   uimenu(hm,'Label','Save Map','Callback',[' PlotMap(' num2str(top) ',''savemap'');']);
     set(gcf,'Menubar','none');
+    if ~isfield(DATA,'map')
     [DATA.map, DATA.monkey] = GetMap(DATA);
+    end
     DATA.selected = ones(size(DATA.map.area));
     DATA.excluded = zeros(size(DATA.map.area));
     DATA.marked = zeros(size(DATA.map.area));
@@ -356,6 +363,27 @@ if init & isempty(toplevel)
 end
 
 
+function map = rflist2map(DATA, R)
+MapDefs;
+
+for j = 1:length(R)
+    map.rf(j,:) = R{j}.rf;
+    map.cellname{j} = R{j}.name;
+    map.area(1) = 1;
+    map.hemisphere(1) = 0;
+    monkey{j} = GetMonkeyName(R{j}.name);
+    if strcmp(R{j}.electrode,'uProbe')
+        map.types(j) = MULTICONTACT;
+    else
+        map.types(j) = NORMAL;
+    end
+end
+[a,b] = Counts(monkey);
+[c,d] = max(a);
+map.monkey = b{d};
+map.monkeyname = b{d};
+map.monkey = find(strcmp(map.monkeyname, DATA.monkeynames));
+map.pen = map.rf(:,6:8);
 
 function [map, monkey] = GetMap(DATA, varargin)
 MapDefs;

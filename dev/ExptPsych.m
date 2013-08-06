@@ -156,7 +156,19 @@ if strmatch(type{2},'ori')  & ~isfield(Expt.Trials,'ori')
         Expt.Trials(j).ori = Expt.Trials(j).or(end);
     end
 end
-    for j = 1:length(Expt.Trials)
+
+fillet = { [] [] []};
+if isfield(Expt.Stimvals,'et') && ~isfield(Expt.Trials,Expt.Stimvals.et)
+    fillet{1} = Expt.Stimvals.et;
+end
+if isfield(Expt.Stimvals,'e2') && ~isfield(Expt.Trials,Expt.Stimvals.e2)
+    fillet{2} = Expt.Stimvals.e2;
+end
+if isfield(Expt.Stimvals,'e3') && ~isfield(Expt.Trials,Expt.Stimvals.e3)
+    fillet{3} = Expt.Stimvals.e3;
+end
+
+for j = 1:length(Expt.Trials)
         if isfield(Expt.Trials,'Start')
         starts(j) = Expt.Trials(j).Start(1);
         else
@@ -166,7 +178,14 @@ end
             Expt.Trials(j).Trial = j;
         end
         Expt.Trials(j).e0 = 0;
-    end
+        if isfield(Expt.Trials,'exvals')
+            for k = 1:length(fillet)
+                if ~isempty(fillet{k})
+                Expt.Trials(j).(fillet{k}) = Expt.Trials(j).exvals(k);
+                end
+            end
+        end
+end
     
     
 if length(varargin) & strcmp(varargin{end},'byrw')
@@ -318,10 +337,16 @@ while j <= length(varargin)
     j = j+1;
 end
 
-if ~isfield(Expt.Trials,type{1}) || (~isfield(Expt.Trials, type{2}) && length(type{2}))
-    if isfield(Expt.Header,'expname')
-        fprintf('%s Doesn''t have values for Psych\n',Expt.Header.expname);
+if ~isfield(Expt.Header,'expname')
+    if isfield(Expt.Header,'name')
+        Expt.Header.expname = Expt.Header.name;
+    else
+        Expt.Header.expname = Expt2Name(Expt);
     end
+end
+
+if ~isfield(Expt.Trials,type{1}) || (~isfield(Expt.Trials, type{2}) && length(type{2}))
+    fprintf('%s Doesn''t have values for Psych\n',Expt.Header.expname);
     return;
 end
 

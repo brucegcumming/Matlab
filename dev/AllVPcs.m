@@ -13,6 +13,14 @@ function res = AllVPcs(V, varargin)
 %AllVPcs(V, 'tchan',c,'trigdt') or AllVPcs(V, 'tchan',c,'dtthr')  trigggers off dVdt
 %AllVPcs(V, 'tchan',c,'dtthr2') Triggers off second temporal derivative
 %
+%AllVPcs(V, 'tchan',c,'dtthr3') Triggers off energy.  N.B. This is dagnerous, because 
+%  of an attempt to align spikes. The trigger point is moved to the nearest max (th+) or min (th-)
+%  in the voltage record.  The means that the histogram of trigger values is altered (measures energy at the new
+%  trigger point, whihc is different, so no longer get a hard edge to the histogram.
+%   ....'dtthr3','thboth') disables the voltage alignment so that the tirgger values are correct
+%  but this can produce artifactual clustering...
+
+
 %AllVPcs(V, 'tchan',c, 'triggertemplate', Clusters{p}) convolves trgger
 %    channel with template in cluster, triggers on peaks
 %
@@ -312,6 +320,7 @@ tt = TimeMark(tt,'Start',DATA.profiling);
 
 if length(varargin) & strcmp(varargin{end},'autocutall')
     autocutall = 1;
+    autocutarg = length(varargin);
 else
     autocutall = 0;
 end
@@ -675,7 +684,7 @@ if isstruct(V)
     clear V;
 elseif isfigure(V)
     DATA = get(V,'UserData');
-    Vall = getappdata(V,'Vall');
+    Vall = mygetappdata(DATA,'Vall');
     vt = DATA.t;
 
 elseif ~isfield(DATA,'name')
@@ -734,6 +743,7 @@ end
 
 addmean = [];
 
+autocutarg = 0;
 passonargs = {};
 
 j = 1;
@@ -746,8 +756,10 @@ while j <= length(varargin)
         DATA.usetrials = 0;
     elseif strncmp(varargin{j},'autocutall',10)
         autocutall = 1;
+        autocutarg = j;
     elseif strncmp(varargin{j},'quickautocutall',13)
         autocutall = 2;
+        autocutarg = j;
         DATA.autocutmode = 'quick';
     elseif strncmp(varargin{j},'quickautocut',9)
         autocutone = 1;
@@ -901,7 +913,7 @@ while j <= length(varargin)
         end
        DATA.autorefine = 3;
        refineall = 1;
-    elseif strncmp(varargin{j},'refclusters',9) 
+    elseif sum(strncmp(varargin{j},{'refclusters' 'refcut'},6)) 
 %        j = j+1;
 %        rfile = varargin{j};
 %default is to use refcluster only on files without previous cut, or only
@@ -1351,7 +1363,9 @@ if DATA.profiling
 end
 
 tt = TimeMark(tt,'After varargs',DATA.profiling);
-
+if DATA.trigdt == 3  && thsign ~=2
+    cprintf('blue','Energy Thresholds with voltage sign are Dangerous - See help\n');
+end
 
 if isfield(Vall,'V')
     if isfield(Vall,'t')  && abs(length(Vall.t) - size(Vall.V,2)) > 1
@@ -1385,7 +1399,8 @@ if autocutall
 F = SetFigure(DATA.tag.top, DATA);
 DATA.toplevel = F;
 set(DATA.toplevel,'UserData',DATA)
-res = AutoCutAll(ispk,  F, Vall, DATA, varargin(1:end-1));
+id = setdiff(1:length(varargin),autocutarg);
+res = AutoCutAll(ispk,  F, Vall, DATA, varargin(id));
 res.toplevel = F;
 res.logfid = DATA.logfid;
 return;
@@ -1395,6 +1410,7 @@ end
 
 
 if reclassifyall == 2
+    args = {};
         DataClusters = LoadCluster(DATA.name,DATA.exptno);
         for j = 1:length(ispk)
             if length(DataClusters) >= ispk(j)
@@ -1453,6 +1469,7 @@ if reclassifyall == 2
         return;
 end
 if reclassifyall || refineall
+    args = {};
     if userefcluster && isfield(DATA,'RefClusters')
         UseClusters = DATA.RefClusters;
     end
@@ -1621,7 +1638,7 @@ end
 [F, isnew] = SetFigure(DATA.tag.top,DATA);
 DATA.toplevel = F;
 if ~isempty(Expts)
-    mysetappdata(DATA,'Expts',Expts);
+    DATA = mysetappdata(DATA,'Expts',Expts);
 end
 
 if isnew
@@ -1924,7 +1941,7 @@ if subtractadj && ispk > 1 && ispk <= DATA.nprobes
 end
 if DATA.trigdt
     if DATA.trigdt == 3 %10pt moving average of dvdt = energy
-        smv = smooth(diff(smv).^2,10);
+        smv = smooth(diff(smv).^2,3,'gauss');
     elseif ismember(DATA.trigdt,[4 5]) %convolve with template
         if recluster && isfield(DATA.cluster,'TriggerTemplate')
             DATA.TriggerTemplate = DATA.cluster.TriggerTemplate;
@@ -1975,8 +1992,8 @@ if verbose > 1
     fprintf('%s %s %s\n',IDStr(DATA),tt(end).str,datestr(now,'HHMM:ss'));
 end
 DATA.nprobes = size(Vall.V,1);
-if ~isfield(DATA,'cluster')
-    DATA.cluster = [];
+if ~isfield(DATA,'cluster') || ~isfield(DATA.cluster,'version')
+    DATA.cluster.version = DATA.version;
 end
 F = SetFigure(DATA.tag.top,DATA);
 DATA.toplevel = F;
@@ -1984,14 +2001,14 @@ res.toplevel = F;
 
 if DATA.interactive >= 0
     set(F,'UserData',DATA);
-    setappdata(F,'Vall',Vall);
+    DATA = mysetappdata(DATA,'Vall',Vall);
     if newdata
         if exist('AutoClusters','var')
             setappdata(DATA.toplevel,'AutoClusters',AutoClusters);
         end
     end
 else
-    DATA.Vall = Vall;
+    DATA = mysetappdata(DATA,'Vall',Vall);
 end
 %load trig times before thresholding current channel. Then set trig times
 %for current channel to match new values after threshold
@@ -3628,7 +3645,11 @@ function DATA = mysetappdata(DATA, str, val)
 
 function val = mygetappdata(DATA, str)
         if DATA.interactive < 0
-            val = DATA.appdata.(str);
+            if isfield(DATA,'appdata') && isfield(DATA.appdata,str)
+                val = DATA.appdata.(str);
+            else
+                val = [];
+            end
         else
             val = getappdata(DATA.toplevel,str);
         end
@@ -4077,7 +4098,7 @@ function [DATA, ClusterDetails] = LoadClusterDetails(DATA, varargin)
     if exist(cfile)
         load(cfile);
         if ~isempty(ClusterDetails)
-            mysetappdata(DATA,'ClusterDetails',ClusterDetails);
+            DATA = mysetappdata(DATA,'ClusterDetails',ClusterDetails);
             DATA.loadedClusterDetails = DATA.exptno;
         else %%may want to set loadedClusterDetails to 0?
         end
@@ -4209,11 +4230,11 @@ end
     end
     DATA.xy{1} = xys{p};
     if savexy
-        mysetappdata(DATA,'ClusterDetails',ClusterDetails);
+        DATA = mysetappdata(DATA,'ClusterDetails',ClusterDetails);
         DATA.loadedClusterDetails = DATA.exptno;
     end
     
-    Vall = getappdata(DATA.toplevel,'Vall');
+    Vall = mygetappdata(DATA,'Vall');
     if isempty(checktimes)
         DATA.trigtimes{DATA.probe(1)} = trigtimes{p};
     end
@@ -4262,20 +4283,24 @@ elseif th(1) > 0
 else
     autoth = 1;
 end
+nv = length(id);
 if isempty(id)
     if DATA.trigdt == 4
         GetFigure(DATA.tag.vhist);
         hold off;
         id = find(abs(sgn) > 1);
+        nv = length(id);
         hist(rV(id),500);
     end
     if DATA.thsign == 1 || DATA.trigdt == 3
         id = find(sgn(1,:) < 0)+1;
+        nv = length(id);
         prc = DATA.setnspk .* 100./length(id); % get 1000 spikes
         th(1) = prctile(rV(id),100-prc);
         id = id(rV(1,id) > th(1));
     else
         id = find(sgn(1,:) > 0)+1;
+        nv = length(id);
         prc = DATA.setnspk .* 100./length(id); % get 1000 spikes
         if prc > 100 %can happen if nspk > # minima
             th(1) = max(rV(1,id));
@@ -4313,7 +4338,7 @@ else
 [a,b] = max(v);
 end    
 xid = id(sid+b-1);
-fprintf('%s Removing %d double Triggers\n',IDStr(DATA),length(xid));
+fprintf('%s Removing %d double Triggers (from %d/%d maxima)\n',IDStr(DATA),length(xid),length(id),nv);
 yid = id(sid+2-b);
 id = setdiff(id,xid);
 else
@@ -4321,8 +4346,9 @@ else
 end
 id = id(id > -DATA.spts(1) & id < size(rV,2)-DATA.spts(end));
 
-if DATA.trigdt == 3  %spk energy trigger
-    FullV = getappdata(DATA.toplevel,'Vall');
+if DATA.trigdt == 3  && DATA.thsign < 2 %spk energy trigger. Not alighn to peak voltage near enrgy max
+%'thboth' (thsign = 2) argument turns this off    
+    FullV = mygetappdata(DATA,'Vall');
     for j =1:length(id)
         if DATA.thsign == 1
         [a,b] = max(FullV.V(DATA.probe(1),id(j)-5:id(j)+5));
@@ -5523,10 +5549,9 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
     if DATA.toplevel
     set(DATA.toplevel,'name',sprintf('Saving %s',outname));
     drawnow;
-    Vall = getappdata(DATA.toplevel,'Vall');
-    else
-        Vall = DATA.Vall;
     end
+    Vall = mygetappdata(DATA,'Vall');
+
     if ~isfield(DATA.cluster,'next') || ~iscell(DATA.cluster.next) %should not need this - check
         DATA = AddErr(DATA,'ERROR!!!!!!!!!!! - missing .next\n');
         DATA.cluster.next  = {};
@@ -5796,7 +5821,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
             ClusterDetails{p}.t = DATA.t(DATA.uid);
             ClusterDetails{p}.clst = DATA.clst(DATA.uid);
         if DATA.interactive >= 0 && isappdata(DATA.toplevel,'ClusterDetails')
-            mysetappdata(DATA,'ClusterDetails',ClusterDetails);
+            DATA = mysetappdata(DATA,'ClusterDetails',ClusterDetails);
             if DATA.auto.showxysaved
                 PlotAllProbes(DATA, 'allxy', 'probes',p,'linewidth',2);
             end
@@ -5962,8 +5987,8 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
     DATA.savespkid = id;
     if DATA.toplevel && DATA.interactive >= 0
         DataClusters{p} = Clusters{p};
-        mysetappdata(DATA,'Clusters',DataClusters);
-        mysetappdata(DATA,'ClusterDetails',ClusterDetails);
+        DATA = mysetappdata(DATA,'Clusters',DataClusters);
+        DATA = mysetappdata(DATA,'ClusterDetails',ClusterDetails);
         set(DATA.toplevel,'name',get(DATA.toplevel,'Tag'));
     end
 
@@ -7392,6 +7417,7 @@ elseif strmatch(fcn,{'profiling'})
     set(DATA.toplevel,'UserData',DATA);
 elseif strmatch(fcn,{'retrigger'})
     args = RetriggerDialog(a,b,'popup');
+    fprintf('Retriggering\n');
     if ~isempty(args)
         AllVPcs(DATA.toplevel,'tchan',DATA.probe, args{:});
     end
@@ -7433,7 +7459,9 @@ figure(DATA.toplevel);
         PlaceUi(a,b,'up');
         b =uicontrol(F,'style','pushbutton','string','SetSpkrate','callback',{@RetriggerDialog, 'setspkrate'});
         PlaceUi(a,b,'left');
-        e = uicontrol(F,'style','pop','string','V|dVdt|accel|energy|Template|Templatedt','tag','trigtype');
+        e = uicontrol(F,'style','pop','string','V|dVdt|accel|energy (dangerous)|Template|Templatedt','tag','trigtype');
+        trigstate.type = 1+DATA.trigdt;
+        set(e,'value',trigstate.type);
         PlaceUi(b,e,'left');
         c = uicontrol(F,'style','text','string','Threshold','tag','labelthrehsold');
         PlaceUi(e,c,'left');
@@ -7464,6 +7492,7 @@ figure(DATA.toplevel);
         FitWindow(F);
         set(F,'UserData',DATA.toplevel);
         uiwait(F);
+        
         args = trigargs;
         elseif strcmp(fcn,'cancel')
             args = {};
@@ -7473,6 +7502,7 @@ figure(DATA.toplevel);
             DATA.setspkrate = str2num(get(findobj(F,'tag','spkrate'),'string'));
             set(DATA.toplevel,'UserData',DATA);
         elseif strcmp(fcn,'go')
+            fprintf('Hit Retrigger Button\n');
             F = get(a,'parent');
             trigtypes = {'threshold','dtthr','dtthr2','dtthr3','triggertemplate','triggertemplatedt'};
             trigtype = get(findobj(F,'tag','trigtype'),'value');
@@ -7646,7 +7676,7 @@ elseif strcmp(fc,'exptxcorr')
     DATA.xcorrs = res;
     set(DATA.toplevel,'UserData',DATA);
 end
-mysetappdata(DATA,'Clusters',DataClusters);
+DATA = mysetappdata(DATA,'Clusters',DataClusters);
 
 function SetCellFromLine(a,b, cluster, cell)
     DATA = GetDataFromFig(a);
@@ -8302,7 +8332,7 @@ elseif fcn == 15
     return;
 elseif fcn == 17
     DataClusters{DATA.probe(1)} = [];
-    mysetappdata(DATA,'Clusters',DataClusters);
+    DATA = mysetappdata(DATA,'Clusters',DataClusters);
     return;
 elseif fcn == 18  %optimnize boundary line in current plot
     set(DATA.toplevel,'Name','Optimizing');
@@ -8365,7 +8395,7 @@ elseif fcn == 22 %evaluate Gaussian means fit in the cluster space
     hold on;
     ezcontour(@(x,y)pdf(a.obj,[x y]),get(gca,'xlim'),get(gca,'ylim'));
     set(DATA.toplevel,'UserData',DATA);
-    mysetappdata(DATA,'Clusters',DataClusters);
+    DATA = mysetappdata(DATA,'Clusters',DataClusters);
     return;
 elseif sum(strcmp(fcn, {'2cells' '3cells' '4cells'})) | ...
         ismember(fcn,[23 26 27 31]) %Check spacee out with guassian mixture model.
@@ -8761,7 +8791,7 @@ function [Expt, matfile] = LoadExpt(DATA, ei)
 %don't setappdata. Causes susequent reads to think this is a Utah Style expt
 % and then they don'w load Expt.  ONly set app data if sure this is really
 % a Utah Expt
-                    mysetappdata(DATA,'Expts',Expts);
+                    DATA = mysetappdata(DATA,'Expts',Expts);
                 end
             else
             Expt = Expts{1};
@@ -8835,7 +8865,7 @@ function Expt = LoadExptA(DATA, exfile, ei)
             Expts{j} = FillTrials(Expts{j},'st');
             Expts{j}.Header.title = [b '.' Expt.Header.expname];
             end
-            mysetappdata(DATA,'Expts',Expts);
+            DATA = mysetappdata(DATA,'Expts',Expts);
         end
         end
     end
@@ -10210,7 +10240,7 @@ function PlotQuickSpikes(DATA, nspk, varargin)
     end
     DataClusters = mygetappdata(DATA,'Clusters');
     npts = length(DATA.spts);
-    Vall = getappdata(DATA.toplevel,'Vall');
+    Vall = mygetappdata(DATA,'Vall');
     probes = 1:size(Vall.V,1);
     DATA.handles = ones(DATA.nprobes,2).*-1;
     subplot('position',[0.01 0.01 0.98 0.98]);
@@ -10272,7 +10302,7 @@ end
 
 if DATA.plotspk.allprobes
     npts = length(DATA.spts);
-    Vall = getappdata(DATA.toplevel,'Vall');
+    Vall = mygetappdata(DATA,'Vall');
     if isempty(probes)
         probes = 1:size(Vall.V,1);
     end
@@ -10451,7 +10481,7 @@ function SyncSpikes(DATA, cells)
     Clusters = mygetappdata(DATA,'Clusters');
 P = Cell2Cluster(cells(1),Clusters);
 Q = Cell2Cluster(cells(2),Clusters);
-    Vall = getappdata(DATA.toplevel,'Vall');
+    Vall = mygetappdata(DATA,'Vall');
    [a, trigtimes{1}] = ismember(P.times,Vall.t);
    [a, trigtimes{2}] = ismember(Q.times,Vall.t);
    Spikes{1}.times = P.times'.*10000;
@@ -11575,7 +11605,7 @@ function DATA = ClassifyAll(DATA, force,varargin)
 %and need to call Classify again anyway to apply refined bounday.
 %Also set cluster.times in each Cluster now for the same reason
 
-    mysetappdata(DATA,'Clusters',DataClusters);
+    DATA = mysetappdata(DATA,'Clusters',DataClusters);
     if autorefine 
         DATA.autorefine = 0;
         DATA = ClassifyAll(DATA,1);
@@ -11802,7 +11832,7 @@ function DATA = ClassifyAndFit(DATA)
     end
     DataClusters{DATA.probe(1)} = DATA.cluster;
     DataClusters{DATA.probe(1)}.times = DATA.t(cl.id);
-    mysetappdata(DATA,'Clusters',DataClusters);
+    DATA = mysetappdata(DATA,'Clusters',DataClusters);
     DATA.plottype = WhichPlotType(DATA.cluster, DATA.currentcluster);
     c = PlotHistogram(DATA, []);
     if DATA.cluster.mahal(4) < 0.001
@@ -12584,7 +12614,7 @@ function MeanSpike = PlotMeanSpike(DATA, varargin)
         lfpts = -20000:10:20000;
         sampleid = DATA.trigtimes{1}(id);
         samplenid = DATA.trigtimes{1}(nid);
-        Vall = getappdata(DATA.toplevel,'Vall');
+        Vall = mygetappdata(DATA,'Vall');
         allid = RectAdd(lfpts, sampleid, 'range', [1 length(Vall.Vsmooth)]);
         MeanSpike.lfpmean = mean(Vall.Vsmooth(allid)+double(Vall.V(allid)),1);
         [st, tid] = ShuffleTimes(Vall.t(sampleid),DATA.Expt);
@@ -12654,6 +12684,11 @@ function MeanSpike = PlotMeanSpike(DATA, varargin)
             return;
         else
             imagesc(ms);
+        end
+        for j = 1:length(DATA.triggerchan)
+            p = DATA.triggerchan(j);
+            xl = get(gca,'xlim');
+            line([xl(1) xl(2)/5],[p p ],'color','k');
         end
     title(sprintf('P%d Cl %d',DATA.probe(1),clnum));
     if size(AllV,1)  == 1
@@ -14226,7 +14261,7 @@ function [Vall, id] = PlotFullV(DATA, t, varargin)
         end
         j = j+1;
     end
-    Vall = getappdata(DATA.toplevel,'Vall');
+    Vall = mygetappdata(DATA,'Vall');
     if size(Vall.V,1) > 1
         voff = DATA.voffset- DATA.voffset(ProbeNumber(DATA));
     else
@@ -15200,7 +15235,7 @@ function MiscMenu(a, b, type)
             fprintf('Layout saved to %s\n',DATA.layoutfile);
         end
     elseif strcmp(type,'preferences')
-%        mysetappdata(DATA,'gui',DATA.gui);
+%        DATA = mysetappdata(DATA,'gui',DATA.gui);
 %        AppDataPopup(DATA, 'gui');
         PreferencesPopup(DATA);
     elseif strcmp(type,'loadlayout')

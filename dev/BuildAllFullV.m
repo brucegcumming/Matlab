@@ -200,8 +200,14 @@ elseif scanfiles
     res.cls{max(suffixes)} = ProcessSuffix(path, probes, max(suffixes), 0, X, args);
     if runautocut == 2
         res.startcuts = now;
-        for ex = donesuff
-            ProcessSuffix(path, probes, ex,0, X,args);
+        if parallel
+            parfor (ex = donesuff)
+                ProcessSuffix(path, probes, ex,0, X,args);
+            end
+        else
+            for ex = donesuff
+                ProcessSuffix(path, probes, ex,0, X,args);
+            end
         end
     end
 return;
@@ -474,19 +480,19 @@ end
 if refcut
     res = {};
     for j = probelist
-        res{j} = AllVPcs(FullV,'tchan',j,'logfid',X.logfid,'savespikes',args{:},'noninteractive');
+        res{j} = AllVPcs(FullV,'tchan',j,'logfid',X.logfid,'savespikes','noninteractive',args{:});
     end
     clear ms;
+
+
+
 elseif ~isempty(template)
     for j = probelist
-        res{j} = AllVPcs(FullV,'tchan',j,'nprobepc',1,'tryall','spkrate',X.spkrate,'cutmode','mahal','logfid',X.logfid,args{:});
+        res{j} = AllVPcs(FullV,'tchan',j,'nprobepc',1,'tryall','spkrate',X.spkrate,'cutmode','mahal','logfid',X.logfid,args{:},'noninteractive');
     end
     clear ms;
 else
-    res = AllVPcs(FullV,'tchan',probelist,'nprobepc',1,'tryall','spkrate',X.spkrate,'cutmode','mahal',args{:},'savespikes','autocutall');
-    if isfield(res,'toplevel')
-        close(res.toplevel);
-    end
+    res = AllVPcs(FullV,'tchan',probelist,'nprobepc',1,'tryall','spkrate',X.spkrate,'cutmode','mahal',args{:},'savespikes','noninteractive','autocutall');
 end
 if lastblk
     PrintMsg(X.logfid,sprintf('%s Too big for one file',outname));

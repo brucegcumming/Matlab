@@ -1,6 +1,8 @@
 function [FitGauss,fval,exitflag] = FitGauss(x,y, varargin)
 %[FitGauss,fval,exitflag] = FitGauss(x,y, varargin)
 % to evaluate a fit FitGauss(x, params, varargs,'eval')
+%         or FitGauss(x, fit, 'eval', where fit is a returned fit struct.
+%         (second method ensures options like period, baseline are the same
 % params are: [mean SD AMP baseline]
 % 
 %the baseline is zero unless called with:
@@ -11,8 +13,20 @@ AMP = 3;
 SD = 2;
 MEAN = 1;
 maxiter = 5000;
+state.freebase = 0;
+state.period = 0;
+state.wrap = 0;
+state.logy = 0;
+state.maxamp = 0;
+state.posamp = 0;
+state.pweight = 0; %give more weight when fitted value is low. Doesn't work properly
+state.meanlimit = [];
 
-if length(x)  < 2 || length(y) < 2
+if isstruct(y) && isfield(y,'state')
+    infit = y;
+    state = infit.state;
+    y = y.params;
+elseif length(x)  < 2 || length(y) < 2
     fprintf('FitGauss:Insufficient Data\n');
     FitGauss = [];
     fval = 0;
@@ -27,14 +41,6 @@ if length(x) == length(y) && length(x) > 1
     guess(AMP) = max(y)/1.2;
 end
 
-state.freebase = 0;
-state.period = 0;
-state.wrap = 0;
-state.logy = 0;
-state.maxamp = 0;
-state.posamp = 0;
-state.pweight = 0; %give more weight when fitted value is low. Doesn't work properly
-state.meanlimit = [];
 j = 1;
 while j <= nargin -2
     if isstruct(varargin{j}) && isfield(varargin{j},'params')  % a fit struct
@@ -175,8 +181,8 @@ else
   FitGauss.base = 0;
 end
 if state.period > 0
-fittedparams(MEAN) = mod(fittedparams(MEAN),state.period);
-   ssd = Minimise(fittedparams, x,y, 0, NaN, state);
+    fittedparams(MEAN) = mod(fittedparams(MEAN),state.period);
+   [ssd, fity] = Minimise(fittedparams, x,y, 0, NaN, state);
 end
 FitGauss.mean = fittedparams(MEAN);
 FitGauss.rss = fval;
@@ -189,11 +195,15 @@ else
 end
     
 FitGauss.exit = exitflag;
-FitGauss.fitted = Gauss(fittedparams,x);
+if state.period > 0
+    FitGauss.fitted = fity;
+else
+    FitGauss.fitted = Gauss(fittedparams,x);
+end
 FitGauss.params = fittedparams; %% in order needed for Gauss(..)
 FitGauss.state = state;
 
-function SSD = Minimise(params,x,y,sdmax,minoffset,state)
+function [SSD, fity] = Minimise(params,x,y,sdmax,minoffset,state)
 
 %BASE=4 AMP=1, SD=2, XCEN=3,
 BASE = 4;

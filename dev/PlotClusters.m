@@ -139,6 +139,7 @@ if strcmp(name,'getstate')
     varargout{1} = DATA;
     return;
 end
+doload = [];
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'LoadAuto',8)
@@ -171,25 +172,8 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'exptload',7)
         DATA = LoadExpts(DATA);
     elseif strncmpi(varargin{j},'Load',4)
-        
-        if ~isfield(DATA,'name') && ischar(name)
-            fprintf('%s is not a directory\n',name);
-            return;
-        elseif isdir(DATA.name)
-          if strncmpi(varargin{j},'LoadSpikes',8)
-            DATA = LoadAll(DATA,[],'loadspikes',warnmode);
-          else
-            DATA = LoadAll(DATA,[],'force', warnmode,'expts',expts,loadargs{:});
-          end
-            set(DATA.lstui,'string',DATA.strings);
-            if strncmpi(varargin{j},'Loadfullv',9)
-                DATA = LoadFullVs(DATA);
-            end
-        else
-            fprintf('%s is not a directory\n',DATA.name);
-            return;
-        end
-elseif strncmpi(varargin{j},'mahaltype',7)
+        doload = varargin{j};
+    elseif strncmpi(varargin{j},'mahaltype',7)
     j = j+1;
     DATA.mahaltype = varargin{j};
     elseif strncmpi(varargin{j},'rebuild',6)
@@ -210,6 +194,27 @@ elseif strncmpi(varargin{j},'mahaltype',7)
         DATA.usealltrials = 1;
     end
     j = j+1;
+end
+
+if ~isempty(doload)
+        if ~isfield(DATA,'name') && ischar(name)
+            fprintf('%s is not a directory\n',name);
+            return;
+        elseif isdir(DATA.name)
+          if strncmpi(doload,'LoadSpikes',8)
+            DATA = LoadAll(DATA,[],'loadspikes',warnmode);
+          else
+            DATA = LoadAll(DATA,[],'force', warnmode,'expts',expts,loadargs{:});
+          end
+            set(DATA.lstui,'string',DATA.strings);
+            if strncmpi(doload,'Loadfullv',9)
+                DATA = LoadFullVs(DATA);
+            end
+        else
+            fprintf('%s is not a directory\n',DATA.name);
+            return;
+        end
+        
 end
 
 if strncmpi(name,'close',4)
@@ -3354,12 +3359,18 @@ elseif bt == 2
     if a
         cid = find(cl == setcl+offset);
         if isempty(cid) && setcl > cl
-            cid = cl; %if hit on 2 but only 1 is defined
+            cid = cl; %if hit on 2 but only 1 is defined as a cell
+            if DATA.nclusters(ex,p) >= setcl
+                cid = setcl;
+            end
         else
             cid = cl(cid);
         end
         if length(b) == 1
             set(c(tid),'Label',sprintf('E%dP%d Cell %d',ex,p,b));
+            if length(cid) == 1
+                set(c(tid),'foregroundcolor',DATA.colors{cid+1});
+            end
         elseif length(cid) == 1
             set(c(tid),'Label',sprintf('E%dP%d Cell %d (%s)',ex,p,b(cid),sprintf('%d ',b(b~=b(cid)))));
             set(c(tid),'foregroundcolor',DATA.colors{cid+1});
@@ -3404,7 +3415,8 @@ if strcmp(type,'CellRates')
 end
 fprintf('Hit %.0f,%.0f %.3f type %d,%d\n',ex,p,zval,type,bt);
 %If not cutting clusters, then set currentcluster to match hit
-if DATA.elmousept.shape < 0
+%if ht
+if DATA.elmousept.shape < 0 && DATA.nclusters(ex,p) >= setcl
     DATA.currentcluster = setcl;
 end
 if isempty(Clusters) || DATA.show.cellsummary

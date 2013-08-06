@@ -63,6 +63,8 @@ if isfield(Array,'type')
     type = Array.type;
 elseif length(Array.X) == 24 && length(unique(Array.X) == 2)
     type = '12x2';
+elseif length(Array.X) == 96
+    type = 'Utah1';
 else
     type = '24';
 end

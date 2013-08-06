@@ -120,7 +120,6 @@ if forcelen
 end
 elseif iscellstr(name)
     txt = name;
-    
 end
 
 id = strmatch('#Not in',txt);
@@ -138,7 +137,9 @@ lid = strmatch('RL',txt);
 fid = strmatch('RF',txt);
 rwid = strmatch('rw',txt);
 idid = strmatch('id',txt);
+dxid = strmatch('dx',txt);
 stid = strmatch('O 5',txt);
+psyid = strmatch('psyv=',txt);
 endid = strmatch('O 3',txt);
 exid = strmatch('Stimulus',txt);
 types(gid) = 1;
@@ -159,6 +160,7 @@ for j = 1:length(pid)
         scores(j) = scores(j)-10;
     end
 end
+
 
 
 if mkufl
@@ -197,15 +199,18 @@ if readexpts
     end
     lasteiid = 0;
         otherrcs = {};
+        trialmode = 0;
     if isempty(sqid)
         sqid = strmatch('dx:',txt);
         if ~isempty(sqid)
+            trialmode = 1;
+            dxid = setdiff(dxid,sqid);
             ceid = strmatch('ce:',txt);
             otherrcs(1).id = ceid;
             otherrcs(1).type = 'ceseq';
         end
     end
-        
+
     if length(exptlist)
         remid = strmatch('Remaining',txt);
 %        exid = strmatch('Expt',txt);
@@ -263,16 +268,30 @@ for j = 1:length(sqid)
         id = 1;
     end
     nframes(j) = nfs(id(end))-1;
-    aid = find(stid < sqid(j));
-    bid = find(endid < sqid(j));
-    if ~isempty(aid) && aid(end) < length(stid)
-        startid = stid(aid(end));
-        nextid = stid(aid(end)+1);
+    if trialmode == 1 && ~isempty(psyid)%sqid lines are before O 5 for current trial
+        aid = find(pid < sqid(j));
+        bid = find(psyid > sqid(j));
+        if isempty(aid)
+            startid = sqid(j) - 10;
+        else
+            startid = pid(aid(end));
+        end
+        if isempty(bid)
+            nextid  = size(txt,1)
+        else
+            nextid = psyid(bid(1))-1;
+        end
     else
-        startid = sqid(j)-50;
-        nextid = sqid(j)+12;
+        aid = find(stid < sqid(j));
+        bid = find(endid < sqid(j));
+        if ~isempty(aid) && aid(end) < length(stid)
+            startid = stid(aid(end));
+            nextid = stid(aid(end)+1);
+        else
+            startid = sqid(j)-50;
+            nextid = sqid(j)+12;
+        end
     end
-    
     line = txt(sqid(j),:);
     if strncmp(line,'ce:',3)
         nc=5;
@@ -370,7 +389,10 @@ for j = 1:length(sqid)
         end
         Trials(j).exvals = x;
     end
-
+%    id = find(dxid < sqid(j));
+%    if ~isempty(id)
+%        Trials(j).dx = sscanf(txt(dxid(id(end)),:),'dx%f');
+%    end
     
     if scores(t) == 0 || scores(t) == -2 || length(seedseq{j}) > 250
         Trials(j).result = -1;
@@ -380,8 +402,19 @@ for j = 1:length(sqid)
         Trials(j).result = scores(t);
     elseif ~isempty(a{snfield}) %sign is in the line
         Trials(j).result = 1;
-        Trials(j).RespDir = scores(t) .* sign(a{snfield}(1)-0.5);
-        Trials(j).rwdir = sign(a{snfield});
+        if a{snfield}(1) == 0
+            Trials(j).correct = scores(t);
+            id = find(psyid < sqid(j));
+            if ~isempty(psyid)
+                psyv = sscanf(txt(psyid(id(end)),:),'psyv=%f');
+                Trials(j).RespDir = scores(t) .* sign(psyv);
+                Trials(j).rwdir = sign(psyv);
+                Trials(j).psyv = psyv;
+            end
+        else
+            Trials(j).RespDir = scores(t) .* sign(a{snfield}(1)-0.5);
+            Trials(j).rwdir = sign(a{snfield});
+        end
     else
         Trials(j).result = -2;  %%for now, if rwsign not known, cant get RespDir;
         Trials(j).RespDir = 0;

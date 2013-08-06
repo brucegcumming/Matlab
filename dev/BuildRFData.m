@@ -16,7 +16,7 @@ if recurse
     for j= 1:length(d)
         if d(j).isdir
             rf = GetRFFromDir(d(j).name);
-            if length(rf) > 2
+            if ~isempty(rf)
                 nc = nc+1;
                 rfs{nc} = rf;
             end
@@ -29,9 +29,9 @@ end
 
 function therf = GetRFFromDir(dirname)
 d = mydir([dirname '/*.ufl']);
+therf = [];
 
 if isempty(d)
-    therf = NaN;
     return;
 end
 nrf = 0;
@@ -43,5 +43,17 @@ for j = 1:length(d);
         rf{nrf} = sscanf(txt{rid(k)},'cm=rf%f,%f:%fx%f,%fdeg pe%f %f,%f fx=%f,fy=%f');
         rfs(nrf,1:length(rf{nrf})) = rf{nrf};
     end
+    if ~isempty(regexp(d(j).name,'[M][0-9][0-9]'))
+        types(j) = 1;
+    else
+        types(j) = 2;
+    end
 end
-therf = prctile(rfs,50);
+type = prctile(types,50);
+if type == 1
+    therf.electrode= 'uProbe';
+else
+    therf.electrode = 'Normal';
+end
+therf.rf = prctile(rfs,50);
+therf.name = dirname;

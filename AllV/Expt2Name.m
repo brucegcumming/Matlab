@@ -4,6 +4,8 @@ function [expname, exptypename, suff, stimname]  = Expt2Name(Expt, varargin)
 SpkDefs;
 suff = [];
 addsuff = 0;
+crtrial = 0;
+nt = length(Expt.Trials);
 
 j = 1;
 while j <= length(varargin)

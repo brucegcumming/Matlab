@@ -131,4 +131,4 @@ if isnan(d)
 end
 
 
-dlist(1) = d;
+dlist(1) = d(1);

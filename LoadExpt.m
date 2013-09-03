@@ -1,9 +1,19 @@
 function Expt = LoadExpt(name, varargin);
+%Expt = LoadExpt(name,...
+%Loads an Expt File, checks for some inconsistencies, and returns;
+%Expt = LoadExpt(name,'loadem') Adds eye position data to teh Trials
+%Expt = LoadExpt(name,'loadlfp') Adds LFP data to teh Trials.  The length of Trials.LFP is
+%   forced to be the same for all trials. Missing samples are filled with NaN
+%Expt = LoadExpt(name,'loadlfp','zeropad') fills missing samples with 0
+
 loadem = 0;
+loadlfp = 0;
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'loadem',6)
         loadem = 1;
+    elseif strncmpi(varargin{j},'loadlfp',6)
+        loadlfp = 1;
     end
     j = j+1;
 end
@@ -26,8 +36,19 @@ if ~exist(name,'file')
     if isempty(Expt)
         return;
     end
+elseif isdir(name)
+    Expt = [];
+    return;
 else
     load(name);
+end
+if ~exist('Expt','var') && exist('AllExpt','var')
+    AllExpt.Expt.Header.loadname = name;
+    if loadlfp
+        AllExpt.Expt = LoadLFP(AllExpt.Expt);
+    end
+    Expt = AllExpt;
+    return;
 end
 if ~exist('Expt','var') && exist('cExpt','var')
     Expt = cExpt;
@@ -39,13 +60,8 @@ Expt.Header.loadname = name;
 
 
 idx = [];
-if exist('AllExpt','var')
-    AllExpt.Expt.Header.loadname = name;
-    Expt = AllExpt;
-    return;
-end
 if ~exist('Expt','var') | ~isfield(Expt,'Trials')
-    if exist('cExpt','var') | ~isfield(cExpt,'Trials')
+    if exist('cExpt','var') & isfield(cExpt,'Trials')
         Expt =  cExpt;
     else
     Expt = [];
@@ -107,4 +123,8 @@ end
 
 if loadem
     Expt = LoadEmData(Expt);
+end
+
+if loadlfp
+    Expt = LoadLFP(Expt,varargin{:});
 end

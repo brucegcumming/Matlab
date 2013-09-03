@@ -3,11 +3,14 @@ function DATA = FixClusterFiles(name, varargin)
 %reads in Cluster files made by AllVPcs and plots up clusters for each
 %expt/cell
 %FixClusterFiles(name, 'write')  writes out any modified Cluster structs
+%FixClusterFiles(dir, 'checkexpt','Expts',Expts) Checks that numbering of Expts
+%in the ClusterTimes Files matches Expts
 %
 cmpdrive = [];
 forcewrite = 0;
 TAGTOP = 'PlotClusters';
 args = {};
+Expts = [];
 errs = {};
 j = 1;
 while j <= length(varargin)
@@ -74,7 +77,9 @@ elseif isdir(name)
     id = setdiff(1:length(strings),xid);
     strings = strings(id);
 elseif exist(name,'file')
-    strings{1} = name;
+    d = mydir([fileparts(name) '/*ClusterTimes.mat']);
+    strings = {d.name name};
+%    strings{1} = name;
 end
 
 DATA = FixClusters(strings,args{:});
@@ -94,9 +99,11 @@ function [DATA, errs] = FixClusters(strings, varargin)
     clstcheck = 0;
     copyallnewer = 0;
     checkauto = 0;
+    checkexpt = 0;
     fixlatestbug = 0;
     findspace = [];
     sublist = [];
+    Expts = [];
     DATA.saves = {};
 while j <= length(varargin)
     if strncmpi(varargin{j},'templatesrc',11)
@@ -109,12 +116,17 @@ while j <= length(varargin)
         clstcheck =  1;
     elseif strncmpi(varargin{j},'checkauto',9)
         checkauto = 1;
+    elseif strncmpi(varargin{j},'checkexpt',9)
+        checkexpt = 1;
     elseif strncmpi(varargin{j},'checknext',9)
         checknext = 1;
     elseif strncmpi(varargin{j},'checkmean',9)
         checkmean = 1;
     elseif strncmpi(varargin{j},'copynew',7)
         copyallnewer = 1;
+    elseif strncmpi(varargin{j},'expts',5)
+        j = j+1;
+        Expts = varargin{j};
     elseif strncmpi(varargin{j},'latest',6)
         fixlatestbug = 1;
     elseif strncmpi(varargin{j},'sublist',7) % just checkcertain files
@@ -150,6 +162,14 @@ end
        newlog.expts = CellToMat(newlog.ClusterLog,'exptno');
        newlog.savetime = CellToMat(newlog.ClusterLog,'savetime');
    end
+   
+   if checkexpt && isempty(Expts)
+       [a, Expts] = APlaySpkFile(strings{end});
+   end
+   if checkexpt && isempty(strfind(strings{end},'ClusterTimes'))
+       strings = strings(1:end-1);
+   end
+
     for j = 1:length(strings)
         nerr = length(errs);
         if ischar(strings{j})
@@ -175,6 +195,9 @@ end
             end
         else 
             exptlist = [];
+        end
+        if isempty(strfind(strings{j},'ClusterTimes'))
+            go = 0;
         end
         if go
             if length(cmpdrive)
@@ -223,6 +246,29 @@ end
         saveclusters = 0;
         if diff(size(exptlist)) <0
             exptlist = exptlist';
+        end
+        
+        if checkexpt && ~isempty(Expts)
+            if isfield(Clusters{1},'usealltrials') && Clusters{1}.usealltrials
+                fprintf('Calling APlaySpkFile with usealltrials');
+                if ~isfield(Expts{1}.Header,'usebadtrials') || Expts{1}.Header.usebadtrials == 0
+                    [a, Expts] = APlaySpkFile(Expts{1}.Header.loadname,'usealltrials');
+                end
+            end
+            t = minmax(Clusters{1}.times);
+            for e = 1:length(Expts)
+                matched(e) = 0;
+                if t(1) > Expts{e}.Header.trange(1)./10000 && t(2) < Expts{e}.Header.trange(2)./10000 
+                    fprintf('%s Matches Expt %d\n',strings{j},e);
+                    matched(e) = 1;
+                elseif t(1) > Expts{e}.Header.trange(1)./10000 && t(1) < Expts{e+1}.Header.trange(1)./10000
+                    cprintf('red','%s Bigger than  Expt %d\n',strings{j},e);
+                    matched(e) = 2;
+                end
+            end
+            if sum(matched) == 0
+                    cprintf('red','%s No matching Expt\n',strings{j});                    
+            end
         end
         for k = exptlist
             cmodified = 0;

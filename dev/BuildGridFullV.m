@@ -172,8 +172,12 @@ vid  = [];
                     sumv(1:length(FullV.V)) = sumv(1:length(FullV.V)) + FullV.V./std(FullV.V);
                 end
             end
+            FullV.intscale(3) = max(abs(FullV.V));
             FullV.sumscale = 0; %set below if mean is subtracted.    
             xscale = v.MetaTags.Resolution./max(abs(FullV.V));
+            FullV.skew = skewness(FullV.V);
+            FullV.kurtosis = kurtosis(FullV.V);
+            FullV.intscale(4) = prctile(abs(FullV.V),99.9); %may use to check for bad outliers....
             FullV.highpass = DATA.highpass;
             if isnan(DATA.highpass)
                 [ratio, details] = HighLowRatio(FullV);
@@ -187,7 +191,7 @@ vid  = [];
                 FullV.HLratio = ratio;
                 FullV.coilnoiseratio = details.coilratio;
             end
-            FullV.V = int16(FullV.V * xscale);
+            FullV.V = int16(roune(FullV.V * xscale));
             FullV.savetime = now;
             result.buildtime(p) = FullV.savetime;
             t = mygetCurrentTask();

@@ -28,7 +28,7 @@ function result = PlotExpt(name, varargin)
 %
 %PlotExpt(Expt,'psych') splits data into two according to psych choices,
 %and plots psf. 
-
+%
 %PlotExpt(Expt,'psych','cp') calculates choice probability, and plots rates
 %'cpt' plots mean sdf by choice, 'cph' plots spikecount histograms by
 %PlotExpt(Expt,'cpt','eyem') adds mean eye position traces to timecourse
@@ -41,7 +41,8 @@ function result = PlotExpt(name, varargin)
 %PlotExpt(Expt,'block',blockids)
 %                       Plots data only for the blocks in blockids. Look in 
 %                       Expt.Header.BlockStart for a list
-
+%...,'seqt')  Plot counts for each trial against time
+%...,'seqid')  Plot counts for each trial against id#
 
 
 
@@ -300,7 +301,9 @@ else
 Expt = name;
 name = Expt.Header.Name;
 end
-
+if ~isfield(Expt,'Trials')
+    return;
+end
 
 %if ignorename is set to zero by the input args, leave it this way.
 if ~isempty(Expt.Stimvals.et) & ~isempty(Expt.Stimvals.e2) & ischar(Expt.Stimvals.et) & ignorename
@@ -441,6 +444,9 @@ for j = 1:length(Expt.Trials);
       Expt.Trials(j).RespDir = 0;
   end
   if getlfp & ~isfield(Expt.Trials,'FTlfp')
+      if isfield(Expt.Trials,'LFP')
+          Expt.Trials(k).FTlfp = 0;
+      else
       while LFP.Trials(k).Start < Expt.Trials(j).Start
           k = k+1;
       end
@@ -449,6 +455,7 @@ for j = 1:length(Expt.Trials);
            [Expt.Trials(j).LFP Expt.Trials(j).FTlfp] = FilterLFP(LFP.Trials(k).LFP(1:lfplen),LFP.Header.CRsamplerate,'freq',mainsf);
            k = k+1;
        end
+      end
   end
 end
 if revcor
@@ -456,7 +463,7 @@ if revcor
         result.Data = Expt;
         result.name = Expt.Header.Name;
     if plotpsych
-        args = {Expt.Stimvals.et,'Type2',Expt.Stimvals.e2};
+        args = {Expt.Stimvals.et};
         args = CheckExpt(Expt, args);
         GetFigure('Psych');
         hold off;
@@ -656,7 +663,7 @@ if ignorename
         Expt = FillTrials(Expt,'rd');
         args = {'dx', 'Type2', 'rd'};
     end
-    if isfield(Expt.Trials,'od') && isfield(Expt.Trials,'me') && isfield(Expt.Trials,'or')
+    if (isfield(Expt.Trials,'od')|| Expt.Stimvals.od ~= 0) && isfield(Expt.Trials,'me') && isfield(Expt.Trials,'or') 
         Expt= FillTrials(Expt,'or');
     end
     if sum(strcmp(Expt.Stimvals.e3,{'sM' 'ce' 'mixac' 'a2'}))

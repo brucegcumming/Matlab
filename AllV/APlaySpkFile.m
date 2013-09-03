@@ -93,9 +93,12 @@ while j <= length(varargin)
         state.needframes = 0;
     elseif strncmpi(vg,'profile',6)
         state.profiling = 1;
-    elseif strncmpi(vg,'quicksuffix',9)
+    elseif sum(strncmpi(vg,{'quicksuffix' 'quickload'},9))
        ignoreSpikeO = 2;
        quickload = 1;
+       if strcmp(vg,'quicksuffix')
+           quickload = 2;
+       end
     elseif strncmpi(vg,'relist',4)
         mkidx = 1;
     elseif strncmpi(vg,'saveexpts',6)
@@ -532,6 +535,9 @@ if ischar(name)
                     else
                         go = 1;
                     end
+                    if quickload == 2 %temp test for dynamically loading everything
+                       go = 0;
+                    end
                     if suffix == csuffix && go
                     fprintf('loading %s\n',d(j).name);
                     clusterdate = d(j).datenum;
@@ -562,7 +568,7 @@ if ischar(name)
                             if exist(dname)
                                 b = load(dname);
                                 for k = 1:length(a.Clusters)
-                                    if isfield(b.ClusterDetails{k},'t') && ~isfield(a.Clusters,'xy')
+                                    if isfield(b.ClusterDetails{k},'t') && ~isfield(a.Clusters{k},'xy')
                                         a.Clusters{k}.times = b.ClusterDetails{k}.t;
                                         a.Clusters{k}.xy = b.ClusterDetails{k}.xy;
                                         a.Clusters{k}.clst = b.ClusterDetails{k}.clst;
@@ -1228,7 +1234,9 @@ end
 %Trials.esstimes(id) = NaN;
 
 tic;
-opid = strmatch('op',Text.text);
+xid = strmatch('op=',Text.text); %Text descriptors
+opid = setdiff(strmatch('op',Text.text),xid);
+
 for j = 1:length(opid)
     str= sscanf(Text.text(opid(j),:),'op%d');
     if ~isempty(str)
@@ -1581,7 +1589,7 @@ if length(fsid) == length(bsid)
                 else
                     Trials.FalseStart(j) = 1;
                     Trials.delay(j) = NaN;
-                    ff = id(1);
+                    ff = 1;
                 end
 
           
@@ -1600,6 +1608,12 @@ if length(fsid) == length(bsid)
           id = find(rwtimes > Trials.Start(j) & rwtimes < nextfs);
           if ~isempty(id)
               Trials.rwtimes(j,1:length(id)) = rwtimes(id);
+          else
+              if Trials.estimes(j)-Trials.bstimes(j) > 20000 & Trials.Result(j) > 0
+              Trials.rwtimes(j,1:length(id)) = 0;
+              else
+              Trials.rwtimes(j,1:length(id)) = 0;
+              end
           end
       end
       if mod(j,100) == 0
@@ -2317,7 +2331,9 @@ for j = 1:length(aText.text)
             end
         elseif strncmp(txt,'op',2)
             a = sscanf(txt(3:end),'%f,%f');
-            if ~isempty(a)
+            if txt(3) == '='  %char description
+                Stimulus.OptionCode = txt(4:end);
+            elseif ~isempty(a)
                 Stimulus.op = a(1);
             end
             if length(a) > 1
@@ -3182,7 +3198,7 @@ ids = [ids find(strcmp('ex3val',fn))];
 state.tt = TimeMark(state.tt,'Set Fields');
 
 %do not include PhaseSeq here - has special cases
-seqstrs = {'Seedseq' 'dxvals' 'cevals'};
+seqstrs = {'dxvals' 'cevals'};
 seqvars = {};
 for j = 1:length(seqstrs)
     id = find(strcmp(seqstrs{j},fn));
@@ -3465,6 +3481,8 @@ for nx = 1:length(AllExpts)
         end
 % for image seqs, Stimseq records the order of seeds, and there will not
 % be a conversion to stimulus type
+%NB. Seedseq is NOT in seqvars, and is handled separately. Don't want to
+%build substpace maps, to don't make Start/End into vectors
        needseq = 0;
        for ns = 1:length(seqvars)
            if length(AllTrials.(seqvars{ns}){igood(k)}) > 1
@@ -3534,7 +3552,7 @@ for nx = 1:length(AllExpts)
                 Trials(k).cR(Trials(k).cR < 0) = 0;
                 Trials(k).cR(Trials(k).cR > 512) = 0;
             end
-            if isfield(AllTrials,'Phaseseq') & length(AllTrials.Phaseseq{igood(k)}) > 0
+            if isfield(AllTrials,'Phaseseq') & length(AllTrials.Phaseseq{igood(k)}) > 1
                 if Expt.Stimvals.sM ==13 && Expt.Stimvals.st == STIM_BAR
                 Trials(k).lph = lphasevals(AllTrials.Phaseseq{igood(k)}+1);
                 Trials(k).rph = rphasevals(AllTrials.Phaseseq{igood(k)}+1);
@@ -3620,6 +3638,19 @@ for nx = 1:length(AllExpts)
         
         durs(k) = Trials(k).End(end) - Trials(k).Start(1);
         nframes(k) = length(Trials(k).Start);
+    end
+    if isfield(Trials,'ob') && sum([Trials.ob] < 0) && ~isfield(Trials,'or')
+        aid = find([Trials.ob] >= 0);
+        bid = find([Trials.ob] < 0);
+        [Trials(aid).or] = deal(Expt.Stimvals.or);
+        if Expt.Stimvals.or > 25
+            [Trials(bid).or] = deal(Expt.Stimvals.or-90);
+        else
+            [Trials(bid).or] = deal(Expt.Stimvals.or+90);
+        end
+        for j = 1:length(Trials)
+            Trials(j).ob = abs(Trials(j).ob);
+        end
     end
     if isfield(Trials,'CorLoop')
         id = find([Trials.CorLoop] == 0);
@@ -3968,7 +3999,7 @@ end
 function Idx = AddError(err, varargin)
 
 if ischar(err) %% old style
-    Idx = varargin{1}
+    Idx = varargin{1};
     show = varargin{2};
 else
     Idx = err;

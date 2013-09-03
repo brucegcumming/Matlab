@@ -379,6 +379,8 @@ elseif strncmpi(str,'Psych',4)
               if sethold == 0
               hold off;
               end
+              pres = ExptPsych(Expt);
+              showplot = 2;
           end
           if strcmp(Expt.Stimvals.e2,'Id') || strcmp(Expt.Stimvals.e2,'e0')
               for k = 1:size(dres.psum,2)
@@ -445,7 +447,7 @@ elseif strncmpi(str,'Psych',4)
               end
               if length(psf) > 1
                   fit = fitpsf(psf);
-                  if showplot
+                  if showplot == 1 %now plotted with ExptPsych
                       plot([psf.x],[psf.resp]./[psf.n],'o','color',colors{k});
                       h = fitpsf(fit.data,'showfit',fit,psfargs{:},'color',colors{1});
                       fit.fith = h.fith;
@@ -834,6 +836,7 @@ for ie = 1:length(extraexp)
             extra.n(ie) = length(counts(idx));
             extra.sd(ie) = std(counts(idx));
             extra.id{ie} = idx;
+            extra.ids{ie} = [Expt.Trials(idx).id];
             extra.counts{ie} = counts(idx);
             extraidx = [extraidx idx];
             if gettimes
@@ -855,12 +858,13 @@ for ie = 1:length(extraexp)
 end
 
 
-if plotlfp  
+if plotlfp  && isfield(Expt.Trials,'FTlfp')
     if extra.n(1) > 0
         idx = extra.id{1};
         fts = abs([Expt.Trials(idx).FTlfp]);
         ft = mean(fts,2);
         aft = mean(fts,1);
+        if length(ft) >= max(agidx);
         blanklfpwr = mean(ft(gidx));
         ablanklfpwr = mean(ft(agidx));
         bblanklfpwr = mean(ft(bgidx));
@@ -886,6 +890,7 @@ if plotlfp
         cgidx = minf:maxf;
         cblanklfpwr = mean(ft(cgidx));
         lfpautof = [ftfrq(minf) ftfrq(maxf)];
+        end
     else
         blanklfpwr = 0;
         ablanklfpwr = 0;
@@ -1108,6 +1113,9 @@ for nc = 1:length(cvals)
 
                 lfpch = 1;
                 if plotlfp
+                    if length(ft) == 0
+                        plotlfp = 2;
+                    end
                     subplot(2,1,2);
                     fts = abs([Expt.Trials(idx).FTlfp]);
                     ft = mean(abs([Expt.Trials(idx).FTlfp]),2);
@@ -1120,6 +1128,7 @@ for nc = 1:length(cvals)
                         fprintf('No Data for %s\n',stimlab);
                     else
                         if plotlfp == 2 %time domain
+                            addl = mod(addl,100);
                             ts = [1:size([Expt.Trials.LFP],1)] .* Expt.Header.LFPsamplerate;
                             lfph(nlfp) = plot(ts,mean([Expt.Trials(idx).LFP],2),'color',colors{ix+addn+addl});
                             result.lfpt(ix,ie,:) = mean([Expt.Trials(idx).LFP],2);
@@ -1128,6 +1137,7 @@ for nc = 1:length(cvals)
                         end
                         lfplabels{nlfp} = stimlab;
                         nlfp = nlfp + 1;
+                        if length(ft) > 1
                         result.lfpwr(ix,ie,nc) = mean(ft(gidx)) - blanklfpwr;
                         result.alfpwr(ix,ie,nc) = mean(ft(agidx)) - ablanklfpwr;
                         result.blfpwr(ix,ie,nc) = mean(ft(bgidx)) - bblanklfpwr;
@@ -1137,6 +1147,7 @@ for nc = 1:length(cvals)
                         result.blfpwrs{ix,ie,nc} = mean(fts(bgidx,:),1) - bblanklfpwr;
                         result.clfpwrs{ix,ie,nc} = mean(fts(cgidx,:),1) - cblanklfpwr;
                         result.lpfsnr = Expt.Header.LFPsnr;
+                        end
                         hold on;
                     end
                     if(laxis ~= 0)
@@ -1218,7 +1229,7 @@ for nc = 1:length(cvals)
                 set(ber,'color',colors{ie+addn},'linestyle',linestyle{nc});
             end
 
-            if(plotlfp)
+            if(plotlfp ==1)
                 for li = 1:size(result.lfpwrs,1)
                     lstd(li) = std(result.lfpwrs{li,ie,nc}) ./ sqrt(length(result.lfpwrs{li,ie,nc}));
                     astd(li) = std(result.alfpwrs{li,ie,nc}) ./ sqrt(length(result.alfpwrs{li,ie,nc}));
@@ -1373,6 +1384,7 @@ if extra.n(ie) > 0 & ~plotsimple
       end
       fts = abs([Expt.Trials(idx).FTlfp]);
       ft = mean(abs([Expt.Trials(idx).FTlfp]),2);
+      if length(ft) > 1
       extra.lfpwr(ie) = mean(ft(gidx)) - blanklfpwr;
       extra.lfpwrs{ie} = mean(fts(gidx,:),1) - blanklfpwr;
       extra.alfpwrs{ie} = mean(fts(agidx,:),1) - ablanklfpwr;
@@ -1385,7 +1397,7 @@ if extra.n(ie) > 0 & ~plotsimple
       extra.alfpse(ie) = std(mean(fts(agidx,:),1))/sqrt(length(idx));
       extra.blfpse(ie) = std(mean(fts(bgidx,:),1))/sqrt(length(idx));
       extra.clfpse(ie) = std(mean(fts(cgidx,:),1))/sqrt(length(idx));
-
+      end
       if showplot & plotlfp == 1
           if ie ==1  %%Blank stimulus
               plot(ftfrq(fidx),ft(fidx),'color','k','linewidth',2);
@@ -1444,7 +1456,7 @@ end
 end
 
 
-if plotlfp & showplot
+if plotlfp == 1 & showplot
     subplot(2,1,2);
     if isempty(result.lfpautorange)
         title(sprintf('No Blank'));

@@ -5,12 +5,15 @@ SpkDefs;
 suff = [];
 addsuff = 0;
 crtrial = 0;
+addprobe = 0;
 nt = length(Expt.Trials);
 
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'addsuff',6)
         addsuff = 1;
+    elseif strncmpi(varargin{j},'addprobe',6)
+        addprobe = 1;
     end
     j = j+1;
 end
@@ -98,6 +101,14 @@ end
     expname = [stimname '.' exptypename];
 if addsuff
     expname = [expname suff];
+end
+
+if addprobe
+    if isfield(Expt.Header,'cellnumber') && Expt.Header.cellnumber > 0
+        expname = [expname '.cell' num2str(Expt.Header.cellnumber)];
+    elseif isfield(Expt.Header,'probe')
+        expname = [expname '.p' num2str(Expt.Header.probe)];
+    end
 end
 
     

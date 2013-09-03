@@ -234,7 +234,7 @@ for j = 1:length(d)
     end
     end
 end
-if nx > 1
+if nx > 0
     [a,b] = sort(details.exptno);
     names = names(b);
     details.ntrials = details.ntrials(b);
@@ -244,7 +244,7 @@ if nx > 1
     try
         save(outname,'details');
     end
-elseif ~exist(outname)
+elseif ~exist(outname) || relist
     details.names = {};
     details.exptno = [];
     save(outname,'details');

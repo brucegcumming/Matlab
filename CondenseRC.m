@@ -69,6 +69,9 @@ for j = 1:length(Expt.Trials)
     if isfield(Expt.Trials,'st')
         Expt.Trials(j).st = median(Expt.Trials(j).st);
     end
+    if isfield(Expt.Trials,'ce')
+        Expt.Trials(j).ce = median(Expt.Trials(j).ce);
+    end
 end
 if Expt.Trials(1).Dw >=18
     Expt.Trials(1).or = mode(exptor);

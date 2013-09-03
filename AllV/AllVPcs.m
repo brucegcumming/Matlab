@@ -13,6 +13,14 @@ function res = AllVPcs(V, varargin)
 %AllVPcs(V, 'tchan',c,'trigdt') or AllVPcs(V, 'tchan',c,'dtthr')  trigggers off dVdt
 %AllVPcs(V, 'tchan',c,'dtthr2') Triggers off second temporal derivative
 %
+%AllVPcs(V, 'tchan',c,'dtthr3') Triggers off energy.  N.B. This is dagnerous, because 
+%  of an attempt to align spikes. The trigger point is moved to the nearest max (th+) or min (th-)
+%  in the voltage record.  The means that the histogram of trigger values is altered (measures energy at the new
+%  trigger point, whihc is different, so no longer get a hard edge to the histogram.
+%   ....'dtthr3','thboth') disables the voltage alignment so that the tirgger values are correct
+%  but this can produce artifactual clustering...
+
+
 %AllVPcs(V, 'tchan',c, 'triggertemplate', Clusters{p}) convolves trgger
 %    channel with template in cluster, triggers on peaks
 %
@@ -312,6 +320,7 @@ tt = TimeMark(tt,'Start',DATA.profiling);
 
 if length(varargin) & strcmp(varargin{end},'autocutall')
     autocutall = 1;
+    autocutarg = length(varargin);
 else
     autocutall = 0;
 end
@@ -734,6 +743,7 @@ end
 
 addmean = [];
 
+autocutarg = 0;
 passonargs = {};
 
 j = 1;
@@ -746,8 +756,10 @@ while j <= length(varargin)
         DATA.usetrials = 0;
     elseif strncmp(varargin{j},'autocutall',10)
         autocutall = 1;
+        autocutarg = j;
     elseif strncmp(varargin{j},'quickautocutall',13)
         autocutall = 2;
+        autocutarg = j;
         DATA.autocutmode = 'quick';
     elseif strncmp(varargin{j},'quickautocut',9)
         autocutone = 1;
@@ -1351,7 +1363,9 @@ if DATA.profiling
 end
 
 tt = TimeMark(tt,'After varargs',DATA.profiling);
-
+if DATA.trigdt == 3  && thsign ~=2
+    cprintf('blue','Energy Thresholds with voltage sign are Dangerous - See help\n');
+end
 
 if isfield(Vall,'V')
     if isfield(Vall,'t')  && abs(length(Vall.t) - size(Vall.V,2)) > 1
@@ -1385,7 +1399,8 @@ if autocutall
 F = SetFigure(DATA.tag.top, DATA);
 DATA.toplevel = F;
 set(DATA.toplevel,'UserData',DATA)
-res = AutoCutAll(ispk,  F, Vall, DATA, varargin(1:end-1));
+id = setdiff(1:length(varargin),autocutarg);
+res = AutoCutAll(ispk,  F, Vall, DATA, varargin(id));
 res.toplevel = F;
 res.logfid = DATA.logfid;
 return;
@@ -1926,7 +1941,7 @@ if subtractadj && ispk > 1 && ispk <= DATA.nprobes
 end
 if DATA.trigdt
     if DATA.trigdt == 3 %10pt moving average of dvdt = energy
-        smv = smooth(diff(smv).^2,10);
+        smv = smooth(diff(smv).^2,3,'gauss');
     elseif ismember(DATA.trigdt,[4 5]) %convolve with template
         if recluster && isfield(DATA.cluster,'TriggerTemplate')
             DATA.TriggerTemplate = DATA.cluster.TriggerTemplate;
@@ -1977,8 +1992,8 @@ if verbose > 1
     fprintf('%s %s %s\n',IDStr(DATA),tt(end).str,datestr(now,'HHMM:ss'));
 end
 DATA.nprobes = size(Vall.V,1);
-if ~isfield(DATA,'cluster')
-    DATA.cluster = [];
+if ~isfield(DATA,'cluster') || ~isfield(DATA.cluster,'version')
+    DATA.cluster.version = DATA.version;
 end
 F = SetFigure(DATA.tag.top,DATA);
 DATA.toplevel = F;
@@ -3630,7 +3645,7 @@ function DATA = mysetappdata(DATA, str, val)
 
 function val = mygetappdata(DATA, str)
         if DATA.interactive < 0
-            if isfield(DATA.appdata,str)
+            if isfield(DATA,'appdata') && isfield(DATA.appdata,str)
                 val = DATA.appdata.(str);
             else
                 val = [];
@@ -4268,20 +4283,24 @@ elseif th(1) > 0
 else
     autoth = 1;
 end
+nv = length(id);
 if isempty(id)
     if DATA.trigdt == 4
         GetFigure(DATA.tag.vhist);
         hold off;
         id = find(abs(sgn) > 1);
+        nv = length(id);
         hist(rV(id),500);
     end
     if DATA.thsign == 1 || DATA.trigdt == 3
         id = find(sgn(1,:) < 0)+1;
+        nv = length(id);
         prc = DATA.setnspk .* 100./length(id); % get 1000 spikes
         th(1) = prctile(rV(id),100-prc);
         id = id(rV(1,id) > th(1));
     else
         id = find(sgn(1,:) > 0)+1;
+        nv = length(id);
         prc = DATA.setnspk .* 100./length(id); % get 1000 spikes
         if prc > 100 %can happen if nspk > # minima
             th(1) = max(rV(1,id));
@@ -4319,7 +4338,7 @@ else
 [a,b] = max(v);
 end    
 xid = id(sid+b-1);
-fprintf('%s Removing %d double Triggers\n',IDStr(DATA),length(xid));
+fprintf('%s Removing %d double Triggers (from %d/%d maxima)\n',IDStr(DATA),length(xid),length(id),nv);
 yid = id(sid+2-b);
 id = setdiff(id,xid);
 else
@@ -4327,7 +4346,8 @@ else
 end
 id = id(id > -DATA.spts(1) & id < size(rV,2)-DATA.spts(end));
 
-if DATA.trigdt == 3  %spk energy trigger
+if DATA.trigdt == 3  && DATA.thsign < 2 %spk energy trigger. Not alighn to peak voltage near enrgy max
+%'thboth' (thsign = 2) argument turns this off    
     FullV = mygetappdata(DATA,'Vall');
     for j =1:length(id)
         if DATA.thsign == 1
@@ -7439,7 +7459,9 @@ figure(DATA.toplevel);
         PlaceUi(a,b,'up');
         b =uicontrol(F,'style','pushbutton','string','SetSpkrate','callback',{@RetriggerDialog, 'setspkrate'});
         PlaceUi(a,b,'left');
-        e = uicontrol(F,'style','pop','string','V|dVdt|accel|energy|Template|Templatedt','tag','trigtype');
+        e = uicontrol(F,'style','pop','string','V|dVdt|accel|energy (dangerous)|Template|Templatedt','tag','trigtype');
+        trigstate.type = 1+DATA.trigdt;
+        set(e,'value',trigstate.type);
         PlaceUi(b,e,'left');
         c = uicontrol(F,'style','text','string','Threshold','tag','labelthrehsold');
         PlaceUi(e,c,'left');

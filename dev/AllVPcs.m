@@ -91,6 +91,7 @@ DATA.plot.dprimemin = 0;
 DATA.plot.xcorrtype = 'xcorr';
 DATA.plot.labelwithid = 0;
 
+
 DATA.autocutmode = 'mahal';
 DATA.autorefine = 0;
 DATA.csd = 0;
@@ -138,6 +139,7 @@ DATA.user = GetUserName();
 DATA.readlayout = 0;
 DATA.loadedClusterDetails = 0;
 prefsdir = '/bgc/group/matlab/preferences/AllVPcs';
+DATA.gui.prefsidr = prefsdir;
 DATA.layoutfile = [];
 DATA.configfile = [];
 DATA.plot.isi = 0;
@@ -193,6 +195,7 @@ Expts = {};
 
 forcetrigger = 0;
 forceevec = 0;
+forceeventlist = [];
 
 matcheventcounts = 0;
 fixerrs = 0;
@@ -274,8 +277,9 @@ DATA.tag.celllist = 'AllCellList';
 DATA.tag.fullv = 'FullV';
 DATA.tag.comments = 'AllVcomment';
 DATA.profiling = 0;
-DATA.defaultconfig = [prefsdir '/' gethostname '.' GetUserName '.config'];
-DATA.defaultlayout = [prefsdir '/' gethostname '.' GetUserName '.layout.mat'];
+DATA.hostname = gethostname;
+DATA.defaultconfig = [prefsdir '/' DATA.hostname '.' GetUserName '.config'];
+DATA.defaultlayout = [prefsdir '/' DATA.hostname '.' GetUserName '.layout.mat'];
 
 DATA.plotrv = 0;
 
@@ -535,7 +539,7 @@ if ischar(V)
         Vall = getappdata(F,'Vall');
         vt = DATA.t;
         else
-            fprintf('Can''t Find %s\n',V);
+            mycprintf('errors','Can''t Find %s\n',V);
             return;
         end
     end
@@ -604,6 +608,9 @@ if isstruct(V)
                 fprintf('%s Using Expt appdata\n',IDStr(DATA));
             end
             Expts = mygetappdata(DATA,'Expts');
+        end
+        if length(Expts) >= Vall.exptno
+            DATA.Expt = Expts{Vall.exptno};
         end
         if DATA.interactive < 0 && isfield(DATA.Expt,'Trials')
             DATA.Expt.Header.trialdur = sum([DATA.Expt.Trials.dur]);
@@ -748,7 +755,9 @@ passonargs = {};
 
 j = 1;
 while j <= length(varargin)
-    if strncmp(varargin{j},'adcplot',3)
+    if iscell(varargin{j}) %do nothing. May be parsed in first run above
+        
+    elseif strncmp(varargin{j},'adcplot',3)
         DATA.plottype = 2;  
     elseif strncmp(varargin{j},'addmean',7)
         addmean = 1;
@@ -1170,8 +1179,12 @@ while j <= length(varargin)
         readclusterfromlog = 1;
     elseif strncmp(varargin{j},'uselst',6) %reclassify applies cluster space to new data (thr, crit, etc differen)
         useoldlst = 1;
-    elseif strncmp(varargin{j},'usecluster',6) %Uses cluster ids, does not reapply boudnary = quicker
+    elseif strncmp(varargin{j},'usecluster',6) %Uses cluster ids,times, does not reapply boudnary = quicker
         recluster = 4;
+        if length(varargin) > j && isnumeric(varargin{j+1})
+            j = j+1;
+            forceeventlist = varargin{j};
+        end
     elseif strncmp(varargin{j},'keepcluster',6) %applies cluster exactly, using current DATA.cluster
         recluster= 1;
         forcecluster = 2;
@@ -1456,6 +1469,7 @@ if reclassifyall == 2
                 res{j} = AllVPcs(Vall, 'tchan', ispk(j), passonargs{:},'reclassify',args{:});
                 catch ME
                     cprintf('errors','AllVPCs ERROR!!! %s\n',ME.message);
+                    res{j}.errstate = ME;
                     res{j}.err = ME.message;
                     t = mygetCurrentTask();
                     res{j}.workerid = t.ID;
@@ -1643,7 +1657,7 @@ end
 
 if isnew
 if isempty(DATA.configfile)
-    DATA = ReadConfig(DATA,DATA.defaultconfig,'print');
+    DATA = ReadConfig(DATA,DATA.defaultconfig,'print','nochoose');
 end
 if isempty(DATA.layoutfile)
     DATA.layoutfile = DATA.defaultlayout;
@@ -1654,6 +1668,7 @@ res.toplevel = F;
 
 tt = TimeMark(tt, 'Laid Out ', DATA.profiling);
 
+p = ProbeNumber(DATA);
 if newdata %things to reset if its a new file, OR just a new probe
         DATA.probe = ispk;
         SetTrialList(DATA);
@@ -1735,7 +1750,7 @@ if newdata == 1 || autocutone;
 end
 
 
-if recluster && length(DataClusters) < DATA.probelist(DATA.probe(1)) && forcecluster == 0
+if recluster && (length(DataClusters) < p || ~isfield(DataClusters{p},'space')) && forcecluster == 0
     if length(DATA.RefClusters) >= DATA.probe(1)
         userefcluster = 1;
         fprintf('DataClusters is empty using refcluster\n', DATA.probelist(DATA.probe(1)));
@@ -1765,7 +1780,7 @@ if recluster
         wasauto = 1;
     elseif length(DataClusters) < DATA.probelist(DATA.probe(1))
         wasauto = 2;
-    elseif DataClusters{DATA.probelist(DATA.probe(1))}.auto == 1
+    elseif isfield(DataClusters{p},'auto') &&  DataClusters{p}.auto == 1
         wasauto = 1;
     else
         wasauto = 0;
@@ -2070,7 +2085,13 @@ if recluster == 4  %use trig times from saved cluster
     DATA.spts = DATA.cluster.spts;
     DATA.setnspk = DATA.cluster.nspks;
     DATA.gmcid = [];
-    id = DATA.trigtimes{p};
+    if ~isempty(forceeventlist)
+%        id = find(ismember(Vall.t,forceeventlist)); %if list is times
+        id = forceeventlist; %if list is index # in Vall.V
+        DATA.clst = ones(1,length(id));
+    else
+        id = DATA.trigtimes{p};
+    end
 else
 %in ver 1.1 and before, some triggers (trigdt) were save to clsueter without
 %converting to double
@@ -2158,7 +2179,7 @@ if isfield(DATA, 'Expt') && isfield(DATA.Expt,'Trials') && DATA.usetrials
     uid = unique(iid);
     if length(DATA.clst) == length(id)
         DATA.clst = DATA.clst(uid);
-        if recluster == 4
+        if recluster == 4 && length(DATA.xy{1}) >= max(uid)
             DATA.xy{1} = DATA.xy{1}(uid,:);
         end
     end
@@ -2650,6 +2671,7 @@ end
 
 
 DATA.TemplateLabels = TemplateLabels(DATA,0);
+DATA.forcecluster = forcecluster;
 
 if isempty(DATA.plotspk.probes)
 DATA.plotspk.probes = DATA.chspk;
@@ -3107,6 +3129,7 @@ elseif autocutone == 2
     tt = TimeMark(tt, 'Pre Cluster', DATA.profiling);
     %check to see if there are missing "next" clusters
     wasempty = 0;
+    p = ProbeNumber(DATA);
     if recluster == 2 && DATA.reclustern(1) == 0 && oldxyloaded %trigger times match - can use old clst
         DATA.clst = DATA.oldclst;
         cc = DATA.currentcluster;
@@ -3141,8 +3164,8 @@ elseif autocutone == 2
         PlotTriggerHist(DATA,DATA.cluster);
     end
      tt = TimeMark(tt,'Replotted', DATA.profiling);
-    if recluster == 2 && isfield(DataClusters{DATA.probe(1)},'space') && exist('oldid','var')
-        oldC = DataClusters{DATA.probe(1)};
+    if recluster == 2 && isfield(DataClusters{p},'space') && exist('oldid','var')
+        oldC = DataClusters{p};
         if length(oldC.space) == 1
             oldC.space(2) = 0;
         end
@@ -3226,7 +3249,7 @@ elseif autocutone == 2
         end
 
         str = sprintf('P%d last cut at %s: %d/%d or %d/%d spikes are different (%s)',...
-            DATA.probe(1),datestr(oldC.ctime),length(ida),...
+            ProbeNumber(DATA),datestr(oldC.ctime),length(ida),...
             length(DATA.clid),length(idb),length(oldid),flipstr);
         res.matchcounts = [length(ida) length(DATA.clid) length(idb) length(oldid) NaN];
         if DATA.reclustern(1) == 0 %trigger times match - can compare lsts
@@ -3290,11 +3313,11 @@ elseif autocutone == 2
         %manual == 4 means using reflcuster, don't worry about matching old
         %space
         if DATA.cluster.manual ~= 4
-            DATA.cluster.auto = DataClusters{DATA.probe(1)}.auto;
+            DATA.cluster.auto = DataClusters{p}.auto;
         end
         if DATA.cluster.manual ==2 %done in plotcluster but not ye quantified. = Can't check
             unsafetosave = -1000;
-        elseif unsafetosave & DATA.cluster.auto == 1  && ~isacell(DATA, DATA.exptno, DATA.probe(1));
+        elseif unsafetosave & DATA.cluster.auto == 1  && ~isacell(DATA, DATA.exptno, p);
             if DATA.savespikes
                 fprintf('Mismatched, so redoing autocut and saving\n');
                 [E, res.cluster] = CutAndSave(DATA);
@@ -3331,30 +3354,35 @@ elseif autocutone == 2
         res.cutfraction(2) = length(DATA.clid)./length(DATA.clst);
         res.trigmatch = DATA.reclustern;
         res.stds  = cat(1,std(DATA.xy{1}),std(DATA.lastxy));
-
         if length(xc) > 1
             res.xcorr = [xc(1,2) yc(1,2)];
         else
             res.xcorr = [0 0 ];
         end
+        DATA.cluster.reclassify.matchcounts = res.matchcounts;
+        DATA.cluster.reclassify.trigmatch = res.trigmatch;
+        DATA.cluster.reclassify.xcorr = res.xcorr;
+        DATA.cluster.reclassify.unsafetosave = unsafetosave;
+        DATA.cluster.reclassify.probe = p;
+        DATA.cluster.reclassify.expt = DATA.exptno;
     elseif recluster == 1 && refinecluster
 % Would like to fit old ellipse, then use this starting point to fit GM
 % model in this space, and adjust ellipse to catpure those points.  But GM
 % model may go off and fit something else entirelys, esp whern there are
 % two clusters.
 %lemM211 Expt 35 P6 is  a good example
-          if length(DataClusters)< DATA.probe(1) || ~isfield(DataClusters{DATA.probe(1)},'mahal') 
+          if length(DataClusters)< p || ~isfield(DataClusters{p},'mahal') 
                  unsafetosave = 0;
-          elseif DataClusters{DATA.probe(1)}.mahal(1) > DATA.cluster.mahal(1)
+          elseif DataClusters{p}.mahal(1) > DATA.cluster.mahal(1)
              if forcecluster == 0
                  unsafetosave = 1;
              end
-         elseif DataClusters{DATA.probe(1)}.auto == 0 && DATA.cluster.exptno ~= forceclusterexpt
+         elseif DataClusters{p}.auto == 0 && DATA.cluster.exptno ~= forceclusterexpt
              %for now only replace auto cuts with refined manual cuts
              %if auto == 0 but manual ==3, means this is a previous
              %"refinement", so overwrite. 
-             if isfield(DataClusters{DATA.probe(1)},'manual') && ...
-                     DataClusters{DATA.probe(1)}.manual == 1
+             if isfield(DataClusters{p},'manual') && ...
+                     DataClusters{p}.manual == 1
              unsafetosave = 2;
              end
          end
@@ -5418,7 +5446,7 @@ end
                      end
                  end
                  if wasempty == 1 && k > 1 %trailing empty next
-                     fprintf('Expt %d Probe %d Cluster missing next{}\n',C.exptno,j);
+                     fprintf('Expt %d Probe %d Cluster missing next{%d}\n',C.exptno,j,k);
                      nexterrs = nexterrs+1;
                  end
              end
@@ -5638,8 +5666,17 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         load(dname);
     elseif isappdata(DATA.toplevel,'ClusterDetails') && DATA.interactive >= 0
         ClusterDetails = mygetappdata(DATA,'ClusterDetails');
-    elseif savexy == 2
+        for j = 1:length(ClusterDetails)
+            if isempty(ClusterDetails{j})
+                mycprintf('errors','Missing ClsuterDetails %d - will not save\n',j);
+                savexy = 0;
+            end
+        end
+    elseif savexy > 0 && exist(dname,'file') %don't overwrite if missing some cells
         savexy = 0;
+    end
+    if savexy > 0 && ~exist('ClusterDetails','var')
+        [DATA, ClusterDetails] = LoadClusterDetails(DATA);
     end
     p = ProbeNumber(DATA);
 
@@ -5702,6 +5739,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
     end
     Clusters{p}.errs = DATA.errs;
     Clusters{p}.user = DATA.user;
+    Clusters{p}.hostname = DATA.hostname;
     if quickmode == 0
     Clusters{p}.dpsum = sum(abs(DATA.cluster.MeanSpike.vdprime(DATA.chspk,:)),2);
     end
@@ -5759,10 +5797,11 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         DATA.cluster.auto = 0;
     end
     if DATA.recluster ~= 2
-    Clusters{p}.auto = 0;
+        Clusters{p}.auto = 0;
+        Clusters{p}.recluster = DATA.recluster + 100 * DATA.forcecluster;
     else
-    Clusters{p}.auto = DATA.cluster.auto;
-    Clusters{p}.recluster = 2;
+        Clusters{p}.auto = DATA.cluster.auto;
+        Clusters{p}.recluster =  100 * DATA.forcecluster;
     end
     Clusters{p}.pcmean = mean(DATA.pcs(:,1:4)); %to check for sign reversal
     Clusters{p}.memsz = [memsize(DATA) DATA.fullvsize];
@@ -5817,6 +5856,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         Clusters{p}.TriggerTemplate = DATA.TriggerTemplate;
     end
     if isfield(DATA,'xy')
+        fprintf('%s Setting xy, t, and clst in ClusterDetails\n',IDStr(DATA));
             ClusterDetails{p}.xy = DATA.xy{1}(DATA.uid,:);
             ClusterDetails{p}.t = DATA.t(DATA.uid);
             ClusterDetails{p}.clst = DATA.clst(DATA.uid);
@@ -5835,7 +5875,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         ClusterDetails{p}.crit = NaN;
     end
     meanvfile = [DATA.datadir '/Expt' num2str(DATA.exptno) 'meanV.mat'];
-    if ~exist(meanvfile)
+    if ~exist(meanvfile) && isfield(Vall,'meanV');
         FullV = rmfield(Vall,'V');
         fprintf('Saving %s\n',meanvfile);
         save(meanvfile,'FullV');
@@ -5881,12 +5921,8 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         else
             ncl = 1;
         end
-        ClusterLog{ncl}.cluster = DATA.currentcluster;
-        if DATA.currentcluster > 1
-            C = Clusters{p}.next{DATA.currentcluster-1};
-        else
-            C = Clusters{p};
-        end
+        ClusterLog{ncl}.cluster = 1;
+        C = Clusters{p};
         ClusterLog{ncl}.shape = C.shape;
         ClusterLog{ncl}.space = C.space;
         ClusterLog{ncl}.mahal = C.mahal;
@@ -5907,6 +5943,15 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         ClusterLog{ncl}.hostname = gethostname;
         ClusterLog{ncl}.recluster = [DATA.recluster DATA.cluster.auto];
         ClusterLog{ncl}.ncut = [C.ncut DATA.nevents];
+        if isfield(C,'reclassify')
+            ClusterLog{ncl}.reclassify = C.reclassify;
+        end
+        for j = 1:length(C.next)
+            next.cluster = j+1;
+            if ~isempty(C.next{j})
+                ClusterLog{ncl}.next{j} = CopyFields(next,C.next{j},{'xyr', 'angle', 'shape',' space', 'mahal' ,'crit'});
+            end
+        end
         save(logname,'ClusterLog');
         if isfield(DATA.cluster,'gmfit')
             nd = size(DATA.cluster.gmfit.mu,2);
@@ -5977,6 +6022,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         end
         backfile = [backdir '/' b datestr(now,'mmddyy.HHMMSS') 'P' num2str(p) c];
         try
+            ts = now;
             movefile(outname,backfile);
             fprintf('Backup took %.2f\n',mytoc(ts));
         catch ME
@@ -6048,6 +6094,8 @@ function probe = ProbeNumber(DATA)
     if isfield(DATA,'probelist')
         if DATA.probe(1) > length(DATA.probelist)
             probe = DATA.probe(1);
+        elseif DATA.probe(1) == 0
+            probe = DATA.probelist(1);
         else
             probe = DATA.probelist(DATA.probe(1));
         end
@@ -6093,8 +6141,10 @@ function SaveSpikes(DATA, id)
     if isfield(DATA,'matfile');
         Spikes.Header.matfile = DATA.matfile;
     end
-    fprintf('Saving %d Spikes to %s\n',length(id),name);
+    ts = now;
+    fprintf('Saving %d Spikes to %s',length(id),name);
     save(name,'Spikes');
+    fprintf('Took %.2f\n',mytoc(ts));
     if DATA.saveallspikes
         xname = regexprep(name,'.p([0-9])*t','.p$1xt');
         if ~strcmp(name,xname) && size(AllV,1) > 1
@@ -6988,7 +7038,7 @@ function DATA = AddErr(DATA,varargin)
         ERR = [];
     end
 s = sprintf(varargin{:});
-cprintf('errors','%s\n',s);
+mycprintf('errors','%s\n',s);
 if isfield(DATA,'errs')
     DATA.nerr = length(DATA.errs)+1;
 else
@@ -7576,6 +7626,10 @@ for j = 1:length(c)
 end
 
 function SelectProbe(a,b,p)
+it = findobj(gca,'Tag','ProbeLabel');
+if ~isempty(it)
+    set(it,'color','m');
+end
 DATA = GetDataFromFig(a);
 if p < 1 && ~isempty(b)
     p = get(b.NewValue,'UserData');
@@ -7589,35 +7643,79 @@ function ProbeSelector(DATA)
    if length(marked) < DATA.allnprobes
        marked(DATA.allnprobes) = 0;
    end
+   
+   
+   if isfield(DATA,'CellList')
+   C = DATA.CellList;
+   C(C < 0) = 0;
+   C(C > 0) = 1;
+   C = sum(C,3);
+   nex = size(C,1);
+   C = sum(C,1)./nex;
+   else
+       C = zeros(1,DATA.allnprobes);
+   end
+   if sum(C>0.1) > 2  %more than 2 cells set 
+       fc = [1 1 1];
+       bc = [0 0 0];
+   else
+       fc = [0 0 0];
+       bc = [1 1 1];
+   end
    if isnew
        nr = 10;
        nc = 10;
        w = 1./nc;
        h = 1./nr;
-       X = uibuttongroup(F,'SelectionChangeFcn',{@SelectProbe, 0});
+       X = uibuttongroup(F,'SelectionChangeFcn',{@SelectProbe, 0},'tag','ProbeSelectorGroup');
+       set(X,'backgroundcolor',bc);
+       set(X,'foregroundcolor',fc);
        set(X,'UserData',DATA.toplevel);
+       cmenu = uicontextmenu;
+       uimenu(cmenu,'label','Cell','foregroundcolor','y');
+       uimenu(cmenu,'label','Cell in other expts','foregroundcolor','c');
+       uimenu(cmenu,'label','Marked Good','foregroundcolor','r');
+       uimenu(cmenu,'label','Marked Good MU','foregroundcolor','b');
+       uimenu(cmenu,'label','Marked Bad/duplicate','foregroundcolor','g');
        for j = 1:DATA.allnprobes
            x = mod((j-1),nr)./nr;
            y = 1 -1./nc - floor((j-1)./nc)/nc;
            it = uicontrol(X,'style','radiobutton','string',num2str(j),'UserData', j,...
                'units','norm','position',[x, y, w, h]);
-           if marked(j) == 2 %good
+           [a, b] = isacell(DATA, DATA.exptno, j);
+           if b
+               set(it,'foregroundcolor','y');
+           elseif C(j) > 0 %Cells one other expts, this probe
+               set(it,'foregroundcolor','c');
+           elseif marked(j) == 2 %good
                set(it,'foregroundcolor','r');
            elseif marked(j) == 4 %good MU
                set(it,'foregroundcolor','b');
-           elseif marked(j) == 3 %BAD
+           elseif marked(j) == 3 || marked(j) == 5 %BAD
                set(it,'foregroundcolor','g');
+           else
+               set(it,'foregroundcolor',fc);
            end
+           set(it,'uicontextmenu',cmenu);
        end
+       set(X,'uicontextmenu',cmenu);
+       set(gcf,'uicontextmenu',cmenu);
    else
        for j = 1:DATA.allnprobes
            h = findobj(F,'style','radiobutton','UserData',j);
-           if ~isempty(h) && marked(j) == 2
+           [a, b] = isacell(DATA, DATA.exptno, j);
+           if b
+               set(h,'foregroundcolor','y');
+           elseif C(j) > 0 %Cells one other expts, this probe
+               set(h,'foregroundcolor','c');
+           elseif ~isempty(h) && marked(j) == 2
                set(h,'foregroundcolor','r');
            elseif marked(j) == 4 %good MU
                set(h,'foregroundcolor','b');
            elseif marked(j) == 3 %BAD
                set(h,'foregroundcolor','g');
+           else
+               set(h,'foregroundcolor',fc);
            end
        end
    end
@@ -7744,8 +7842,12 @@ if ~isfield(DATA,'nclusters')
 end
 eid = find(DATA.CellDetails.exptids == DATA.exptno);
 PlotCellIm(DATA.CellList, DATA.CellDetails, DATA.nclusters,DATA.Comments);
+if isfield(DATA,'tagged')
 PlotCellIm('mark',DATA.tagged,'y');
-PlotCellIm('marklist',[ [DATA.Comments.ex]; [DATA.Comments.p];],'g');
+end
+if isfields(DATA.Comments, 'ec')
+    PlotCellIm('marklist',[ [DATA.Comments.ex]; [DATA.Comments.p];],'g');
+end
 text(ProbeNumber(DATA),0,sprintf('P%d',ProbeNumber(DATA)),'color','r','fontsize',DATA.gui.fontsize(1));
 text(-1,eid,sprintf('E%.0f',DATA.exptno),'color','r','fontsize',DATA.gui.fontsize(1));
 return;
@@ -8121,7 +8223,15 @@ elseif strncmp(fcn,'iteratefit',9)
     DATA = get(DATA.toplevel,'UserData');
     finish = 1;
 elseif strncmp(fcn,'mark',4)
-    DATA.cluster.marked = find(strcmp(fcn,{'marknone' 'markgood' 'markbadprobe' 'markmugood'}));
+    DATA.cluster.marked = find(strcmp(fcn,{'marknone' 'markgood' 'markbadprobe' 'markmugood' 'markduplicateprobe'}));
+    label{3} = 'Bad';
+    label{5} = 'Duplicate';
+    if ismember(DATA.cluster.marked,[3 5]) %Bad or duplicate Probe
+        yn = questdlg(sprintf('Save %s probe to ArrayConfig?',label{DATA.cluster.marked}),'Marking Probe for all expts','Yes','No','Yes');
+        if strcmp(yn,'Yes')
+           DATA.ArrayConfig = GetArrayConfig(DATA.datadir,fcn,ProbeNumber(DATA));
+        end
+    end
     finish = 1;
 elseif strncmp(fcn,'savedef',7)
     outname = ClusterFile(DATA.name,DATA.Expt,'subdir',DATA.clustersubdir);
@@ -8759,7 +8869,8 @@ function [Expt, matfile] = LoadExpt(DATA, ei)
             monk = GetMonkeyName(DATA.name);
             prefix = regexprep(DATA.name,'.*M([0-9]*).*','M$1');
             if isdir(DATA.name)
-                smrname = [DATA.name '/' monk prefix '.' num2str(DATA.exptno) 'mat'];
+%                smrname = [DATA.name '/' monk prefix '.' num2str(DATA.exptno) '.mat'];
+                smrname = [DATA.name '/' monk prefix ]; %  exptno.mat added below
             else
                 smrname = regexprep(DATA.name,'/M([0-9]*).*',['$0/' monk 'M$1']);
             end
@@ -9382,10 +9493,10 @@ if isnew
         end
         hm = uimenu(F,'Label','&Cluster','Tag','ClusterMenu');
         sm = uimenu(hm,'Label','Draw &Ellipse','Tag','EllipseMenu');
-        uimenu(sm,'Label','Cluster &1','foregroundcolor',DATA.colors{2},'Callback',{@PCCluster, 'Ellipse1'});
-        uimenu(sm,'Label','Cluster &2','foregroundcolor',DATA.colors{3},'Callback',{@PCCluster, 'Ellipse2'});
-        uimenu(sm,'Label','Cluster &3','foregroundcolor',DATA.colors{4},'Callback',{@PCCluster, 'Ellipse3'});
-        uimenu(sm,'Label','Cluster &4','foregroundcolor',DATA.colors{5},'Callback',{@PCCluster, 'Ellipse4'});
+        uimenu(sm,'Label','Cluster &1','foregroundcolor',DATA.colors{2},'Callback',{@PCCluster, 'Ellipse1'},'accelerator','1');
+        uimenu(sm,'Label','Cluster &2','foregroundcolor',DATA.colors{3},'Callback',{@PCCluster, 'Ellipse2'},'accelerator','2');
+        uimenu(sm,'Label','Cluster &3','foregroundcolor',DATA.colors{4},'Callback',{@PCCluster, 'Ellipse3'},'accelerator','3');
+        uimenu(sm,'Label','Cluster &4','foregroundcolor',DATA.colors{5},'Callback',{@PCCluster, 'Ellipse4'},'accelerator','4');
         sm = uimenu(hm,'Label','&Clear Cluster','Tag','EllipseMenu');
         uimenu(sm,'Label','Clear Cluster &2','foregroundcolor',DATA.colors{3},'Callback',{@PCCluster, 'Clear2'});
         b = uimenu(sm,'Label','Clear Cluster &3','foregroundcolor',DATA.colors{4},'Callback',{@PCCluster, 'Clear3'});
@@ -9396,13 +9507,14 @@ if isnew
         uimenu(hm,'Label','Scale Density','Callback',{@MiscMenu,'scaledensity'},'Tag','ScaleDensity');
         sm = uimenu(hm,'Label','&Mark','Tag','MarkMenu');
         uimenu(sm,'Label','&Good','Callback',{@PCCluster, 'markgood'},'Tag','MarkGood');
-        uimenu(sm,'Label','&Bad Probe','Callback',{@PCCluster, 'markbadprobe'},'Tag','MarkGood');
-        uimenu(sm,'Label','Good &MU','Callback',{@PCCluster, 'markmugood'},'Tag','MarkGood');
+        uimenu(sm,'Label','&Bad Probe','Callback',{@PCCluster, 'markbadprobe'},'Tag','MarkBad');
+        uimenu(sm,'Label','&Duplicate Probe','Callback',{@PCCluster, 'markduplicateprobe'},'Tag','MarkDup');
+        uimenu(sm,'Label','Good &MU','Callback',{@PCCluster, 'markmugood'},'Tag','MarkMu');
 %        uimenu(sm,'Label','&Good','Callback',{@PCCluster, 'markgood'},'Tag','MarkGood');
         uimenu(hm,'Label','&ReDraw','Callback',{@PCCluster, 3});
         uimenu(hm,'Label','&Template','Callback',{@PCCluster, 5});
         uimenu(hm,'Label','StdTemplate','Callback',{@PCCluster, 32});
-        uimenu(hm,'Label','PC &Line','Callback',{@PCCluster, 'Ellipse0'});
+        uimenu(hm,'Label','PC &Line','Callback',{@PCCluster, 'Ellipse0'},'accelerator','L');
         sm = uimenu(hm,'Label','E&xtras','Tag','ClusterMenu');
         uimenu(sm,'Label','&Flip Sign','Callback',{@PCCluster, 'flipsign'});
         uimenu(sm,'Label','PC &Line2','Callback',{@PCCluster, 11});
@@ -10121,10 +10233,10 @@ function KeyPressed(src, ks)
 
 DATA = GetDataFromFig(src);
 spk = [0 0];
-
 if ~isfield(DATA,'currenttrial') %keypress before ready.
     return;
 end
+oldf = gcf;
 if isempty(DATA.spklst)
     DATA.spklst = 1:100;
 end
@@ -10223,13 +10335,22 @@ function PlotGridSpikes(DATA, nspk, varargin)
             end
             yl = get(gca,'ylim');
         end
-        if isfield(Clusters{j},'marked')
-        c = MarkAxes(gca, Clusters{j}.marked);
+        if isacell(DATA, DATA.exptno, j)
+            c = MarkAxes(gca, 2);
+        elseif isfield(Clusters{j},'marked')
+            c = MarkAxes(gca, Clusters{j}.marked);
+            if Clusters{j}.marked == 0 && isfield(Clusters{j},'recluster')
+                if Clusters{j}.recluster > 90 %automatice reapply of some kind
+                c = [0 0 1];
+                end
+            end                
+        elseif Clusters{j}.manual
+            c = [0 0 1];            
         else
             c = [1 0 0];
         end
         text(10,yl(2),sprintf('%d',j),'fontweight','bold',...
-            'horizontalalignment','left','verticalalignment','top','color',c);
+            'horizontalalignment','left','verticalalignment','top','color',c,'Tag','ProbeLabel');
         AddSelectorContextMenu(DATA, gca, j);
     end
 
@@ -13159,6 +13280,7 @@ function [out, TemplateUsed, DprimeUsed] = TemplatePlot(DATA, varargin)
                 TemplateScores(k,5,:) = squeeze(sign(dp(j,id))) * squeeze(AllV(j,id,:));
             end
             TemplateScores(k,6,:) = squeeze(diff(ms(j,:),1,2)) * squeeze(diff(AllV(j,:,:),1,2));
+            TemplateScores(k,19,:) = squeeze(diff(othermeans{1}(j,:),1,2)) * squeeze(diff(AllV(j,:,:),1,2));
             if normalize
                 TemplateScores(k,6,:) = TemplateScores(k,6,:) ./ std(diff(AllV(j,:,:),1,2));
             end
@@ -13287,14 +13409,16 @@ function [out, TemplateUsed, DprimeUsed] = TemplatePlot(DATA, varargin)
         TMPL.pcs(:,6) = TemplateScores(ispk,3,:); %dprime weighted
         TMPL.pcs(:,7) = TemplateScores(1,3,:); %dprime weighted
         TMPL.pcs(:,3) = TemplateScores(1,7,:);
-        TMPL.pcs(:,4) = TemplateScores(1,8,:);
+        TMPL.pcs(:,4) = TemplateScores(1,19,:); %dvdt for other cluster
         TMPL.pcs(:,10) = TemplateScores(1,3,:); %dprime
         TMPL.pcs(:,11) =DATA.rV;
         TMPL.pcs(:,12) = (TemplateScores(1,12,:)); %std1 dvdt
         TMPL.pcs(:,13) = (TemplateScores(1,9,:)); %sum abs diffs
         TMPL.pcs(:,14) = (TemplateScores(1,2,:)); %sum mu score
         TMPL.pcs(:,15) = (TemplateScores(1,10,:)); %sum score for other template
+        TMPL.pcs(:,9) = TemplateScores(1,10,:); %Other Cluster
         TMPL.pcs(:,5) = (TemplateScores(1,10,:)) - TemplateScores(1,1,:); %diff in sums
+        TMPL.pcs(:,16) = (TemplateScores(1,10,:)) - TemplateScores(1,2,:); %diff in sums
         TMPL.pcs(:,17) = (TemplateScores(1,11,:)); %TemplateScore for cluster above
         TMPL.pcs(:,18) = (TemplateScores(1,12,:)); %TemplateScore for cluster below
     else

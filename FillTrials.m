@@ -62,6 +62,16 @@ function Expt = FillField(Expt, code)
 
 if strcmp(code,'sO') %fill this even if it exists already
 %        if isfield(Expt.Trials,'yo') && isfield(Expt.Trials,'xo') && isfield(Expt.Trials,'or') && isfield(Expt.Trials,'wi') && isfield(Expt.Trials,'hi')
+        Expt = FillField(Expt,'ar');
+        if ~isfield(Expt.Trials,'xo') && isfield(Expt.Trials,'sO') 
+            for j = 1:length(Expt.Trials)
+                cosa = cos(Expt.Trials(j).or *pi/180);
+                sina = sin(Expt.Trials(j).or *pi/180);
+                Expt.Trials(j).xo = Expt.Trials(j).sO * cosa;
+                Expt.Trials(j).yo = Expt.Trials(j).sO * sina;
+                Expt.Trials(j).stimxy = Expt.Trials(j).sO * cosa;
+            end
+        end
         if isfield(Expt.Trials,'yo') && isfield(Expt.Trials,'xo') && isfield(Expt.Trials,'or')
             rf = Expt.Stimvals.rf;
             [a,b] = Counts([Expt.Trials.or]);
@@ -81,7 +91,6 @@ if strcmp(code,'sO') %fill this even if it exists already
             end
             Expt.Stimvals.xycos = min(abs([sina cosa]));
             for j = 1:length(Expt.Trials)
-%                ar = Expt.Trials(j).wi./Expt.Trials(j).hi;
                 ar = Expt.Trials(j).ar;
                 oid = find(ors == Expt.Trials(j).or);
                 sina = sins(oid);
@@ -120,27 +129,24 @@ if strcmp(code,'sO') %fill this even if it exists already
                     Expt.Trials(j).thinor = orthors(oid);
                 end
             end
-           
-        elseif isfield(Expt.Trials,'sO') %
-            if ~isfield(Expt.Trials,'xo')
-                for j = 1:length(Expt.Trials)
-                    cosa = cos(Expt.Trials(j).or *pi/180);
-                    sina = sin(Expt.Trials(j).or *pi/180);
-                    Expt.Trials(j).xo = Expt.Trials(j).sO * cosa;
-                    Expt.Trials(j).yo = Expt.Trials(j).sO * sina;
-                    Expt.Trials(j).stimxy = Expt.Trials(j).sO * cosa;
-                end
-            end
         else
             for j = 1:length(Expt.Trials)
                 Expt.Trials(j).sO = Expt.Trials(j).xo;
             end
         end
-elseif strcmp(code,'or') && isfield(Expt.Trials,'me') && isfield(Expt.Trials,'od')
+elseif strcmp(code,'or') && isfield(Expt.Trials,'me') && isfield(Expt.Trials,'or') && (isfield(Expt.Trials,'od') || Expt.Stimvals.od ~= 0)
+    if ~isfield(Expt.Trials,'od')
+        setod = Expt.Stimvals.od;
+    else 
+        setod = 0;
+    end
     for j = 1:length(Expt.Trials)
         if ~isfield(Expt.Trials,'oR') || isempty(Expt.Trials(j).oR)
             if j == length(Expt.Trials)
                 mycprintf('blue','Filling R/L Oris with or and od\n');
+            end
+            if setod
+                Expt.Trials(j).od = setod;
             end
             %% Checked July 2013 that oR has od/2 removed
             Expt.Trials(j).oR = Expt.Trials(j).or-Expt.Trials(j).od/2;
@@ -162,6 +168,17 @@ elseif ~isfield(Expt.Trials(1),code)
         idx = find([Expt.Trials.Trial]);  
         for j = 1:length(idx)
             Expt.Trials(idx(j)).oR = Expt.Trials(idx(j)).or - Expt.Trials(idx(j)).od;
+        end
+    elseif strcmp(code,'ar') %aspect ratio
+        idx = find([Expt.Trials.Trial]);  
+        for j = 1:length(idx)
+            if isfield(Expt.Stimvals,'ar')
+                Expt.Trials(idx(j)).ar = Expt.Stimvals.ar;
+            elseif isfield(Expt.Trials,'wi')
+                Expt.Trials(idx(j)).ar = Expt.Trials(idx(j)).wi./Expt.Trials(idx(j)).hi;
+            else
+                Expt.Trials(idx(j)).ar = Expt.Stimvals.wi./Expt.Stimvals.hi;
+            end
         end
     elseif strmatch(code,'rd') %relative disp
         idx = find([Expt.Trials.Trial]);  

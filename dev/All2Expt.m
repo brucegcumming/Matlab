@@ -9,6 +9,8 @@ while j <= length(varargin)
         mu= 2;
     elseif strncmpi(varargin{j},'mu',2)
         mu= 1;
+    elseif strncmpi(varargin{j},'probe',2)
+        findprobe =1;
     end
     j = j+1;
 end
@@ -21,6 +23,9 @@ if mu == 0
     id = find(cells == cell);
 elseif mu == 2
     id = cell;
+elseif findprobe
+    id = find(probes == cell);
+    id = id(1); %is cell and MU, use cell
 else
     id = find(probes == cell & cells == 0);
 end

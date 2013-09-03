@@ -129,6 +129,7 @@ elseif strmatch(dat.type{1},{'Op' 'Pp'}) %not RC expt
     end
     fit = FitGauss(x,y,'nreps',np,fitargs{:});
     fit.x = x;
+    fit.resp = y;
     fit.ve = 1 - fit.rss./(var(y) .* length(y)-1);
     theta = pi/2 - (GetEval(dat.Data,'Ro') * pi/180);
     y = GetEval(dat.Data,'Pp');
@@ -168,10 +169,12 @@ elseif strmatch(dat.type{1},{'stimxy'}) %not RC expt
         znp = [znp dat.extras.n(bl)];
         fitargs = {fitargs{:} 'freebase'};
     end
-    fit = FitGauss(x,y,'nreps',np,fitargs{:});
+    fit = FitGauss(x,y,'nreps',np,fitargs{:});   
     fit(2) = FitGauss(z,zy,'nreps',znp,fitargs{:});
     fit(1).x = x;
     fit(2).x = z;
+    fit(1).resp = y;
+    fit(2).resp = zy;
     id = find(~isnan(fit(1).x) & ~isinf(fit(1).x));
     fit(1).xv = linspace(min(fit(1).x(id)),max(fit(1).x(id)));
     fit(1).fitcurve = FitGauss(fit(1).xv,fit(1).params,fitargs{:},'eval');
@@ -251,6 +254,7 @@ elseif strmatch(dat.type{1},{'or'}) & length(dat.type) > 1 & strmatch(dat.type{2
             fit.type = 'FitGauss';
         end
         fit.x = x;
+        fit.resp = y;
         id = find(~isnan(fit.x) & ~isinf(fit.x));
         fit.xv = linspace(min(fit.x(id)),max(fit.x(id)));
         if specialfit
@@ -296,13 +300,15 @@ elseif strmatch(dat.type{1},{'or'})  %%nned period 360 or 180
         fit.fitcurve = FitGauss(fit.xv,fit.params,fitargs{:},'period',period,'eval');
     end
         fit.peak = PeakFit(fit);
+        fit.resp = y;
    
 elseif strmatch(dat.type{1},{'dx'})
     for j = 1:length(dat.x)
         x(j) = dat.x(j);
         y{j} = dat.counts{j};
     end
-    FitGabor(x,y);
+    fit = FitGabor(x,y);
+    fit.resp = y;
 else
     fit = [];
 end

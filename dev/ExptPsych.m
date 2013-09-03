@@ -149,6 +149,8 @@ if isfield(Expt.Trials,'rwsum') %online data
 end
 if strcmp(type{1},'Dc') && strcmp(type{2},'or')
     type{2} = 'ori';
+elseif strcmp(type{2},'Dc') && strcmp(type{1},'or')
+    type{1} = 'ori';
 end
 
 if strmatch(type{2},'ori')  & ~isfield(Expt.Trials,'ori')
@@ -950,10 +952,12 @@ if strcmp(Expt.Stimvals.e3,'Us') && Expt.Header.rc
     legend('Stim','non','diff');
 elseif Expt.Header.rc
     [K,b] = ExptPRC(Expt, 0, []);
-    GetFigure('PK');
-    hold off;
-    id= find(b.rcvals >=0);
-    plot(b.rcvals(id),K(id))
+    if ~isempty(b)
+        GetFigure('PK');
+        hold off;
+        id= find(b.rcvals >=0);
+        plot(b.rcvals(id),K(id));
+    end
 end    
 
 
@@ -983,6 +987,9 @@ details = [];
 if isempty(id)
     id = 1:length(Expt.Trials);
 end
+if ~isfield(Expt.Trials,'or')
+    return;
+end
 for j = 1:length(id)
     lens(j) = length(Expt.Trials(id(j)).or);
 end
@@ -992,9 +999,13 @@ for j = sid;
     Expt.Trials(id(j)).or(lens(j)+1:len) = NaN;
 end
 
-R.dcs = [Expt.Trials(id).Dc];
 signs = sign([Expt.Trials(id).ori] - mean([Expt.Trials(id).ori]));
+if isfield(Expt.Trials,'Dc')
+R.dcs = [Expt.Trials(id).Dc];
 R.dcs = R.dcs .*signs;
+else
+    R.dcs = zeros(size(Expt.Trials));
+end
 signals = union(signals,signals * -1); %need to do + and - signals separaely
 R.resp = [Expt.Trials(id).RespDir];
 R.seq = [Expt.Trials(id).or]';

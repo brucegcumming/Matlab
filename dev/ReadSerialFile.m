@@ -22,6 +22,7 @@ checkseq = 0;
 checkrpts = 0;
 forcelen = 0;
 checkTimes = 1;
+chectrials = 0;
 readexpts = 0;
 checkepos=0;
 addfields = {'rw' 'mD' 'Dc'};
@@ -71,6 +72,8 @@ while j <= length(varargin)
             checkrpts = 1;
         end
         readexpts = 1;
+    elseif strncmpi(varargin{j},'trials',5)
+        checktrials = 1;
     end
     j = j+1;
 end
@@ -610,6 +613,72 @@ if checkrpts
     end
 end
 return;
+end
+
+if checktrials
+    fxid = strmatch('fx',txt);
+    fyid = strmatch('fy',txt);
+    for j = 1:length(fid)
+        a = sscanf(txt(fid(j),:),'R%*c %*2s=%f %*2s=%f');
+        s = regexprep(txt(fid(j),:),'.*st=none ','');
+        d = sscanf(s,'%f %f');
+        Trials(j).Fa = a(1);
+        Trials(j).Fs = a(2);
+        Trials(j).id = fid(j);
+        Trials(j).Result = 1;
+        Trials(j).dur = d(2);    
+        Trials(j).End = d(1);
+        xid = find(fyid < fid(j));
+        if ~isempty(xid)
+            d = sscanf(txt(fyid(xid(end)),:),'fy%f');
+            Trials(j).fy = d(1);
+        end
+        xid = find(fxid < fid(j));
+        if ~isempty(xid)
+            d = sscanf(txt(fxid(xid(end)),:),'fx%f');
+            Trials(j).fx = d(1);
+        end
+    end
+    nt = j;
+    for j = 1:length(bid)
+        if ~isempty(strfind(txt(bid(j),:),'st=none'))
+            a = sscanf(txt(bid(j),:),'R%*c %*2s=%f %*2s=%f');
+            s = regexprep(txt(bid(j),:),'.*st=none ','');
+            d = sscanf(s,'%f %f');
+            xid = find(fid > bid(j));
+            if ~isempty(xid)
+                s = regexprep(txt(fid(xid(1)),:),'.*st=none ','');
+                gd = sscanf(s,'%f %f');
+                gd = gd(1)-d(1); %
+            else
+                gd = 1;
+            end
+            if gd > 0.9
+                Trials(j+nt).Fa = a(1);
+                Trials(j+nt).Fs = a(2);
+                Trials(j+nt).id = bid(j);
+                Trials(j+nt).Result = 0;
+                Trials(j+nt).dur = d(2);
+            else
+                Trials(j+nt).Result = -2;
+            end
+            Trials(j+nt).End = d(1);
+            xid = find(fyid < bid(j));
+            if ~isempty(xid)
+                d = sscanf(txt(fyid(xid(end)),:),'fy%f');
+                Trials(j+nt).fy = d(1);
+            end
+            xid = find(fxid < bid(j));
+            if ~isempty(xid)
+                d = sscanf(txt(fxid(xid(end)),:),'fx%f');
+                Trials(j+nt).fx = d(1);
+            end
+        else
+            Trials(j+nt).Result = -1;
+        end
+        result.Trials = Trials;
+    end
+     return;
 end
 
 if checkfx

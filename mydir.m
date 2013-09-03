@@ -1,7 +1,7 @@
 function d = mydir(path, pattern,varargin)
 % d = mydir(path)
 %works just like dir, but the name field contains full path.
-%In order to avoid trouble with wildcards, is path is just hte
+%In order to avoid trouble with wildcards, if path is just hte
 %directory name, have '/' at the end
 %if path is a cell array of strings, calls mydir for each
 pattern = [];

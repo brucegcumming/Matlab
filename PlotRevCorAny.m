@@ -683,6 +683,16 @@ end
         minplottime = times(1) + sdfw;
     end
     lastf = tlen;
+    chkf = {'ce' 'st' 'me'};
+    for j = 1:length(chkf)
+        if isfield(Expt.Trials,chkf{j})
+            x = unique(cat(1,Expt.Trials.(chkf{j})));
+            if length(x) == 1
+                [Expt.Trials.(chkf{j})] = deal(x);
+            end
+        end
+    end
+    
     for j = 1:length(Expt.Trials)
         if ~isempty(btype) & isfield(Expt.Trials,btype) & length(Expt.Trials(j).(btype)) == 1
             Expt.Trials(j).(btype)(1:tlen,1) = Expt.Trials(j).(btype);

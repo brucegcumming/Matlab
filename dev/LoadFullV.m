@@ -13,6 +13,7 @@ end
 highpass = 1;
 smoothw = 100;
 keepsmooth = 0;
+addtime = 0;
 convert = 1;
 toint = 0;
 
@@ -28,6 +29,8 @@ while j <= length(varargin)
         j = j+1;
         smoothw = varargin{j};
         keepsmooth = 1;
+    elseif strncmpi(varargin{j},'addtime',6)
+        addtime = 1;
     elseif strncmpi(varargin{j},'checkint',6)
         toint = 3;
     elseif strncmpi(varargin{j},'converttoint',5)
@@ -36,6 +39,8 @@ while j <= length(varargin)
         toint = 2;
     elseif strncmpi(varargin{j},'noconvert',5)
         convert = 0;
+    elseif strncmpi(varargin{j},'nohighpass',5)
+        highpass = 0;
     end
     j = j+1;
 end
@@ -99,7 +104,7 @@ end
 if isfield(FullV,'chspk') &&  ~isempty(strfind(name,'p1FullV')) && FullV.chspk == 96
     FullV.chspk = 1;
 end
-if isfield(FullV,'highpass') && ~isnan(FullV.highpass)
+if highpass && isfield(FullV,'highpass') && ~isnan(FullV.highpass)
     ts = now;
     if FullV.highpass > 0
         smoothw = FullV.highpass;
@@ -110,4 +115,14 @@ if isfield(FullV,'highpass') && ~isnan(FullV.highpass)
      end
      FullV.V = int16(round(double(FullV.V) - sm));
      FullV.filtertime = mytoc(ts);
+end
+if addtime
+    first = 1;
+    vt = zeros(size(FullV.V));
+    for j = 1:length(FullV.blklen)
+        last = first+FullV.blklen(j)-1;
+        vt(first:last) = FullV.blkstart(j)+[1:FullV.blklen(j)].*FullV.samper;
+        first = last+1;
+    end
+    FullV.t = vt;
 end

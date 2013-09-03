@@ -37,11 +37,15 @@ end
 dur = median(durs);
 ptimes = 0:10:mean(durs);
 
+if isempty(conditions)
+    aid = ai;
+    bid = bi;
+end
 for c = 1:length(conditions)
 ti = eval(['find([ta(ai).' conditions{c} ')']);
-end
 aid = ai(ti);
 bid = bi(ti);
+end
 rptshuffle = 0;
 if isempty(bid) | isempty(aid)
     fprintf('No Trials satisfy %s, %s\n',sprintf('%s,',conditions{:}),exa.Header.expname);

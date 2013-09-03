@@ -13,6 +13,7 @@ callback = @HitCellIm;
 markmat = {};
 nmark = 0;
 Comments = [];
+nclusters = [];
 
 j = 1;
 while j <= length(varargin)
@@ -34,6 +35,11 @@ while j <= length(varargin)
     j=j+1;
 end
 
+if ischar(CellList) && exist(CellList,'dir') %given a file name
+    load([CellList '/CellList.mat']);
+elseif ischar(CellList) && exist(CellList,'file') %given a file name
+    load(CellList);
+end
 
 if strcmp(CellList,'mark')
     [x,y] = find(CellDetails);
@@ -53,7 +59,7 @@ id = find(sum(CellList,3) > 0);
 X = squeeze(Mahal(:,:,1));
 im(id) = X(id);
 end
-if isempty('nclusters')
+if isempty(nclusters)
     for j = 1:size(CellList,1)
     for k = 1:size(CellList,2)
         id = find(CellList(j,k,:) > 0);

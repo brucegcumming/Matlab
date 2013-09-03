@@ -1,4 +1,7 @@
 function DATA = CheckClusterDir(name, varargin)
+%DATA = CheckClusterDir(name, varargin)  checks for any ClusterTimes that
+%need remaking and calls AllVPcs. Idea was to have this run in background,
+%but file corruption issues make this a bad idea
 
 DATA.name = name;
 DATA.mode = 'list';

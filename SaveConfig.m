@@ -1,4 +1,4 @@
-function SaveConfig(DATA, file, savefields, varargin)
+function file = SaveConfig(DATA, file, savefields, varargin)
 %SaveConfig(DATA, file, savefields, varargin)    
 %saves state of fields in DATA (usually a gui UserData) to a file
 %savefields is a cell array of fields that are saved
@@ -6,22 +6,32 @@ function SaveConfig(DATA, file, savefields, varargin)
 % will save DATA.flag.next but not DATA.flag.next.next
 
 verbose = 0;
+interactive = 0;
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'verbose',5)
         verbose = 1;
+    elseif strncmpi(varargin{j},'choose',5)
+        interactive = 1;
     end
     j= j+1;
 end
 
+if interactive
+    [name, outdir] = uiputfile(file);
+    if ~ischar(name)
+        return;
+    end
+    file = [outdir '/' name];
+end
 fid = fopen(file,'w');
     if fid < 0
-        fprintf('Cant write to %s\n',file)
+        cprintf('errors','Cant write to %s\n',file)
         return;
     end
 
     for f = savefields;
-        ndot = strfind(f{1},'\.')
+        ndot = strfind(f{1},'\.');
         if isempty(strfind(f{1},'\.'))
             if isfield(DATA,f{1})
             val = DATA.(f{1});

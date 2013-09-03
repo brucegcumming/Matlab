@@ -14,21 +14,30 @@ end
 if ~isfield(Expt.Header,'preperiod')
     Expt.Header.preperiod = 1000;
 end
-ts = ([Expt.Trials.Start]-Expt.Header.preperiod)./10000;
+Expt = FillTrials(Expt,'st');
 checkfields = {'st' Expt.Stimvals.et Expt.Stimvals.e2 Expt.Stimvals.e3};
 id = ~strcmp('e0',checkfields);
 checkfields = checkfields(id);
 for j = 1:length(Expt.Trials)
-    id = find([Expt.Trials.(checkfields{1})] == Expt.Trials(j).(checkfields{1}));
-    for k = 2:length(checkfields)
-        xid = find([Expt.Trials.(checkfields{k})] == Expt.Trials(j).(checkfields{k}));
-        id = intersect(id,xid);
-    end
-    if id(1) == j
-        shuffletrial(j) = id(end);
+    ts(j) = (Expt.Trials(j).Start(1)-Expt.Header.preperiod)./10000;
+    if Expt.Header.rc
+        if j < length(Expt.Trials)
+        shuffletrial(j) = j+1;
+        else
+            shuffletrial(j) = 1;
+        end
     else
-        x = find(id == j);
-        shuffletrial(j) = id(x-1);
+        id = find([Expt.Trials.(checkfields{1})] == Expt.Trials(j).(checkfields{1}));
+        for k = 2:length(checkfields)
+            xid = find([Expt.Trials.(checkfields{k})] == Expt.Trials(j).(checkfields{k}));
+            id = intersect(id,xid);
+        end
+        if id(1) == j
+            shuffletrial(j) = id(end);
+        else
+            x = find(id == j);
+            shuffletrial(j) = id(x-1);
+        end
     end
 %    shuffletrial(j) = j;
 end

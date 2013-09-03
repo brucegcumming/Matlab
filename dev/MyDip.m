@@ -1,6 +1,8 @@
 function result = MyDip(values, varargin)
 %X = MyDip(X, varargin) Heuristic for finding best dip in a distribution
 %if X is a cell array of Gaussian Fits, find the dip
+%result.dipsize = min at dip / smallest peak; 
+%result.dipsize(1,2,3) are for less and less smoothed histograms.
 
 if iscell(values) && isfield(values{1},'amp')
     result = GaussDip(values);
@@ -86,13 +88,15 @@ result.peaks = peaks([1 end]);
 [a,b] = min(y(peaks(1):peaks(end)));
 result.dip(1) = peaks(1)+b-1;
 result.dipsize(1) = y(result.dip(1))./min(y(result.peaks));
+
 finey = smhist(v,'sd',sm/2,'xval',x);
 [a,b] = min(finey(peaks(1):peaks(end)));
 result.dip(2) = peaks(1)+b-1;
 result.dipsize(2) = finey(result.dip(2))./min(finey(result.peaks));
+
+
 finey = smhist(v,'sd',sm/4,'xval',x);
 result.finey = finey;
-
 [a,b] = min(finey(peaks(1):peaks(end)));
 result.dip(3) = peaks(1)+b-1;
 result.dipsize(3) = finey(result.dip(3))./min(finey(result.peaks));

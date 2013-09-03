@@ -6,8 +6,15 @@ DATA.layout.top = [];
     DATA.layout.lfp = [];
     DATA.layout.combineplot = [];
     DATA.layout.options = [];
-    DATA.prefsdir = '/bgc/group/matlab/preferences/Combine/';
-    DATA.layoutfile = [DATA.prefsdir 'default.config.mat'];
+    DATA.gui.prefsdir = '/bgc/group/matlab/preferences/Combine/';
+    DATA.defaultconfig = [DATA.gui.prefsdir '/' gethostname '.' GetUserName '.config'];
+    DATA.defaultlayout = [DATA.gui.prefsdir '/' gethostname '.' GetUserName '.layout.mat'];
+    if ~isfield(DATA,'configfile') || isempty(DATA.configfile)
+        DATA.configfile = DATA.defaultconfig;
+    end
+    if ~isfield(DATA,'layoutfile') || isempty(DATA.layoutfile)
+        DATA.layoutfile = DATA.defaultlayout;
+    end
     DATA.bysuffix = 0;
     if ~isempty(layout)
         f = fields(layout);
@@ -247,3 +254,4 @@ DATA.usenev = 0;
     DATA.savedclusters = 1; %no changes made yet
     DATA.plot.prettyfigs = 0;
     DATA.plot.voffsets = [];
+    DATA.progname = 'Combine';

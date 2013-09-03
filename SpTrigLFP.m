@@ -1,7 +1,11 @@
 function [avg, details] = SpTrigLFP(Trials, duration, samplerate, w, varargin)
 %
-%TrigLFP(Trials, duration, samplerate, w)
+%SpTrigLFP(Trials, duration, samplerate, w)
 %Builds a spike triggered LFP for a set of trials
+% By tdefault also builds a voltage histogram for the LFP, which can be
+% slow
+%SpTrigLFP(...,'nohist')  turns  this off;
+%
 %sample rate is samples per tic
 % for spike2 LFP this is 1/(Expt.Header.LFPsamplerate * 10000)
 %
@@ -10,22 +14,28 @@ latency = 500;
 nspk = 0;
 lfpch = 1;
 histx = [];
+shuffle = 0;
 frameperiod = 166.7;
 mkhist = 1;
 nch = size(Trials(1).LFP,2);
 j =1;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'framer',5)
+    if isfield(varargin{j},'loadname')
+        details = varargin{j};
+    elseif strncmpi(varargin{j},'framer',5)
         j = j+1;
         frameperiod = varargin{j};
     elseif strncmpi(varargin{j},'histvals',5)
         j = j+1;
         histx = varargin{j};
+    elseif strncmpi(varargin{j},'shuffle',5)
+        shuffle = 1;
     elseif strncmpi(varargin{j},'nohist',5)
         mkhist = 0;
     end
     j = j+1;
 end
+slfpavg = zeros(2*w+1,nch);
 lfpavg = zeros(2*w+1,nch);
 lfpavn = zeros(2*w+1,1);
 lfprange = round([latency  latency+duration] .* samplerate);
@@ -37,6 +47,15 @@ toff = 0;
 dtimes = {};
 for tr = 1:length(Trials);
     lfp = Trials(tr).LFP;
+    if shuffle
+        if tr > 1
+            slfp = Trials(tr-1).LFP;
+        else
+            slfp = Trials(end).LFP;
+        end
+        slfp(isnan(slfp)) = 0;
+    end
+    lfp(isnan(lfp)) = 0;
     lfppre = Trials(tr).Start(1)-Trials(tr).lfptime;
     if ~isempty(lfp)
         if isfield(Trials,'spkuse')
@@ -91,6 +110,9 @@ for tr = 1:length(Trials);
             err = iend-istart;
         end
         lfpavg(istart:iend,:) = lfpavg(istart:iend,:) + lfp(start:last,:);
+        if shuffle
+            slfpavg(istart:iend,:) = slfpavg(istart:iend,:) + slfp(start:last,:);
+        end
         lfpavn(istart:iend) = lfpavn(istart:iend)+1;
     end
 %        lfpv = [lfpv lfp(lfptimes)'];
@@ -99,11 +121,19 @@ end
 idx = find(lfpavn == 0);
 lfpavg(idx,:) = 0;
 lfpavn(idx) = -1;
+if shuffle
+    details.shuffle = slfpavg ./ repmat(lfpavn,1,nch);;
+end
 avg = lfpavg ./ repmat(lfpavn,1,nch);
 lfp = cat(3,Trials.LFP);
 stimlfp = mean(lfp,3);
 lfpid = [lfprange(1):lfprange(end)];
+
+if isfield(Trials,'lfpo')
 lfpo = round(mean([Trials.lfpo]));
+else
+    lfpo = 0;
+end
 id = find(lfpid+lfpo > 0 & lfpid++lfpo <= size([Trials.LFP],1));
 lfpid = lfpid(id);
 spktimes = round(lfpid./samplerate);

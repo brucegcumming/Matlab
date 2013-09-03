@@ -9,6 +9,7 @@ cl = 1;
 pw = 1; %distance to include
 shuffletimes = 0;
 spts = [];
+filterA = [];
 if ischar(dirname) && isdir(dirname)
     e = varargin{1};
     probes = varargin{2};
@@ -17,6 +18,11 @@ end
 while j <= length(varargin)
     if iscell(varargin{j}) && isfield(varargin{j}{1},'Trials')
         Expts = varargin{j};
+    elseif strncmpi(varargin{j},'cutoff',6)
+        j = j+1;
+        fz = varargin{j};
+        f = fz./15000;
+        [filterA, filterB]  = butter(8,f);
     elseif strncmpi(varargin{j},'cluster',2)
         j = j+1;
         cl = varargin{j};
@@ -24,7 +30,7 @@ while j <= length(varargin)
         j = j+1;
         pw = varargin{j};
     elseif strncmpi(varargin{j},'shuffle',4)
-        shuffletimes = 1;
+        shuffletimes = 1;        
     elseif strncmpi(varargin{j},'spts',4)
         j = j+1;
         spts = varargin{j};
@@ -60,8 +66,10 @@ for np = 1:length(probes)
     for  j = 1:length(pid)
         if pid(j) > length(V) || isempty(V{pid(j)})
             pfile = [dirname sprintf('/Expt%d.p%dFullV.mat',e,pid(j))];
-            load(pfile);
-            V{pid(j)} = FullV;
+            V{pid(j)} = LoadFullV(pfile,'nohighpass');
+            if ~isempty(filterA)
+                V{pid(j)}.V = filtfilt(filterA, filterB, V{pid(j)}.V);
+            end
         end
     end
     for j = 1:length(V{p}.blkstart)
@@ -73,7 +81,7 @@ for np = 1:length(probes)
     else
         if shuffletimes
             [st,tid] = ismember(Clusters{p}.times,t);
-            ts = ShuffleTimes(Clusters{p}.times, Expts{e})
+            ts = ShuffleTimes(Clusters{p}.times, Expts{e});
             [st,stid] = ismember(round(ts.*30000),round(t.*30000));
             stid = stid(stid>0);
             tid = tid(stid >0);
@@ -95,6 +103,7 @@ for np = 1:length(probes)
         result(np).X(j) = A.X(pid(j));
         result(np).Y(j) = A.Y(pid(j));
         result(np).distance(j) = distances(pid(j));
+        result(np).mean = mean(V{pid(j)}.V);
     end
 
 
@@ -108,6 +117,8 @@ for np = 1:length(probes)
     result(np).Amps = Amps;
     plot(MeanV');
     refline(0);
+    h = refline(0, result(np).mean);
+    set(h,'color','r');
     if shuffletimes
         allid = repmat(stid,length(spts),1)' + repmat(spts',1,length(tid))';
         allid(allid<=0) = 1;

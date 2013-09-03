@@ -21,6 +21,7 @@ TOPTAG = 'Combiner'; %default
 LFP = [];
 setexpts = [];
 layout = [];
+
 nextcell = 0;
 newprobe = 0;
 DATA.bysuffix = 0;
@@ -40,17 +41,14 @@ else
             argon = {argon{:} 'setprobe' varargin{j}};
         elseif strncmpi('layout',varargin{j},6)
             j = j+1;
-            if exist(varargin{j},'file')
-                layout = ReadLayout(varargin{j});
-            else
-                layout = ReadLayout([DATA.prefsdir varargin{j} '.config.mat']);
-            end
+            DATA.layoutfile = varargin{j};
+
         elseif strncmpi('expts',varargin{j},4)
             j = j+1;
             setexpts = varargin{j};
             if exist('DATA','var') & isfield(DATA,'elst')
                 set(DATA.elst,'value',setexpts);
-                DATA.currentexpt = setexpts(1);
+                DATA.currentexpt = setexpts;
             end
         end
     j = j+1;
@@ -131,6 +129,9 @@ while j <= length(varargin)
         if length(varargin{j}) > 1
             DATA.state.bigwindow(2) = varargin{j}(1);
         end
+    elseif strncmpi(varargin{j},'fontsize',6)
+        j = j+1;
+        DATA.gui.FontSize = varargin{j};
     elseif strncmpi(varargin{j},'newprobe',6)
         newprobe = 1;
     elseif strncmpi(varargin{j},'nospikes',6)
@@ -353,6 +354,10 @@ elseif strncmpi(name,'listexps',6)
         end
         if ~isempty(it)
             expname = DATA.expnames{it};
+        else
+            expname = DATA.exptypelist{eid(1)};
+        end
+        if 1 %was test for it
             if strmatch(expname,'CO','exact') & strmatch(stimname,'square')
                 expname = 'FLSH';
             end
@@ -363,9 +368,22 @@ elseif strncmpi(name,'listexps',6)
             else
                 DATA.outname = CombinedName(DATA,eid(1),DATA.spikelist(1));
             end
-            if exist(DATA.outname,'file')
+            expfile = DATA.outname;
+            if DATA.listbycell
+                expfile = regexprep(DATA.outname,'\.p[0-9]*c[0-9]\.',sprintf('.cell%d.',DATA.probe));
+                args = {};
+            else
+                args = {'probe'};
+            end
+            if ~exist(expfile,'file')
+                expfile = regexprep(DATA.outname,'\.p[0-9]*c[0-9]\.','.Cells.');
+            end
+            if exist(expfile,'file')
                SetFigure(DATA.tag.dataplot,DATA);
-                load(DATA.outname);
+                load(expfile);
+                if exist('AllExpt','var')
+                    Expt = All2Expt(AllExpt,DATA.probe,args{:});
+                end
                 Expt.Header.Name = BuildName(Expt.Header.Name);
                 DATA.Expt = Expt;
                 args = PlotArgs(DATA, Expt,'combined');
@@ -423,7 +441,7 @@ elseif strncmpi(name,'ingnoreonline',9)
 elseif strncmpi(name,'checklists',6)
     CheckLists(DATA);
 elseif strncmpi(name,'ClearClusters',7)
-    eid = DATA.currentexpt;
+    eid = DATA.currentexpt(1);
     nc = CountClusters(DATA.Expts{eid}.Cluster);
     for k = 1:nc;
         for j = 1:size(DATA.Expts{eid}.Cluster,2);
@@ -467,7 +485,7 @@ elseif strncmpi(name,'ClearallClusters',10)
 elseif strncmpi(name,'comments',6)
     PrintComments(DATA);
     DATA.currentprobe = DATA.probe;
-    PlotComments(DATA.datadir,'parent',DATA.toplevel);
+    DATA.Comments = PlotComments(DATA.datadir,'parent',DATA.toplevel);
 elseif strncmpi(name,'combine',6)
     DATA.extype = get(DATA.clst,'value');
     if length(DATA.extype) > 1
@@ -508,7 +526,7 @@ elseif strncmpi(name,'plotshape',6)
     PlotSpikeShapes(DATA.MeanSpike,varargin{:});
 elseif strncmpi(name,'PlotISI',5)
     GetFigure('ISI');
-    [isis, t, s] = CalcISI(DATA.Expts{DATA.currentexpt}.Trials);
+    [isis, t, s] = CalcISI(DATA.Expts{DATA.currentexpt(1)}.Trials);
     id = find(isis < 1000)
     hist(isis(id),100);
     [a,b] = sort(isis);
@@ -540,10 +558,8 @@ elseif strncmpi(name,'revertcelllist',10)
         DATA.TemplateInfo = TemplateInfo;
     end
     set(DATA.toplevel,'UserData',DATA);
-elseif strncmpi(name,'saveconfig',6)
-        SaveConfig(DATA);
 elseif strncmpi(name,'loadconfig',6)
-       [outname, pathname] = uigetfile(DATA.layoutfile);
+       [outname, pathname] = uigetfile(DATA.configfile);
        if outname
            DATA.layoutfile = [pathaname outname];
            DATA  = ReadConfig(DATA);
@@ -639,11 +655,11 @@ elseif strncmpi(name,'setexp',6)
             stop(DATA.timerobj);
         end
     end
-    lastexpt = DATA.currentexpt;
+    lastexpt = DATA.currentexpt(1);
     if isempty(id)
-        DATA.currentexpt = [];
+        DATA.currentexpt = DATA.expid(1);
     else
-        DATA.currentexpt = DATA.expid(id(1));
+        DATA.currentexpt = DATA.expid(id);
     end
     DATA.currenttrial = 0; 
     DATA.firsttrial = 0; %no partial list
@@ -664,13 +680,13 @@ elseif strncmpi(name,'setexp',6)
             if ~isfield(DATA,'grididx')
             DATA.grididx = BuildGridIndex(DATA.name, DATA.Expts);
             end
-            DATA = LoadSpikes(DATA, DATA.currentexpt);
-            DATA = CheckClusterLoaded(DATA, DATA.currentexpt, DATA.probe);
+            DATA = LoadSpikes(DATA, DATA.currentexpt(1));
+            DATA = CheckClusterLoaded(DATA, DATA.currentexpt(1), DATA.probe);
         end
         playargs = [playargs 'Onetrial'];
 %        DATA.plot.useprobe(DATA.probe) = 1;
-    elseif DATA.state.online & lastexpt ~= DATA.currentexpt
-        DATA = LoadSpikes(DATA, DATA.currentexpt);
+    elseif DATA.state.online & lastexpt ~= DATA.currentexpt(1)
+        DATA = LoadSpikes(DATA, DATA.currentexpt(1));
     elseif isfield(DATA,'AllClusters') && iscell(DATA.AllClusters)
         DATA = SetProbe(DATA, DATA.probe);
         if DATA.listbycell && newprobe
@@ -702,7 +718,7 @@ elseif strncmpi(name,'setexp',6)
         playspk = 0;
     end
     if isfield(DATA,'AllClusters') | isfield(DATA,'AllSpikes')
-        DATA.allexp = DATA.currentexpt;
+        DATA.allexp = DATA.currentexpt(1);
     end
 % need to copy Expt.Cluster to DATA.cluster for all probes
     if DATA.state.resetclusters
@@ -722,8 +738,8 @@ elseif strncmpi(name,'setexp',6)
         pdef(j) = 0;
         ndef(j) = 0;
         for k = 1:size(DATA.cluster,1)
-        if isfield(DATA.Expts{DATA.currentexpt},'Cluster') && iscluster(DATA.Expts{DATA.currentexpt}.Cluster,1,j)
-            DATA.cluster{k,j} = DATA.Expts{DATA.currentexpt}.Cluster{1,j};
+        if isfield(DATA.Expts{DATA.currentexpt(1)},'Cluster') && iscluster(DATA.Expts{DATA.currentexpt(1)}.Cluster,1,j)
+            DATA.cluster{k,j} = DATA.Expts{DATA.currentexpt(1)}.Cluster{1,j};
             DATA.cluster{k,j}.touched = 1;
             ndef(j) = ndef(j)+1;
             pdef(j) = pdef(j)+1;
@@ -734,7 +750,7 @@ elseif strncmpi(name,'setexp',6)
         if ndef(j) == 0 && iscluster(DATA.cluster,1,j) & DATA.state.applylastcluster
             for k = 1:size(DATA.cluster,1)
                 if iscluster(DATA.cluster,k,j)
-                DATA.Expts{DATA.currentexpt}.Cluster{k,j} = DATA.cluster{k,j};
+                DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j} = DATA.cluster{k,j};
                 ndef(j) = ndef(j)+1;
                 end
             end
@@ -744,8 +760,8 @@ elseif strncmpi(name,'setexp',6)
         for j = 1:size(DATA.cluster,2)
             if ndef(j) & ~isempty(DATA.AllSpikes{j})
                 DATA.probe = j;
-                DATA = SetExptSpikes(DATA,DATA.currentexpt,0,'useexp');
-%                DATA.Expts{DATA.currentexpt}.Cluster{1,j}.touched = 1;
+                DATA = SetExptSpikes(DATA,DATA.currentexpt(1),0,'useexp');
+%                DATA.Expts{DATA.currentexpt(1)}.Cluster{1,j}.touched = 1;
             end
         end
         for j = 1:length(DATA.probelist)
@@ -812,11 +828,11 @@ elseif strncmpi(name,'setexp',6)
             DATA =  PlotAllProbeXY(DATA,0);
             [DATA, ispk] = SetExptSpikes(DATA,DATA.expid(id(1)),0,'useexp');
             DATA.spklist = ispk;
-            DATA.Expts{DATA.currentexpt}.gui.spks = ispk;
+            DATA.Expts{DATA.currentexpt(1)}.gui.spks = ispk;
             if DATA.plot.quickspks
-                PlaySpikes(DATA,DATA.currentexpt,'quickspks');
+                PlaySpikes(DATA,DATA.currentexpt(1),'quickspks');
             else
-                PlaySpikes(DATA,DATA.currentexpt,'xyonly');
+                PlaySpikes(DATA,DATA.currentexpt(1),'xyonly');
             end
             
             GetFigure(DATA.tag.clusterxy);
@@ -1072,7 +1088,7 @@ elseif strncmpi(name,'save',4) & isfield(DATA,'Expt')
     nspk = sum([Expt.Trials.count]);
     fprintf('Saved %d spikes (Expts%s) to %s\n',nspk,sprintf(' %d',DATA.combineids),DATA.outname);
     if DATA.logfid
-        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s\n',datestr(now),nspk,sprintf(' %d',DATA.combineids),DATA.outname);
+        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s (%s)\n',datestr(now),nspk,sprintf(' %d',DATA.combineids),DATA.outname,DATA.user);
     end
     cfile = CombinerLst(DATA);
     if exist(cfile,'file') == 2
@@ -1118,18 +1134,18 @@ elseif strncmpi(name,'pcaplot',6)
     if length(varargin) & isnumeric(varargin{1})
         eid = varargin{1};
     else
-        eid = DATA.currentexpt;
+        eid = DATA.currentexpt(1);
     end
     PlotPCAs(DATA,eid);
 elseif strncmpi(name,'trodecorr',6)
     if length(varargin) & isnumeric(varargin{1})
         eid = varargin{1};
     else
-        eid = DATA.currentexpt;
+        eid = DATA.currentexpt(1);
     end
     out= CalcTrodeCorrs(DATA,eid);
 elseif strncmpi(name,'tetrodemov',6)
-    ispk = DATA.Expts{DATA.currentexpt}.gui.spks;
+    ispk = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
     for j = 1:32
         hold off;
         plot(DATA.AllData.Spikes.values(ispk,j),DATA.AllData.Spikes.values(ispk,j+32),'.','markersize',1);
@@ -1424,7 +1440,7 @@ function PlotAdjacentXcorrs(DATA, probes, type)
     [nr, nc] = NSubplots(np-1);
     for j = 1:np-1
         subplot(nr,nc,j);
-              CalcXcorr(DATA, DATA.currentexpt,probes(j),probes(j+1));
+              CalcXcorr(DATA, DATA.currentexpt(1),probes(j),probes(j+1));
               set(gca,'xtick',[],'ytick',[])
               title(sprintf('%d,%d',j,j+1));
     end
@@ -1439,11 +1455,11 @@ function DATA = PlotXcorr(DATA, probes, type)
         for k = 1:j
             subplot(nc,nc,((j-1)*nc) + k);
             if type == 3
-                CalcXcorr(DATA, DATA.currentexpt,probes(j),probes(k));
+                CalcXcorr(DATA, DATA.currentexpt(1),probes(j),probes(k));
             elseif type == 1
-                CalcXcorrDC(DATA, DATA.currentexpt,probes(j),probes(k));
+                CalcXcorrDC(DATA, DATA.currentexpt(1),probes(j),probes(k));
             else
-                CalcXcorrV(DATA, DATA.currentexpt,probes(j),probes(k));
+                CalcXcorrV(DATA, DATA.currentexpt(1),probes(j),probes(k));
             end
             set(gca,'ytick',[],'xtick',[]);
             if k == 1
@@ -1456,11 +1472,11 @@ function DATA = PlotXcorr(DATA, probes, type)
     end
     else
         if type == 3
-            CalcXcorr(DATA, DATA.currentexpt,probes(1),probes(2));
+            CalcXcorr(DATA, DATA.currentexpt(1),probes(1),probes(2));
         elseif type == 1
-            CalcXcorrDC(DATA, DATA.currentexpt,probes(1),probes(2));
+            CalcXcorrDC(DATA, DATA.currentexpt(1),probes(1),probes(2));
         else
-            CalcXcorrV(DATA, DATA.currentexpt,probes(1),probes(2));
+            CalcXcorrV(DATA, DATA.currentexpt(1),probes(1),probes(2));
         end
     end
 
@@ -1493,7 +1509,7 @@ function DATA = ReadGridFile(DATA)
    end
    idx = BuildGridIndex(datdir, DATA.Expts, 'reindex');
    DATA.grididx = idx;
-   id = find(idx.expt == DATA.currentexpt);
+   id = find(idx.expt == DATA.currentexpt(1));
    bid = id;
    for j = 1:length(id)
        nfiles{j} = [datdir '/' idx.names{id(j)}];
@@ -1686,6 +1702,7 @@ end
         for j = 1:length(DATA.ArrayConfig.id)
             DATA.probenames{j} = sprintf('%d(E%d %d,%d)',j,DATA.ArrayConfig.id(j),DATA.ArrayConfig.X(j),DATA.ArrayConfig.Y(j));
         end
+        DATA.state.includeprobename = 1;
     end
     if isempty(Expts)
         NotBusy(DATA);
@@ -1994,14 +2011,7 @@ function ShowLFPPlot(DATA)
          j =  j+1;
      end
      [a,isnew] = GetFigure(tag,args{:});
-     if iscellstr({figpos.tag})
-     id = strmatch(tag,{figpos.tag});
-     if ~isempty(id) && (isnew || figpos(id).set ==0)
-             set(a,'Position',figpos(id).pos);
-             figpos(id).set = 1;
-             setappdata(DATA.toplevel,'FigPos',figpos);
-     end
-     end
+     SetFigPos(DATA, tag);
      if isnew && strcmp(tag,'CombinerAllExpts')
          hm = uimenu(a,'label','&Plots');
          uimenu(hm,'label','&Next','Callback',{@AllCellPlots, 'next'});
@@ -2070,7 +2080,7 @@ function AllCellPlots(a,b, op)
      DATA = GetDataFromFig(a);
      onoff = {'off' 'on'};
      AllCellRes = getappdata(DATA.toplevel,'AllCellRes');
-     ename = Expt2Name(DATA.Expts{DATA.currentexpt});
+     ename = Expt2Name(DATA.Expts{DATA.currentexpt(1)});
      P =  getappdata(DATA.toplevel,'AllCellPlot');
      if isnumeric(op)
          P = NextPlot(P,AllCellRes,op);
@@ -2549,14 +2559,20 @@ function [DATA, Stimvals, needv, retval] = CheckCombine(DATA, interactive)
             Stimvals.BlockedStim = 1;
         end        
     end
+    if Stimvals.st == 2 && sum(c.sls > 0) == 0 %don't check or for RDS with sl=0
+        rdssl =1;
+    else
+        rdssl = 0;
+    end
+
     %don't check SF for RDS/RLS/Cylinder
     if length(c.sfs) >1 & isempty(strmatch('sf',{e1lst{:} e2lst{:}}))  & ~ismember(Stimvals.st,[2 15 11])
       err = [err sprintf('%d SFS in %s',length(c.sfs),DATA.outname) sprintf('%.2f ',c.sfs)];
     end
-    if length(c.ors) > 1 & isempty(strmatch('or',{e1lst{:} e2lst{:}}))
-      err = [err sprintf('%d Oris in %s',length(c.ors),DATA.outname) sprintf('%.2f ',c.ors)];
+    if length(c.ors) > 1 & isempty(strmatch('or',{e1lst{:} e2lst{:}})) & rdssl == 0
+            err = [err sprintf('%d Oris in %s',length(c.ors),DATA.outname) sprintf('%.2f ',c.ors)];
     end
-    if length(c.ods) > 1 & isempty(strmatch('od',{e1lst{:} e2lst{:}}))
+    if length(c.ods) > 1 & isempty(strmatch('od',{e1lst{:} e2lst{:}})) & rdssl == 0
       err = [err sprintf('%d Ori diffs in %s',length(c.ors),DATA.outname) sprintf('%.2f ',c.ods)];
     end
     if length(c.sls) > 1 & isempty(strmatch('sl',{e1lst{:} e2lst{:}}))
@@ -2626,7 +2642,7 @@ if isfield(DATA.plot,'useprobe') & sum(DATA.plot.useprobe)
     end
 else
        
-DATA.ispk = DATA.Expts{DATA.currentexpt}.gui.spks;
+DATA.ispk = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
 C = OptimizeDprime(DATA);
 DATA.cluster{DATA.currentcluster,DATA.probe} = C;
 [DATA, newd, nc] = SetSpkCodes(DATA,DATA.ispk,DATA.probe,2);
@@ -2639,7 +2655,7 @@ function C = OptimizeDprime(DATA)
     global ycs;
     ncall = 0;
     ycs = [];
-    eid = DATA.currentexpt;
+    eid = DATA.currentexpt(1);
     cl = DATA.currentcluster;
     C = DATA.cluster{cl,DATA.probe};
   
@@ -2693,7 +2709,7 @@ function dprime = ClusterDprime(x, DATA, nspks)
     global ncall;
     global ycs;
 
-    eid = DATA.currentexpt;
+    eid = DATA.currentexpt(1);
     C = DATA.cluster{DATA.currentcluster,DATA.probe};
     if length(x) == 2
     C.x(2) = x(1);
@@ -2732,7 +2748,7 @@ if length(AllClusters) < e || length(AllClusters{e}) < p
 end
 C = AllClusters{e}(p);
     
-f = {'mahal' 'crit' 'ctime' 'excludetrialids' 'clustersign' 'cluster'};
+f = {'mahal' 'crit' 'ctime' 'excludetrialids' 'clustersign' 'cluster' 'dips' 'dropi' 'savetime' 'user'};
 for j = 1:length(f)
     if isfield(C,f{j})
         Cluster.(f{j}) = C.(f{j});
@@ -2754,7 +2770,7 @@ function [Expt, DATA, plotres] = CombinePlot(DATA, dlgs, varargin)
         end
         j = j+1;
     end
-    
+    plotres = [];
     needfields = {};
     oldf = gcf;
     if DATA.state.online < 2
@@ -2994,18 +3010,24 @@ function [Expt, DATA, plotres] = CombinePlot(DATA, dlgs, varargin)
                 if cid > 1
                     try
                         Expt.Header.Clusters{j}.cluster = cid;
-                        Expt.Header.dips(j,:) = DATA.AllClusters{eid}(probe).next{cid-1}.dips;
+                        dips = DATA.AllClusters{eid}(probe).next{cid-1}.dips;
                         Expt.Header.dropi(j) = DATA.AllClusters{eid}(probe).next{cid-1}.dropi;
                     catch err
                         fprintf('Missing next or field for E%dP%dC%d(%s)\n',eid,probe,cid,err.message);
-                        Expt.Header.dips(j,:) = DATA.AllClusters{eid}(probe).dips;
+                        dips = DATA.AllClusters{eid}(probe).dips;
                         Expt.Header.dropi(j) = NaN;
                     end
                 else
-                    Expt.Header.dips(j,:) = DATA.AllClusters{eid}(probe).dips;
+                    dips = DATA.AllClusters{eid}(probe).dips;
                     Expt.Header.dropi(j) = DATA.AllClusters{eid}(probe).dropi;
                     Expt.Header.Clusters{j}.cluster = 1;
                 end
+                if length(dips) < 4
+                    cprintf('errors','Missing Quantification E%dP%dC%d(%d values)\n',eid,probe,cid,length(dips));
+                    dips(4) = NaN;
+                end
+                Expt.Header.dips(j,:) = dips;
+                    
             elseif ~isempty(DATA.AllClusters{eid}(DATA.probe).dips)
                 Expt.Header.dips(j,:) = DATA.AllClusters{eid}(DATA.probe).dips;
                 Expt.Header.dropi(j) = DATA.AllClusters{eid}(DATA.probe).dropi;
@@ -3126,7 +3148,12 @@ end
      return;
  end
     SetFigure(DATA.tag.dataplot,DATA);
-    if Expt.Header.rc
+    if sum(strcmp('Dc',{Expt.Stimvals.et Expt.Stimvals.e2}))
+        Expt.Header.rc = 2;
+    elseif Expt.Stimvals.Dc > 0 && Expt.Stimvals.Dc < 1
+        Expt.Header.rc = 2;
+    end
+    if Expt.Header.rc == 1
         SetFigure(DATA.tag.rcfiga,DATA);
         SetFigure(DATA.tag.rcfigb,DATA);
         SetFigure(DATA.tag.rcfigc,DATA);
@@ -3497,6 +3524,9 @@ end
                 DATA = AddMultiProbeGUI(DATA);
         end
     end
+    if sum(DATA.probelist < 100) > 1 % count # of recording chans
+        DATA.state.includeprobename = 1;
+    end
     it = findobj(DATA.toplevel,'Tag','ProbeId');
     set(it,'string',DATA.probenames,'value',DATA.probe);
 
@@ -3668,17 +3698,17 @@ function CutTrial(a,b)
 %DATA = combine('getstate');
 DATA = GetDataFromFig(a);
 
-t = DATA.Expts{DATA.currentexpt}.Trials(DATA.currenttrial).Trial;
+t = DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.currenttrial).Trial;
 if length(DATA.probelist) > 1 & isfield(DATA,'CellList')
     cells = CellsSelected(DATA);
      for j = 1:length(cells)
          DATA.CellQuality(cells(j),t) = 3;
      end
 else
-DATA.Expts{DATA.currentexpt}.Trials(DATA.currenttrial).Trial = -abs(t);
+DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.currenttrial).Trial = -abs(t);
 end
 it = findobj(DATA.svfig,'Tag','ChooseTrial');
-set(it,'string',sprintf('%d|',[DATA.Expts{DATA.currentexpt}.Trials.Trial]),'value',1);
+set(it,'string',sprintf('%d|',[DATA.Expts{DATA.currentexpt(1)}.Trials.Trial]),'value',1);
 set(DATA.toplevel,'UserData',DATA);
 PlayOneTrial(DATA,a,1);
         
@@ -3706,29 +3736,29 @@ while j <= length(varargin)
 end
 
 %DATA = combine('getstate');
-expid = DATA.currentexpt;
+expid = DATA.currentexpt(1);
 
 if b < 0  & DATA.currenttrial > 1 %step back
     DATA.currenttrial = DATA.currenttrial-1;
-    while DATA.Expts{DATA.currentexpt}.Trials(DATA.currenttrial).Trial < 0 & DATA.currenttrial > 1 
+    while DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.currenttrial).Trial < 0 & DATA.currenttrial > 1 
         DATA.currenttrial = DATA.currenttrial-1;
     end
-elseif b > 0 & DATA.currenttrial < length(DATA.Expts{DATA.currentexpt}.Trials) %step back
+elseif b > 0 & DATA.currenttrial < length(DATA.Expts{DATA.currentexpt(1)}.Trials) %step back
     DATA.currenttrial = DATA.currenttrial+1;
-    while DATA.Expts{DATA.currentexpt}.Trials(DATA.currenttrial).Trial < 0 &  ...
-            DATA.currenttrial < length(DATA.Expts{DATA.currentexpt}.Trials) 
+    while DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.currenttrial).Trial < 0 &  ...
+            DATA.currenttrial < length(DATA.Expts{DATA.currentexpt(1)}.Trials) 
         DATA.currenttrial = DATA.currenttrial+1;
     end
 elseif b == 0 % step to a trial on list
-    DATA.currenttrial = find([DATA.Expts{DATA.currentexpt}.Trials.Trial] == a);    
+    DATA.currenttrial = find([DATA.Expts{DATA.currentexpt(1)}.Trials.Trial] == a);    
     DATA.currenttrial = a;    
 end
 if DATA.currenttrial <= 0
     DATA.currenttrial = 1;
 end
-Trial = DATA.Expts{DATA.currentexpt}.Trials(DATA.currenttrial);
+Trial = DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.currenttrial);
 if Trial.Trial < 0 && b == 0 && setgui %%manually select -Trial = include again
-    DATA.Expts{DATA.currentexpt}.Trials(DATA.currenttrial).Trial = abs(Trial.Trial);
+    DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.currenttrial).Trial = abs(Trial.Trial);
     it = findobj(DATA.svfig,'Tag','ChooseTrial');
     set(it,'string',sprintf('%d|',[DATA.Expts{expid}.Trials.Trial]),'value',1);
 end
@@ -3741,7 +3771,7 @@ if DATA.state.recut
 else
     nc = DATA.s2clusters;
 end
-Trial.ed = GetEval(DATA.Expts{DATA.currentexpt},'ed',DATA.currenttrial);
+Trial.ed = GetEval(DATA.Expts{DATA.currentexpt(1)},'ed',DATA.currenttrial);
 probes =  [DATA.probe DATA.xprobes];
 if (length(probes) > 1 & DATA.plot.syncoverlay == 0) || DATA.plot.showwave
     Aargs = {'timemode'};
@@ -3831,7 +3861,7 @@ end
 CheckSpoolButton(DATA);
 set(DATA.toplevel,'UserData',DATA);
 set(0,'CurrentFigure',DATA.svfig);
-tid = DATA.Expts{DATA.currentexpt}.Trials(DATA.currenttrial).id;
+tid = DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.currenttrial).id;
 if setgui
 it = findobj(DATA.svfig,'Tag','ChooseTrial');
 set(it,'value',DATA.currenttrial);
@@ -4237,9 +4267,9 @@ if ispk
 
     if DATA.probe < 100
         if isfield(DATA,'AllClusters')
-            pid = GetProbe(DATA, DATA.currentexpt, DATA.probe);
-            cx = DATA.AllClusters{DATA.currentexpt}(pid).cx(ispk);
-            cy = DATA.AllClusters{DATA.currentexpt}(pid).cy(ispk);
+            pid = GetProbe(DATA, DATA.currentexpt(1), DATA.probe);
+            cx = DATA.AllClusters{DATA.currentexpt(1)}(pid).cx(ispk);
+            cy = DATA.AllClusters{DATA.currentexpt(1)}(pid).cy(ispk);
         else
         [cx, DATA] = GetSpikeVals(DATA,ispk, Spks.values(ispk,:), Spks.dVdt(ispk,:),DATA.plot.clusterX, classify,PCs(ispk,:));
         DATA.Spikes.cx(ispk) = cx;
@@ -4513,9 +4543,9 @@ elseif isfield(DATA,'AllClusters')
             Spks = DATA.AllClusters{expid}(pid(1));
             spikelist = cid(1);
             if isfield(Spks,'excludetrialids')
-            if cid <= length(Spks.excludetrialids)
-                xcl = Spks.excludetrialids{cid};
-            end
+                if cid <= length(Spks.excludetrialids)
+                    xcl = Spks.excludetrialids{cid};
+                end
             end
         elseif length(pid) > 1
             Spks = DATA.AllClusters{expid}(pid(1));
@@ -4525,6 +4555,9 @@ elseif isfield(DATA,'AllClusters')
             end
         else
                 Spks = [];
+        end
+        if isfield(Spks,'missingtrials') && ~isempty(Spks.missingtrials)
+            xcl = [xcl Spks.missingtrials];
         end
         if isempty(pid)
             counts = [];
@@ -4640,10 +4673,10 @@ function nc = MaxSpikeCode(DATA, expspks)
     ctype = 2;
 
     if isfield(DATA,'AllClusters')
-        probe = GetProbe(DATA,DATA.currentexpt, DATA.probe);
+        probe = GetProbe(DATA,DATA.currentexpt(1), DATA.probe);
         if iscell(DATA.AllClusters)
             ctype = 1;
-            nc = max(DATA.AllClusters{DATA.currentexpt}(probe).codes(expspks,ctype));
+            nc = max(DATA.AllClusters{DATA.currentexpt(1)}(probe).codes(expspks,ctype));
         else
         nc = max(DATA.AllClusters(DATA.probe).codes(expspks,ctype));
         end
@@ -4780,9 +4813,9 @@ end
 
 nc = CountClusters(DATA.cluster);
 DATA.nclusters = nc;
-eid = DATA.currentexpt;
+eid = DATA.currentexpt(1);
 DATA.Expts{eid}.Cluster{1,DATA.probe}.touched = 2;
-DATA.Expts{DATA.currentexpt}.gui.ncluster = nc;
+DATA.Expts{DATA.currentexpt(1)}.gui.ncluster = nc;
 DATA.cluster{DATA.currentcluster,DATA.probe}.autocut = 0;
 if isfield(DATA.cluster{DATA.currentcluster,DATA.probe},'deleted') & ...
     DATA.cluster{DATA.currentcluster,DATA.probe}.deleted == 1
@@ -4796,9 +4829,9 @@ if isfield(DATA,'AllClusters') || isfield(DATA,'AllSpikes') % only save clusters
 for k = 1:nc
     for j = 1:min([size(DATA.cluster,2) length(DATA.AllSpikes)])
         if  isfield(DATA.cluster{k,j}, 'touched') && DATA.cluster{k,j}.touched > 0 && isfield(DATA.AllSpikes{j},'cx')
-        DATA.Expts{DATA.currentexpt}.Cluster{k,j} = DATA.cluster{k,j};
+        DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j} = DATA.cluster{k,j};
         if sum(ismember(DATA.cluster{k,j}.params,[29 30 31])) %templates used
-            DATA.Expts{DATA.currentexpt}.Cluster{k,j}.Templates = DATA.Templates;
+            DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j}.Templates = DATA.Templates;
         end
           touched(j) = 1;
         end
@@ -4806,10 +4839,10 @@ for k = 1:nc
 end
     fprintf('Probes %s\n',num2str(find(touched >0)));
 else
-        DATA.Expts{DATA.currentexpt}.Cluster = DATA.cluster;
+        DATA.Expts{DATA.currentexpt(1)}.Cluster = DATA.cluster;
         for k = 1:nc
         if isfield(DATA.cluster{k,1},'params') & sum(ismember(DATA.cluster{k,1}.params,[29 30 31])) %templates used
-            DATA.Expts{DATA.currentexpt}.Cluster{k,1}.Templates = DATA.Templates;
+            DATA.Expts{DATA.currentexpt(1)}.Cluster{k,1}.Templates = DATA.Templates;
         end
         end
 %
@@ -4819,8 +4852,8 @@ else
 % Add these to AllClusters below
     DATA.Expts{eid}.Cluster{1,DATA.probe}.touched = 2;
 end
-DATA.Expts{DATA.currentexpt}.gui.clustertype = 1;
-DATA.Expts{DATA.currentexpt}.gui.classified = 1;
+DATA.Expts{DATA.currentexpt(1)}.gui.clustertype = 1;
+DATA.Expts{DATA.currentexpt(1)}.gui.classified = 1;
 spkvarnames= DATA.spkvarnames;
 p = DATA.probe;
 for j = 1:length(DATA.Expts)
@@ -4921,7 +4954,7 @@ save(ClusterFile(DATA,'allprobes'),'AllClusters','spkvarnames','Templates','Temp
 end
 
 if DATA.logfid
-    fprintf(DATA.logfid,'Cluster set for P%d Expt %d %s by %s\n',DATA.probe,DATA.currentexpt,datestr(now),DATA.user);
+    fprintf(DATA.logfid,'Cluster set for P%d Expt %d %s by %s\n',DATA.probe,DATA.currentexpt(1),datestr(now),DATA.user);
 end
 % now re-do list of su-expts to reflect cut clusters
 eid = get(DATA.clst,'value');
@@ -4929,7 +4962,7 @@ if DATA.currentcluster > 7 %defining artifact
     DATA.currentcluster = 1;
     figure(DATA.xyfig);
     hold off;
-    DATA = DrawXYPlot(DATA, DATA.Expts{DATA.currentexpt}.gui.spks);
+    DATA = DrawXYPlot(DATA, DATA.Expts{DATA.currentexpt(1)}.gui.spks);
     cid = findobj('Tag','Clusterid');
     set(cid,'value',1);
 end
@@ -5012,7 +5045,7 @@ if DATA.state.online == 0 %%not online data
     end
 else
     if spkcodefile 
-        cfile = sprintf('%s/SpikeCodes%d.mat',DATA.datafilename,DATA.Expts{DATA.currentexpt}.Trials(end).id);
+        cfile = sprintf('%s/SpikeCodes%d.mat',DATA.datafilename,DATA.Expts{DATA.currentexpt(1)}.Trials(end).id);
     else
         cfile = [DATA.datafilename '/Clusters.mat'];
     end
@@ -5174,8 +5207,8 @@ elseif type ==2
     Spks = GetSpikeStruct(DATA);
     id = find(Spks.codes(:,2) < 8);
     a = FitGaussMeans([DATA.Spikes.cx(DATA.spklist)' DATA.Spikes.cy(DATA.spklist)'],2, 'verbose');
-    DATA.Expts{DATA.currentexpt}.Clusters{1,DATA.probe}.mahal = a.mahal;
-    C = DATA.Expts{DATA.currentexpt}.Clusters{1,DATA.probe};
+    DATA.Expts{DATA.currentexpt(1)}.Clusters{1,DATA.probe}.mahal = a.mahal;
+    C = DATA.Expts{DATA.currentexpt(1)}.Clusters{1,DATA.probe};
     
     hold on;
     ezcontour(@(x,y)pdf(a.obj,[x y]),get(gca,'xlim'),get(gca,'ylim'));
@@ -5195,7 +5228,7 @@ elseif type ==2
     fprintf('Bestangle %.1f, %.3f H%.4f\n',a * 180/pi,b,c.hdip);
     C.dip = c.hdip;
     C.bmc = b;
-    DATA.Expts{DATA.currentexpt}.Clusters{1,DATA.probe} = C;
+    DATA.Expts{DATA.currentexpt(1)}.Clusters{1,DATA.probe} = C;
     set(DATA.toplevel,'UserData',DATA);
     
 elseif type ==3  %recalc PCA
@@ -5330,7 +5363,7 @@ ispk = DATA.spklist;
 if (plot == 3 | type == 3 ) & DATA.plot.clusterZ > 0
     Plot3DClusters(DATA,recalcxy);
 else
-        DATA = CalcClusterVars(DATA, DATA.Expts{DATA.currentexpt}.gui.spks,'force');
+        DATA = CalcClusterVars(DATA, DATA.Expts{DATA.currentexpt(1)}.gui.spks,'force');
         hold off;
     DATA = DrawXYPlot(DATA, ispk); %returned DATA has chnges to clusterX/Yrange
 end
@@ -5418,88 +5451,6 @@ xlabel(['X:' DATA.spkvarnames{DATA.plot.clusterX}]);
 ylabel(['Y:' DATA.spkvarnames{DATA.plot.clusterY}]);
 zlabel(['Z:' DATA.spkvarnames{DATA.plot.clusterZ}]);
 
- function SaveConfig(DATA)
-%save flags and window layout
-%consider adding DAT.show
-     fid = 1;
- 
- name = [fileparts(DATA.name) '/combine.config'];
- [outname, pathname] = uiputfile(DATA.layoutfile);
- if outname
-     name = [pathname outname];
- fid = fopen(name,'W');
- f = fields(DATA.tag);
- nf = 0;
- for j = 1:length(f);
-     it = findobj('Tag',DATA.tag.(f{j}),'type','figure');
-     if ~isempty(it)
-         nf = nf+1;
-         DATA.figpos(nf).pos = get(it,'Position');
-         DATA.figpos(nf).tag = DATA.tag.(f{j});
-     end
-
- end
- 
-for j = 1:length(DATA.figpos)
-         fprintf(fid,'DATA.figpos(%d).tag = ''%s'';\n',j,DATA.figpos(j).tag);
-         fprintf(fid,'DATA.figpos(%d).pos = [%s];\n',j,sprintf('%d ',DATA.figpos(j).pos));
-end
-f = fields(DATA.plot);
-for j = 1:length(f)
-    if strmatch(f{j},{'clusterXrange' 'clusterYrange' 'clusterZrange'})
-    elseif strmatch(f{j},{'type'})
-    elseif length(DATA.plot.(f{j})) == 1
-        fprintf(fid,'DATA.plot.%s = %f;\n',f{j},DATA.plot.(f{j}));
-    end
-end
-
-f = fields(DATA.state);
-for j = 1:length(f)
-    if strmatch(f{j},{'clusterXrange' 'clusterYrange' 'clusterZrange'})
-    elseif strmatch(f{j},{'type'})
-    elseif length(DATA.state.(f{j})) == 1
-        fprintf(fid,'DATA.state.%s = %f;\n',f{j},DATA.state.(f{j}));
-    end
-end
-fclose(fid);
-fprintf('Configuration saved to %s\n',name); 
- 
-
- end
- 
-
-function DATA = ReadConfig(DATA, varargin)
-  
- DATA.configfile = [fileparts(DATA.name) '/combine.config'];
- j = 1;
- while j <= length(varargin)
-     if strncmpi(varargin{j},'file',4)
-         j = j+1;
-         name = varargin{j};
-         DATA.configfile = name;
-     end
-     j = j+1;
- end
-
-fid = fopen(DATA.configfile,'r');
-line = fgets(fid);
-while line > -1
-    eval(line);
-    line = fgets(fid);
-end
-for j = 1:length(DATA.figpos)
-    it = findobj('Tag',DATA.figpos(j).tag,'type','figure');
-     if ~isempty(it)
-         set(it, 'Position', DATA.figpos(j).pos);
-         DATA.figpos(j).set = 1;
-     else
-         DATA.figpos(j).set = 0;
-     end
-end
-fclose(fid);
-      if length(DATA.figpos) > 0
-         setappdata(DATA.toplevel,'FigPos',DATA.figpos);
-     end
 
 function AddClusterIdButton(a,b)
     DATA = GetDataFromFig(a);
@@ -5775,7 +5726,7 @@ if DATA.spooling ~= 2 %2 == spool from current trial
     DATA.currenttrial = 0;
 end
 DATA.ISIpair = 0;
-DATA.currentexpt = expid;
+DATA.currentexpt(1) = expid;
 if DATA.test.fastplot
     set(DATA.svfig,'renderer','painters');
     ax = findobj(DATA.svfig,'type','ax');
@@ -5801,8 +5752,8 @@ elseif isfield(DATA,'AllClusters')
         %remove monkey name then add again in case its not in prefix
         prefix = strrep(DATA.prefix,DATA.monkey,'');
         prefix = [DATA.monkey prefix];  %new style for spks files
-        pid = GetProbe(DATA, DATA.currentexpt, DATA.probe);
-        spkfile = sprintf('%s/Spikes/%s.p%dt%d.mat',DATA.datadir,prefix,pid,DATA.currentexpt);
+        pid = GetProbe(DATA, DATA.currentexpt(1), DATA.probe);
+        spkfile = sprintf('%s/Spikes/%s.p%dt%d.mat',DATA.datadir,prefix,pid,DATA.currentexpt(1));
         DATA.AllData.Spikes = GetProbeSpikes([],spkfile,'Spikes',pid);
         Spks = DATA.AllData.Spikes;
     end
@@ -6306,12 +6257,12 @@ fprintf('Spool Took %.2f\n',(now-tstart) * 24 * 60 * 60);
 if isfield(DATA,'AllClusters') && ~strncmp(DATA.filetype,'Grid',4)
 %    set(0,'currentfig',DATA.xyfig);
 %    plot(DATA.Spikes.cx(allspks),DATA.Spikes.cy(allspks),'.','markersize',DATA.ptsize);
-%    DATA.allexp = DATA.currentexpt;
+%    DATA.allexp = DATA.currentexpt(1);
     DATA = PlotAllProbeXY(DATA,0);
 end
 if isfield(DATA,'AllSpikes') && nprobes == 2 && DATA.plot.xcorr
     GetFigure(DATA.tag.xcorr);
-    xc = CalcXcorr(DATA,DATA.currentexpt,probes(1),probes(2));
+    xc = CalcXcorr(DATA,DATA.currentexpt(1),probes(1),probes(2));
 end
 
 if DATA.plot.voltxy == 4
@@ -6513,9 +6464,9 @@ if isfigure(a) & Bstrmatch(get(a,'Tag'),'SpoolSpikes') & DATA.currenttrial > 1
     DATA.spooling = 2; %spool from current spike to end
 end
 if DATA.state.nospikes == 2
-    DATA = LoadSpikes(DATA,DATA.currentexpt);
+    DATA = LoadSpikes(DATA,DATA.currentexpt(1));
 end
-DATA = PlaySpikes(DATA,DATA.currentexpt);
+DATA = PlaySpikes(DATA,DATA.currentexpt(1));
 set(DATA.toplevel,'UserData',DATA);
 
 function NextList(a,b, varargin)
@@ -6552,8 +6503,8 @@ if val < length(strs)
         combine('setexpt',DATA);
         if 0 % need to use setexp to clear cluster.touched, etc
         id = get(DATA.elst,'value');
-        DATA.currentexpt = DATA.expid(id(1));
-        DATA.allexp = DATA.currentexpt;
+        DATA.currentexpt = DATA.expid(id);
+        DATA.allexp = DATA.currentexpt(1);
         PlotAllProbeXY(DATA);
         end
     else
@@ -7003,7 +6954,7 @@ function timerfn(tim, varargin)
     
 function LoadAllProbes(a,b, varargin)
     DATA = GetDataFromFig(a);
-    expid = DATA.currentexpt;
+    expid = DATA.currentexpt(1);
     j = 1; 
     while j <= length(varargin)
         j = j+1;
@@ -7021,7 +6972,7 @@ function LoadAllProbes(a,b, varargin)
         if DATA.state.online == 0
             DATA.AllData.Spikes = GetProbeFiles(DATA, DATA.probelist(j),DATA.subprobe,'trange',times/10000);
         else
-            filename = ['C:' DATA.Expts{DATA.currentexpt}.Header.Name];
+            filename = ['C:' DATA.Expts{DATA.currentexpt(1)}.Header.Name];
             if DATA.probelist(j) > 16 || DATA.probesource(j) == 1
                 filename = strrep(filename,'/Expt','A/Expt');
             end
@@ -7032,7 +6983,7 @@ function LoadAllProbes(a,b, varargin)
         DATA.clustervals(j).y = [];
         DATA.clustervals(j).spkrange = [0 0 ];
         else
-        DATA = SetExptSpikes(DATA, DATA.currentexpt, 0);
+        DATA = SetExptSpikes(DATA, DATA.currentexpt(1), 0);
         ispk = DATA.Expts{expid}.gui.spks;
         DATA.clustervals(j).x = DATA.Spikes.cx(ispk);
         DATA.clustervals(j).y = DATA.Spikes.cy(ispk);
@@ -7048,7 +6999,7 @@ function LoadAllProbes(a,b, varargin)
         end
     end
     subplot(6,4,2);
-    text(1,1.5,sprintf('Expt %d',DATA.currentexpt),'units','norm');
+    text(1,1.5,sprintf('Expt %d',DATA.currentexpt(1)),'units','norm');
     toc
     DATA.AllData.Spikes = Spikes;  %% Don't change main probe array
     set(DATA.toplevel,'UserData',DATA);
@@ -7619,7 +7570,7 @@ function MarkProbes(a,b)
     for j = 1:length(DATA.probelist)
         it = findobj(get(a,'parent'),'Tag',sprintf('MarkProbe%d',j));
         if length(it) == 1 && get(it,'value') > 0
-            DATA.markexp(DATA.currentexpt,j) = 1;
+            DATA.markexp(DATA.currentexpt(1),j) = 1;
             DATA.plot.useprobe(j) = 1;
         else
             DATA.plot.useprobe(j) = 0;
@@ -7643,7 +7594,7 @@ function HideSpikes(a,b)
         
 function LoadAllProbeParams(a,b, varargin)
     DATA = GetDataFromFig(a);
-    expid = DATA.currentexpt;
+    expid = DATA.currentexpt(1);
     j = 1; 
     while j <= length(varargin)
         j = j+1;
@@ -7661,7 +7612,7 @@ function LoadAllProbeParams(a,b, varargin)
         if DATA.state.online == 0
             DATA.AllData.Spikes = GetProbeFiles(DATA, DATA.probelist(j),DATA.subprobe);
         else
-            filename = ['C:' DATA.Expts{DATA.currentexpt}.Header.Name];
+            filename = ['C:' DATA.Expts{DATA.currentexpt(1)}.Header.Name];
             if DATA.probelist(j) > 16
                 filename = strrep(filename,'/Expt','A/Expt');
             end
@@ -7687,7 +7638,7 @@ function DATA = LoadAllProbeSpikes(a,b, varargin)
     end
     
 
-    expid = DATA.currentexpt;
+    expid = DATA.currentexpt(1);
     times(1) = DATA.Expts{expid}.Trials(1).Start(1)-10000;
     times(2) = DATA.Expts{expid}.Trials(end).End(end) + 10000;
     DATA.allexp = expid;
@@ -7744,7 +7695,7 @@ function DATA = LoadAllProbeSpikes(a,b, varargin)
 %            DATA.AllSpikes{probelist(j)} = GetProbeFiles(DATA, probelist(j),'trange',times/10000);
             DATA = LoadClusters(DATA, ClusterFile(DATA,'probe', probelist(j)),DATA.subprobe,'probe', probelist(j));
         else
-            filename = ['C:' DATA.Expts{DATA.currentexpt}.Header.Name];
+            filename = ['C:' DATA.Expts{DATA.currentexpt(1)}.Header.Name];
             if DATA.probelist(j) > 16
                 filename = strrep(filename,'/Expt','A/Expt');
             end
@@ -7774,13 +7725,13 @@ function DATA = LoadAllProbeSpikes(a,b, varargin)
         else
             id = DATA.probe;
         end
-        xc = CalcXcorr(DATA,DATA.currentexpt,DATA.probe,id);
+        xc = CalcXcorr(DATA,DATA.currentexpt(1),DATA.probe,id);
     end
 
     function LoadSpikeTimes(a,b, varargin)
 
         DATA = GetDataFromFig(a);
-        eid = DATA.currentexpt;
+        eid = DATA.currentexpt(1);
         ns = ones(size(DATA.probelist));
         for j = 1:length(DATA.probelist)
             DATA.AllSpikes{j}.times = [];
@@ -7864,7 +7815,7 @@ mkmean = 0;
         j = j+1;
     end
 if 0
-    [DATA, ispk] = SetExptSpikes(DATA, DATA.currentexpt,'setrange');
+    [DATA, ispk] = SetExptSpikes(DATA, DATA.currentexpt(1),'setrange');
     DATA = SetSpkCodes(DATA, ispk, DATA.probe, 0);
 end
     oldprobe = DATA.probe;
@@ -8125,7 +8076,7 @@ set(gcf, 'WindowButtonUpFcn',@ButtonReleased);
             end
         elseif isfield(DATA,'AllClusters')
             if iscell(DATA.AllClusters)
-                e = DATA.currentexpt;
+                e = DATA.currentexpt(1);
                 ispk = find(DATA.AllClusters{e}(j).times > times(1) &...
                     DATA.AllClusters{e}(j).times < times(2));
                 cx = DATA.AllClusters{e}(j).cx(ispk);
@@ -8246,7 +8197,7 @@ function DATA = AddMultiProbeGUI(DATA)
 if ~isfield(DATA,'toplevel') %no GUI 
     return;
 end
-
+ncw=1./45;
 it = findobj(DATA.toplevel,'Tag','ProbeId');
 set(it,'string',DATA.probenames,'value',DATA.probe);
 
@@ -8285,8 +8236,8 @@ end
             [DATA.spkvarnames, DATA.spkvarorder] = GetSpikeVals(DATA,NaN,NaN,NaN,[]);
         end
     end
-    bp(3) = 0.06;
-    bp(1) = bp(1)+bp(3);
+    bp(1) = bp(1)+bp(3)+0.01;
+    bp(3) = ncw*3;
       uicontrol(gcf,'style','pushbutton','string','>>','units','norm','Position',bp, 'Callback',{@SetProbeHit,'next'});
     bp(1) = bp(1)+bp(3);
       uicontrol(gcf,'style','pushbutton','string','<<','units','norm','Position',bp, 'Callback',{@SetProbeHit,'prev'});
@@ -8569,8 +8520,8 @@ it = findobj(get(caller,'Parent'),'Tag','AddOneCellToList');
 cell = get(it,'value');
     [a,b] = TrialRange(DATA);
 if DATA.state.online
-    a = a + DATA.Expts{DATA.currentexpt}.gui.firsttrial-1;
-    b = b + DATA.Expts{DATA.currentexpt}.gui.firsttrial-1;
+    a = a + DATA.Expts{DATA.currentexpt(1)}.gui.firsttrial-1;
+    b = b + DATA.Expts{DATA.currentexpt(1)}.gui.firsttrial-1;
 end
 DATA.CellList(cell,a:b) = p;
 DATA.CellQuality(cell,a:b) = q;
@@ -8939,8 +8890,8 @@ for j = 1:length(cells)
 end
 end
 iscellim = sum(DATA.CellList,3) > 0;
-p = GetProbe(DATA, DATA.currentexpt, DATA.probe)
-DATA.currentpoint = [DATA.currentexpt p];
+p = GetProbe(DATA, DATA.currentexpt(1), DATA.probe)
+DATA.currentpoint = [DATA.currentexpt(1) p];
 DATA = MarkCurrentCell(DATA);
 set(DATA.toplevel,'UserData',DATA);
 %set(gcf, 'KeyPressFcn',{@KeyPressed,3});
@@ -9351,7 +9302,11 @@ function DATA = BuildGUI(DATA)
 
 scrsz = get(0,'Screensize');
 DATA.gui.scrsz = scrsz;
-DATA.gui.FontSize = 14;
+if isfield(DATA.gui,'FontSize')
+    FontSize = DATA.gui.FontSize;
+else
+    FontSize = 0;
+end
 
 cw= scrsz(3)/140;
 ch= scrsz(4)/60;
@@ -9377,44 +9332,57 @@ if DATA.state.bigwindow(2) > 0
 end
 DATA.plot.cw = cw;
 DATA.plot.ch = ch;
-DATA.user = getenv('username');
-if isempty(DATA.user) %for MAC/Linux
-DATA.user = getenv('username');
-end
+DATA.user = GetUserName();
+DATA.host = gethostname();
 %fprintf('User is %s\n',DATA.user);
 wsiz = [cw*40,ch*44];
 SPACE = 0.01;
 nch = 0.05;
-ncw=0.022;
+ncw= 1./45; %45 chars wide
 
 if length(DATA.layout.top) ~= 4
     DATA.layout.top = [100 scrsz(4)-(wsiz(2)+ch*4) wsiz(1) wsiz(2)];
 end
 cntrl_box = figure('Position', DATA.layout.top,...
     'NumberTitle', 'off', 'Tag',DATA.tag.top,'Name',DATA.tag.top,'ResizeFcn',@GuiResize);
+DATA.toplevel = cntrl_box;
+DATA = ApplyLayout(DATA);
+if ~isempty(DATA.configfile)
+    prefconfig = [DATA.gui.prefsdir '/' DATA.configfile '.config'];
+    if ~exist(DATA.configfile) && exist(prefconfig,'file')
+        DATA.configfile = prefconfig;
+    end
+    DATA = ReadConfig(DATA, DATA.configfile,'nochoose');
+end
+if FontSize > 0
+    DATA.gui.FontSize = FontSize;
+elseif ~isfield(DATA.gui, 'FontSize')
+    DATA.gui.FontSize = 12;
+end
+
 bp = [0.02 0.02 0.98 0.25];
 %            set(cntrl_box,'DefaultUIControlFontName',DATA.font.FontName);
     set(cntrl_box,'DefaultUIControlFontSize',DATA.gui.FontSize);
 DATA.elst = uicontrol(gcf, 'Style','listbox',...
     'Callback', ['combine(''setexpt'',''Tag'',''' DATA.tag.top ''');'],'Tag','subexptlist',...
     'Units','norm','Position',bp,'Max',3,'Min',1);
-bp = [0.02 bp(2)+bp(4)+0.01 ncw*6 nch];
+bp = [0.02 bp(2)+bp(4)+0.01 ncw*9 nch];
 uicontrol(gcf,'Style', 'pushbutton', 'Callback', ['combine(''combine'',''Tag'',''' DATA.tag.top ''');'],...
 'String', 'Combine','Units','norm', 'Position', bp);
 
 bp(1) = bp(1)+bp(3)+SPACE;
-bp(3) = ncw * 4;
+bp(3) = ncw * 7;
 uicontrol(gcf,'Style', 'pushbutton', 'Callback', ['combine(''Save'',''Tag'',''' DATA.tag.top ''');'],...
 'String', 'Save', 'Units','norm','Position', bp);
 bp = [bp(1)+bp(3)+SPACE bp(2) ncw*7 nch];
 uicontrol(gcf,'Style', 'pushbutton', 'Callback', ['combine(''SaveLFP'',''Tag'',''' DATA.tag.top ''');'],...
 'String', 'SaveLFP', 'Units', 'norm', 'Position', bp);
-bp = [bp(1)+bp(3)+SPACE bp(2) ncw*12 nch];
+bp = [bp(1)+bp(3)+SPACE bp(2) ncw*14 nch];
 uicontrol(gcf,'Style', 'pushbutton', 'Callback', {@SaveWithEM},...
 'String', 'Save with EM', 'Units', 'norm', 'Position', bp);
 
 
-bp = [SPACE bp(2)+bp(4)+SPACE ncw*30 nch];
+bp = [SPACE bp(2)+bp(4)+SPACE 0.99 nch];
 DATA.saveitem = uicontrol(gcf,'Style','Edit','String','Save As','Units', 'norm','Position',bp);
 
 bp = [0.01 bp(2)+bp(4)+SPACE 0.98 nch*6];
@@ -9428,14 +9396,16 @@ bp = [bp(1)+bp(3)+SPACE bp(2) ncw*30 nch];
 uicontrol(gcf,'Style','Edit','String',DATA.datafilename,'Units', 'norm','Position',bp,'Callback',['combine(''newfile''''Tag'',''' DATA.tag.top ''');'],...
     'Tag','FileName');
 
-bp = [0.01 bp(2)+bp(4)+SPACE ncw*6 nch];
+bp = [0.01 bp(2)+bp(4)+SPACE ncw*9 nch];
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'ShowN', 'Tag', 'ShowN', 'Units', 'norm','Position', bp, 'value',DATA.plot.showN);
 
 bp(1) = bp(1) + bp(3) + SPACE;
+bp(3) = ncw * 8;
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'Spikes', 'Tag', 'ShowSpikes', 'Units', 'norm','Position', bp,'value',DATA.state.showspikes,'Callback',@Update);
 bp(1) = bp(1) + bp(3) + SPACE;
+bp(3) = ncw * 9;
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'SpkXY', 'Tag', 'SpkXY', 'Units', 'norm','Position', bp,'value',DATA.state.showspkxy,...
 'Callback',@Update);
@@ -9446,7 +9416,7 @@ uicontrol(gcf,'Style', 'checkbox',...
 'Callback',@Update);
 
 bp(1) = bp(1) + bp(3) + SPACE;
-bp(3) = ncw*7;
+bp(3) = ncw*6;
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'Auto', 'Tag', 'AutoPlot','Units', 'norm', 'Position', bp,'value',DATA.state.autoplot,...
 'Callback',@Update);
@@ -9457,15 +9427,15 @@ uicontrol(gcf,'Style', 'pop',...
 'Tag', 'PlotSeq','Units', 'norm', 'Position', bp,'value',DATA.state.plotseq+1,...
 'Callback',@Update);
 
-bp = [bp(1)+bp(3)+SPACE bp(2) ncw*6 nch];
+bp = [bp(1)+bp(3)+SPACE bp(2) ncw*9 nch];
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'Recount', 'Tag', 'Recount', 'Units', 'norm','Position', bp,'value',DATA.state.recount,...
 'Callback',@Update);
-bp = [bp(1)+bp(3)+SPACE bp(2) ncw*5 nch];
+bp = [bp(1)+bp(3)+SPACE bp(2) ncw*7 nch];
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'Psych', 'Tag', 'PlotPsych', 'Units', 'norm','Position', bp,'value',DATA.state.plotpsych,...
 'Callback',@Update);
-bp = [bp(1)+bp(3)+SPACE bp(2) ncw*8 nch];
+bp = [bp(1)+bp(3)+SPACE bp(2) ncw*11 nch];
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'Combined', 'Tag', 'PlotCombined', 'Units', 'norm','Position', bp,'value',DATA.state.plotcombined,...
 'Callback',@Update);
@@ -9489,14 +9459,15 @@ uicontrol(gcf,'Style', 'checkbox',...
 bp(1) = bp(1)+bp(3);
 uicontrol(gcf,'Style', 'checkbox',...
 'String', '4', 'Tag', 'UseCluster4', 'Units', 'norm','Position', bp,'Callback',{@SetClusters, DATA.tag.top});
-bp(1) = bp(1)+bp(3);
+bp(1) = bp(1)+bp(3)+ncw/2;
+bp(3) = ncw*4;
 uicontrol(gcf,'Style', 'pushbutton', 'Callback', @FitButton, ...
 'String', 'Fit', 'Tag','FitButton','Units', 'norm','Position', bp);
 bp(1) = bp(1)+bp(3);
 uicontrol(gcf,'Style', 'pushbutton', 'Callback', 'combine(''setexpplot'')', ...
 'String', 'Plot', 'Tag','PlotButton','Units', 'norm','Position', bp);
 bp(1) = bp(1)+bp(3);
-bp(3) = ncw*5;
+bp(3) = ncw*6;
 uicontrol(gcf,'Style', 'checkbox',...
 'String', 'LFP', 'Tag', 'UseLFP', 'Units', 'norm','Position', bp,'Callback',@Update);
 
@@ -9513,7 +9484,7 @@ uicontrol(gcf,'Style','Edit','String','Comments','Units', 'norm','Position',bp,'
 
 DATA.gui.toprow = bp(2);
 
-  hm = uimenu(gcf,'Label','Mark');
+  hm = uimenu(gcf,'Label','&Mark');
   uimenu(hm,'Label','&Mark','Callback','combine(''Mark'')');
   uimenu(hm,'Label','&relist','Callback','combine(''relist'')');
   uimenu(hm,'Label','&Options','Callback','combine(''options'')');
@@ -9523,9 +9494,15 @@ DATA.gui.toprow = bp(2);
   uimenu(hm,'Label','&Next CEell','Callback','combine(''nextcell'')');
   uimenu(hm,'Label','&Update Lists','Callback','combine(''checklists'')');
   uimenu(hm,'Label','&Comments','Callback','combine(''Comments'')');
-  uimenu(hm,'Label','Save Comments','Callback','combine(''SaveComments'')');
-  uimenu(hm,'Label','Save Config','Callback','combine(''saveconfig'')');
-  uimenu(hm,'Label','Load Config','Callback',{@combine, 'loadconfig'});
+%  uimenu(hm,'Label','Save Comments','Callback','combine(''SaveComments'')');
+  sm = uimenu(hm,'Label','&Settings');
+  uimenu(sm,'Label','Load &Config','Callback',{@DoConfig, 'load'});
+  uimenu(sm,'Label','&Save Config','Callback',{@DoConfig, 'save'});
+  uimenu(sm,'Label','&Save Default Config','Callback',{@DoConfig, 'savedefault'});
+  uimenu(sm,'Label','Load &Layout','Callback',{@DoLayout, 'load'});
+  uimenu(sm,'Label','Save La&yout','Callback',{@DoLayout, 'save'});
+  uimenu(sm,'Label','Choose &Font','Callback',{@DoLayout, 'setfont'});
+  uimenu(sm,'Label','Save &DefaultLayout','Callback',{@DoLayout, 'savedefault'});
   uimenu(hm,'Label','&Close','Callback',['combine(''Close'',''Tag'',''' DATA.tag.top ''');']);
   cm = uimenu(gcf,'Label','&Cluster');
   uimenu(cm,'Label','&AutoCut','Callback','combine(''autocut'')');
@@ -9552,11 +9529,37 @@ DATA.figpos(1).tag = DATA.tag.top;
 DATA.figpos(1).pos = get(DATA.toplevel,'Position');
 setappdata(DATA.toplevel,'FigPos',DATA.figpos);
 
+function DoConfig(a,b, fcn)
+    DATA = GetDataFromFig(a);
+    if strcmp(fcn,'load')
+        DATA = LoadConfig(DATA, 'choose');
+    elseif strcmp(fcn,'savedefault')
+        SaveConfig(DATA, DATA.defaultconfig, {'state' 'plot' 'show'}, 'choose');
+    elseif strcmp(fcn,'save')
+        DATA.configfile = SaveConfig(DATA, DATA.configfile, {'state' 'plot' 'show'}, 'choose');
+    end
+    set(DATA.toplevel,'UserData',DATA);
 
 
+function DoLayout(a,b, fcn)
+    DATA = GetDataFromFig(a);
+    if strcmp(fcn,'load')
+        DATA = ApplyLayout(DATA, 'choose');
+    elseif strcmp(fcn,'setfont')
+        font = uisetfont();
+        DATA.gui = copyfields(DATA.gui,font,{'FontSize' 'FontName' 'FonwWeight'});
+        SetUIRecursive(DATA.toplevel,font);
+        set(DATA.toplevel,'UserData',DATA);
+    elseif strcmp(fcn,'savedefault')
+        DATA = SaveLayout(DATA, 'layout', DATA.defaultlayout);
+    elseif strcmp(fcn,'save')
+        DATA = SaveLayout(DATA);
+    end
+        
+        
 function MakeTemplates(a,b, varargin)
 DATA = GetDataFromFig(a);
-eid = DATA.currentexpt;
+eid = DATA.currentexpt(1);
 if isfield(DATA.Expts{eid}.gui,'spks')
 ispk = DATA.Expts{eid}.gui.spks;
 else
@@ -9595,7 +9598,7 @@ legend(labels,'position',[0.8 0.2 0.2 0.2]);
 
 function AddTemplate(a,b, varargin)
 DATA = GetDataFromFig(a);
-eid = DATA.currentexpt;
+eid = DATA.currentexpt(1);
 if isfield(DATA.Expts{eid}.gui,'spks')
 ispk = DATA.Expts{eid}.gui.spks;
 else
@@ -9807,16 +9810,11 @@ save(outname,'MeanSpike','TrialVar','TemplateScores','Templates','TemplateInfo')
 function AddComment(a,b)
     DATA = GetDataFromFig(a);
     n = 1;
-    if isfield(DATA.Comments,'Offline')
-        n = length(DATA.Comments.Offline)+1;
+    if ~isfield(DATA,'Comments')
+        DATA.Comments = PlotComments(DATA.datadir,'parent',DATA.toplevel,'noninteractive');
     end
-    cfile = strrep(DATA.datafilename,'.mat','.txt');
-    oid = fopen(cfile,'a');
-    DATA.Comments.Offline{n} = get(a,'string');
-    set(a,'string','');
-    fprintf(oid,'%s\n',DATA.Comments.Offline{n});
-    fclose(oid);
-    set(DATA.toplevel,'UserData',DATA);
+    DATA.Comments = PlotComments(DATA.Comments, 'addhidden', get(a,'string'),DATA);
+
     
     
         
@@ -10234,7 +10232,7 @@ for p = 1:length(probelist)
                         cl = 1;
                         spikelist = DATA.spikelist;
                         while cl < nc
-                            cl = cl+1;
+                            cl = cl+1;TA
                             if nspk(cl+1) > 10
                                 DATA.spikelist = cl;
                                 SetClusterCheck(DATA);
@@ -10422,17 +10420,25 @@ end
     else
         [Expt, DATA, plotres] = CombinePlot(DATA, 1);
     end
+    if isempty(Expt)
+        return;
+    end
     nspk = sum([Expt.Trials.count]);
     if isempty(combinelist) 
         useeachcombineids = 1;
     elseif savefiles 
+        BackupFile(file,'print');
         save(file,'Expt');
         fprintf('Saved %d spikes (Expts %s) to %s (%s)\n',nspk,sprintf(' %d',DATA.combineids),file,DATA.user);
     end
     AllExpt.Expt = Expt;
     
 ids = get(DATA.elst,'value');
+if isfield(DATA,'CellDetails')
 eid = find(ismember(floor(DATA.CellDetails.exptids),DATA.expid(ids)));
+else
+    eid = DATA.exlist;
+end
 %eid is now a list of inices to the CellList array
 %so expt #s are CEllDetails.exptids(eid)
 cells = unique(DATA.CellList(eid,:,:));
@@ -10505,6 +10511,7 @@ for j = js:(length(cells)+length(domu))
         end
         c = '';
         nspk = sum([Expt.Trials.count]);
+        BackupFile(file,'print');
         save(file,'Expt');
         fprintf('Saved %d spikes (Expts %s) to %s (%s)\n',nspk,sprintf(' %d',DATA.combineids),file,DATA.user);
     end
@@ -10512,13 +10519,18 @@ for j = js:(length(cells)+length(domu))
         AllExpt.Spikes{j}.trialid(t) = int16(Expt.Trials(t).id);
         AllExpt.Spikes{j}.Spikes{t} = int16(Expt.Trials(t).Spikes);
         AllExpt.Spikes{j}.OSpikes{t} = int16(Expt.Trials(t).OSpikes);
-        AllExpt.Spikes{j}.Ocodes{t} = int8(Expt.Trials(t).Ocodes);
-        AllExpt.Header(j).cellnumber = Expt.Header.cellnumber;
-        AllExpt.Header(j).probe = Expt.Header.probe;
-        AllExpt.Header(j).dropi = Expt.Header.dropi;
-        AllExpt.Header(j).dips = Expt.Header.dips;
-        AllExpt.Header(j).Clusters = Expt.Header.Clusters;
-        AllExpt.Header(j).excludeids = Expt.Header.excludeids;
+        AllExpt.Spikes{j}.Ocodes{t} = int8(Expt.Trials(t).Ocodes);            
+    end
+    AllExpt.Header(j).cellnumber = Expt.Header.cellnumber;
+    AllExpt.Header(j).probe = Expt.Header.probe;
+    AllExpt.Header(j).dropi = Expt.Header.dropi;
+    AllExpt.Header(j).dips = Expt.Header.dips;
+    AllExpt.Header(j).Clusters = Expt.Header.Clusters;
+    AllExpt.Header(j).excludeids = Expt.Header.excludeids;
+    if ismember(Expt.Header.probe,find(DATA.ArrayConfig.badprobes>0))
+        AllExpt.Header(j).badprobe = DATA.ArrayConfig.badprobes(Expt.Header.probe);
+    else
+        AllExpt.Header(j).badprobe = 0;
     end
 
     Expt.plotres = rmfields(plotres,'Data');
@@ -10538,13 +10550,14 @@ for j = js:(length(cells)+length(domu))
     end
 %    file = CombinedName(DATA,eid,1);
     if DATA.state.nospikes == 0
+        BackupFile(file,'print');
         save(file,'Expt');
         fprintf('Saved %d spikes to %s\n',nspk,file);
     end
     Expts{j} = Expt;
   
     if DATA.logfid > 0
-        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s\n',datestr(now),nspk,sprintf(' %d',Expt.Header.Combineids),file);
+        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s (%s)\n',datestr(now),nspk,sprintf(' %d',Expt.Header.Combineids),file,DATA.user);
     end
     end
 end
@@ -10565,10 +10578,11 @@ DATA.state.showspikes = oldspikes;
 if guicall
     set(DATA.toplevel,'UserData',DATA);
 end
-ename = Expt2Name(DATA.Expts{DATA.currentexpt});
+ename = Expt2Name(DATA.Expts{DATA.currentexpt(1)});
 %make sure allexptname is something different (i.e. regexprep worked)
 if ~strcmp(DATA.outname, allexptname)
     fprintf('Saving AllExpt to %s\n',allexptname);
+    BackupFile(allexptname,'print');
     save(allexptname,'AllExpt')
 end
 SetCellChooser(DATA);
@@ -10662,13 +10676,14 @@ for j = 1:length(DATA.probelist)
     file = regexprep(outname,'\.p[0-9]*c1\.',['.p' num2str(DATA.probelist(j)) 'c1.']);
 %    file = CombinedName(DATA,eid,1);
     if DATA.state.nospikes == 0 || DATA.state.nospikes == 2
+        BackupFile(file,'print');
         save(file,'Expt');
         fprintf('Saved %d spikes to %s\n',nspk,file);
     end
     Expts{j} = Expt;
   
     if DATA.logfid
-        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s\n',datestr(now),nspk,sprintf(' %d',Expt.Header.Combineids),file);
+        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s (%s)\n',datestr(now),nspk,sprintf(' %d',Expt.Header.Combineids),file,DATA>user);
     end
 end
 DATA.Expt = Expt;
@@ -10767,16 +10782,18 @@ if ~isempty(cntrl_box)
     return;
 end
 
-nf = strmatch(tag,{DATA.figpos.tag});
+Figpos = getappdata(DATA.toplevel,'Figpos');
+nf = strmatch(tag,fields(Figpos));
 if isempty(nf)
    bp = get(DATA.toplevel,'Position');    
    nf = length(DATA.figpos)+1;
-   DATA.figpos(nf).pos =  [bp(1)+bp(3) bp(2) w*wsc(1) h*wsc(2)];
-   setappdata(DATA.toplevel,'FigPos',DATA.figpos);
+   Figpos.(tag) =  [bp(1)+bp(3) bp(2) w*wsc(1) h*wsc(2)];
+   setappdata(DATA.toplevel,'Figpos',Figpos);
 end
 dat.parentfigtag = DATA.tag.top;
-cntrl_box = figure('Position', DATA.figpos(nf).pos , 'Menubar', 'none',...
+cntrl_box = figure('Position', Figpos.(tag) , 'Menubar', 'none',...
     'NumberTitle', 'off', 'Tag',tag,'Name','Options','UserData',dat);
+set(cntrl_box,'DefaultUIControlFontSize',DATA.gui.FontSize);
 
 
 top = num2str(DATA.toplevel); 
@@ -10896,7 +10913,7 @@ bp(2) = rows(2); bp(1) = cols(1);
   
   bp(2) = rows(7);
    uicontrol(gcf,'Style', 'CheckBox','String','Hide Spikes','units','norm','Position', bp,...
-      'Tag','NoSpikes','Callback',@Update,'value',DATA.state.nospikes);
+      'Tag','NoSpikes','Callback',@Update,'value',DATA.state.nospikes>0);
   
 
   % fourth column of checkboxes 
@@ -11159,7 +11176,7 @@ if DATA.state.online == 2
     DATA.Expts = CountTxtSpikes(DATA.Expts,DATA.probe,DATA.spikelist);
 end
 if DATA.state.autoreplotgraph
-    id = union(DATA.currentexpt,DATA.exabsid);
+    id = union(DATA.currentexpt(1),DATA.exabsid);
     for j = id
         DATA = CountSpikes(DATA,j);
     end
@@ -11259,9 +11276,9 @@ end
 
 if isfield(DATA,'AllSpikes')
     if DATA.state.applylastcluster
-    [DATA, DATA.spklist] = SetExptSpikes(DATA,DATA.currentexpt,0,'useexpt');
+    [DATA, DATA.spklist] = SetExptSpikes(DATA,DATA.currentexpt(1),0,'useexpt');
     else
-    [DATA, DATA.spklist] = SetExptSpikes(DATA,DATA.currentexpt,'setrange');
+    [DATA, DATA.spklist] = SetExptSpikes(DATA,DATA.currentexpt(1),'setrange');
     end
     nloaded = 0;
     for j = 1:length(DATA.AllSpikes)
@@ -11300,7 +11317,7 @@ elseif (DATA.state.autospool | playspk) & nloaded < 4
     DATA = combine('setexp', DATA);
 else
     DATA = CalcClusterVars(DATA,  DATA.spklist);
-    DATA.Expts{DATA.currentexpt}.gui.spks = DATA.spklist;
+    DATA.Expts{DATA.currentexpt(1)}.gui.spks = DATA.spklist;
     if isfigure(DATA.xyfig)
     GetFigure(DATA.xyfig);
     hold off;
@@ -11332,13 +11349,13 @@ if ~isfield(DATA,'currentexpt')
 end
 if isfield(DATA,'AllClusters')
     ts = now;
-    probe = GetProbe(DATA, DATA.currentexpt, DATA.probe);
+    probe = GetProbe(DATA, DATA.currentexpt(1), DATA.probe);
     if probe > 0
-        DATA = CheckClusterLoaded(DATA, DATA.currentexpt, probe);
+        DATA = CheckClusterLoaded(DATA, DATA.currentexpt(1), probe);
         if iscell(DATA.AllClusters)
-            C  = DATA.AllClusters{DATA.currentexpt}(probe);
-            DATA.Spikes.cx = DATA.AllClusters{DATA.currentexpt}(probe).cx;
-            DATA.Spikes.cy = DATA.AllClusters{DATA.currentexpt}(probe).cy;
+            C  = DATA.AllClusters{DATA.currentexpt(1)}(probe);
+            DATA.Spikes.cx = DATA.AllClusters{DATA.currentexpt(1)}(probe).cx;
+            DATA.Spikes.cy = DATA.AllClusters{DATA.currentexpt(1)}(probe).cy;
         else
             DATA.Spikes.cx = DATA.AllClusters(probe).cx;
             DATA.Spikes.cy = DATA.AllClusters(probe).cy;
@@ -11346,6 +11363,7 @@ if isfield(DATA,'AllClusters')
     end
 %    DATA.AllData.Spikes.times = DATA.AllClusters(probe).times;
 %    DATA.AllData.Spikes.codes = zeros(length(DATA.AllClusters(probe).times),4);
+DATA.currentprobe = DATA.probe;
 if probe ~= DATA.oldprobe
     for j = 1:length(DATA.Expts)
         DATA.Expts{j}.gui.classified = 0;
@@ -11366,9 +11384,9 @@ elseif isfield(DATA,'AllSpikes')
 elseif sum([DATA.probes.probe] < 100) == 1 %ustim expt with just 1 channel
     DATA.probe = probe;
 else
-DATA = LoadSpikes(DATA, DATA.currentexpt);
+DATA = LoadSpikes(DATA, DATA.currentexpt(1));
 if DATA.state.nospikes && isfield(DATA,'AllClusters')
-    DATA = CheckClusterLoaded(DATA, DATA.currentexpt, DATA.probe);
+    DATA = CheckClusterLoaded(DATA, DATA.currentexpt(1), DATA.probe);
 else
     DATA = LoadClusters(DATA,ClusterFile(DATA),'noclear');
 end
@@ -11395,7 +11413,7 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
         if (length(DATA.AllClusters) < eid || length(DATA.AllClusters{eid}) < pid)...
                 || DATA.state.usensx == 1 
             if strncmp(DATA.filetype,'Grid',4)
-                DATA =  GetNS5Spikes(DATA, DATA.currentexpt,  pid);
+                DATA =  GetNS5Spikes(DATA, DATA.currentexpt(1),  pid);
             end
         end
     elseif length(DATA.AllClusters) < eid || isempty(DATA.AllClusters{eid}) ... 
@@ -11414,12 +11432,17 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
             DATA.AllClusters{eid}(j).times = Clusters{j}.t' .*10000;
             DATA.AllClusters{eid}(j).codes= Clusters{j}.clst-1;
             DATA.AllClusters{eid}(j).suffix = eid;
-            DATA.AllClusters{eid}(j).dips = Clusters{j}.mahal;
+            DATA.AllClusters{eid}(j).dips = GetDips(Clusters{j});
             DATA.AllClusters{eid}(j).dropi = Clusters{j}.dropi(3);
             if isfield(Clusters{j},'excludetrialids')
                 DATA.AllClusters{eid}(j).excludetrialids{1} = Clusters{j}.excludetrialids;
             else
                 DATA.AllClusters{eid}(j).excludetrialids{1} = [];
+            end
+            if isfield(Clusters{j},'missingtrials')
+                DATA.AllClusters{eid}(j).missingtrials = Clusters{j}.missingtrials;
+            else
+                DATA.AllClusters{eid}(j).missingtrials = [];
             end
             else
                 DATA.AllClusters{eid}(j).cx = [];
@@ -11429,16 +11452,15 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
                 DATA.AllClusters{eid}(j).dropi = [];
                 DATA.AllClusters{eid}(j).excludetrialids{1} = [];
             end
+            if isfield(Clusters{j},'user')
+                DATA.AllClusters{eid}(j).user = Clusters{j}.user;
+            end
+            DATA.AllClusters{eid}(j).savetime = Clusters{j}.savetime(end);
+                
             if isfield(Clusters{j},'next')
                 for k = 1:length(Clusters{j}.next)
-                    if isfield(Clusters{j}.next{k},'fitdprime')
-                        DATA.AllClusters{eid}(j).dips(1) = Clusters{j}.next{k}.fitdprime(1);
-                    end
-                    if isfield(Clusters{j}.next{k},'mahal')
-                        DATA.AllClusters{eid}(j).next{k}.dips(2) = Clusters{j}.next{k}.mahal(4);
-                        DATA.AllClusters{eid}(j).dips(3) = Clusters{j}.next{k}.mahal(1);
-                    end
-                    if isfield(Clusters{j}.next{k},'dropi')
+                    if isfield(Clusters{j}.next{k},'dropi') %don't read empties
+                        DATA.AllClusters{eid}(j).next{k}.dips = GetDips(Clusters{j}.next{k});
                         DATA.AllClusters{eid}(j).next{k}.dropi = Clusters{j}.next{k}.dropi(3);
                     end
                 end
@@ -11457,6 +11479,20 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
         LoadSpikes(DATA, eid);
     end
 
+function dips = GetDips(C)
+    if isfield(C,'fitdprime')
+        dips(1) = C.fitdprime(1);
+    end
+    if isfield(C,'mahal')
+        dips(2) = C.mahal(4); %1D GM fit
+        dips(3) = C.mahal(1); %2D Gm fit
+    end
+    if isfield(C,'mydip')
+        dips(4) = C.mydip(3);
+    end
+    if isfield(C,'hdip') %hartigans
+        dips(5) = C.hdip;
+    end
 
 function filename = GetProbeFilename(DATA, eid, probe)
 
@@ -11498,22 +11534,22 @@ id = find(DATA.probelist == probe);
       onexpt = 0; %temp kludge to allow quicker probe switching set 1 1 = only load spikes for 1 expt
         if DATA.state.online == 0
             if DATA.bysuffix
-                eid = DATA.currentexpt;
+                eid = DATA.currentexpt(1);
                 [d, a,b]  = fileparts(DATA.Expts{eid}.Header.loadname);
                 name = regexprep(a,'\.([0-9,a]*)$',['.p' num2str(DATA.probe) 't$1.mat']);
                 filename = [d '/Spikes/' name];
                 [DATA.AllData.Spikes]= GetProbeSpikes(DATA.AllData, filename, [],[DATA.probe DATA.subprobe]);
                 if isfield(DATA.AllData.Spikes,'times')
-                    DATA.Expts{DATA.currentexpt}.gui.spks = 1:length(DATA.AllData.Spikes.times);
+                    DATA.Expts{DATA.currentexpt(1)}.gui.spks = 1:length(DATA.AllData.Spikes.times);
                 else
-                    DATA.Expts{DATA.currentexpt}.gui.spks = [];
+                    DATA.Expts{DATA.currentexpt(1)}.gui.spks = [];
                 end
             elseif strncmp(DATA.filetype,'GridData',8)
                 if ~isfield(DATA,'AllClusters')
                     DATA.AllClusters = {};
                 end
-%                DATA.AllData.Spikes = LoadGridSpikes(DATA, DATA.probe, DATA.currentexpt);
-                DATA = CheckClusterLoaded(DATA, DATA.currentexpt, DATA.probe);
+%                DATA.AllData.Spikes = LoadGridSpikes(DATA, DATA.probe, DATA.currentexpt(1));
+                DATA = CheckClusterLoaded(DATA, DATA.currentexpt(1), DATA.probe);
             elseif length(id) > 1 || length(DATA.probes) > 2 %KLUDGE Need to detect new files with only 1 expt
                 if onexpt
                     DATA.AllData.Spikes = GetProbeFiles(DATA,DATA.probe,DATA.subprobe,'trange',DATA.Expts{eid}.Header.trange);
@@ -11531,10 +11567,10 @@ id = find(DATA.probelist == probe);
                 [DATA.AllData.Spikes]= GetProbeSpikes(DATA.AllData, filename, DATA.probevars{id},[DATA.probe DATA.subprobe]);
             end
             DATA = SetSpkLists(DATA);
-            DATA.spklist = DATA.Expts{DATA.currentexpt}.gui.spks;
+            DATA.spklist = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
             DATA = SetExptSpikes(DATA, eid, 0);
         elseif strncmp(DATA.filetype,'Grid',4) && DATA.state.somespikes == 2
-                DATA =  GetNS5Spikes(DATA, DATA.currentexpt,  DATA.probe);
+                DATA =  GetNS5Spikes(DATA, DATA.currentexpt(1),  DATA.probe);
                 DATA = SetExptSpikes(DATA, eid, 0);
         else
             if isfield(DATA.Expts{eid}.Header,'loadname')
@@ -11551,7 +11587,7 @@ id = find(DATA.probelist == probe);
                 filename = [DATA.datafilename '/'  b '.mat'];
             end
             if strncmp(DATA.filetype,'Grid',4) && ~isfield(DATA,'probevars')
-                DATA =  GetNS5Spikes(DATA, DATA.currentexpt,  DATA.probe);
+                DATA =  GetNS5Spikes(DATA, DATA.currentexpt(1),  DATA.probe);
             else
                 [DATA.AllData.Spikes]= GetProbeSpikes(DATA.AllData, filename , DATA.probevars{id},[DATA.probe DATA.subprobe]);
                 DATA.spklist = [];
@@ -11622,13 +11658,13 @@ function DATA = GetNS5Spikes(DATA, eid, probe);
     DATA.AllData.Spikes = Spikes;
     DATA = CalcClusterVars(DATA,  1:length(DATA.AllData.Spikes.codes),'force');
     DATA.spklist = [];
-    DATA.AllClusters{DATA.currentexpt}(DATA.probe).cx = DATA.Spikes.cx;
-    DATA.AllClusters{DATA.currentexpt}(DATA.probe).cy = DATA.Spikes.cy;
-    DATA.AllClusters{DATA.currentexpt}(DATA.probe).times = DATA.AllData.Spikes.times;
-    DATA.AllClusters{DATA.currentexpt}(DATA.probe).codes = DATA.AllData.Spikes.codes;
-    DATA.AllClusters{DATA.currentexpt}(DATA.probe).suffix = DATA.currentexpt;
-    DATA.AllClusters{DATA.currentexpt}(DATA.probe).dips = 0;
-    DATA.AllClusters{DATA.currentexpt}(DATA.probe).dropi = 0;
+    DATA.AllClusters{DATA.currentexpt(1)}(DATA.probe).cx = DATA.Spikes.cx;
+    DATA.AllClusters{DATA.currentexpt(1)}(DATA.probe).cy = DATA.Spikes.cy;
+    DATA.AllClusters{DATA.currentexpt(1)}(DATA.probe).times = DATA.AllData.Spikes.times;
+    DATA.AllClusters{DATA.currentexpt(1)}(DATA.probe).codes = DATA.AllData.Spikes.codes;
+    DATA.AllClusters{DATA.currentexpt(1)}(DATA.probe).suffix = DATA.currentexpt(1);
+    DATA.AllClusters{DATA.currentexpt(1)}(DATA.probe).dips = 0;
+    DATA.AllClusters{DATA.currentexpt(1)}(DATA.probe).dropi = 0;
     if probe > size(DATA.cluster,2)
         DATA.cluster{1,probe}.touched = 0;
     end
@@ -11921,7 +11957,7 @@ if (DATA.xyfig & get(a, 'Parent') == DATA.xyfig) || strcmp(caller,'AutoScaleMode
     set(ax,'Ylim', DATA.plot.clusterYrange,'Xlim',DATA.plot.clusterXrange);
     DATA.state.currentclusterquality = get(findobj(DATA.xyfig,'Tag','ClusterQuality'),'value')-1;
     if strcmp(caller,'ClusterQuality')
-        DATA.Expts{DATA.currentexpt}.Cluster{DATA.currentcluster,DATA.probe}.quality = ...
+        DATA.Expts{DATA.currentexpt(1)}.Cluster{DATA.currentcluster,DATA.probe}.quality = ...
             DATA.state.currentclusterquality;
     end
     it = findobj(DATA.xyfig,'Tag','ForceClusterid');
@@ -11933,7 +11969,7 @@ if (DATA.xyfig & get(a, 'Parent') == DATA.xyfig) || strcmp(caller,'AutoScaleMode
     end
 elseif DATA.xyfig & strcmp(caller,'SetPtSize');
     figure(DATA.xyfig); hold off;
-    DrawXYPlot(DATA,DATA.Expts{DATA.currentexpt}.gui.spks);
+    DrawXYPlot(DATA,DATA.Expts{DATA.currentexpt(1)}.gui.spks);
 end
 DATA.plot.dvdt = GetCheck('dVdt');
 DATA.plot.nodc = GetCheck('RemoveDC');
@@ -12207,6 +12243,8 @@ end
 
 if (DATA.plot.condenseRC || combined == 0) && isempty(strmatch(DATA.plot.type ,'Subspace'))
     args = {args{:} 'condense'};
+elseif Expt.Header.rc == 2 && ~strcmp(DATA.plot.type ,'Subspace')
+    args = {args{:} 'condense'};
 end
 if DATA.plot.centerRFmeasures
     args = {args{:} 'centerRF'};
@@ -12450,13 +12488,13 @@ DATA.cluster{cl,p} = [];
 DATA.cluster{cl,p}.touched = 1; %records active deletion. Will be copied to Expt
 DATA.cluster{cl,p}.quality = 0; %records active deletion. Will be copied to Expt
 DATA.cluster{cl,p}.deleted = 1; %records active deletion. Will be copied to Expt
-if isfield(DATA.Expts{DATA.currentexpt}.Cluster{cl,p},'forceid')
-    DATA.Expts{DATA.currentexpt}.Cluster{cl,p} = rmfield(DATA.Expts{DATA.currentexpt}.Cluster{cl,p},'forceid');
+if isfield(DATA.Expts{DATA.currentexpt(1)}.Cluster{cl,p},'forceid')
+    DATA.Expts{DATA.currentexpt(1)}.Cluster{cl,p} = rmfield(DATA.Expts{DATA.currentexpt(1)}.Cluster{cl,p},'forceid');
 end
 DATA.forceclusterid = 0;
-DATA.Expts{DATA.currentexpt}.Cluster{cl,p}.quality = 0;
-if isfield(DATA.Expts{DATA.currentexpt}.gui,'spkrange')
-    ispk = DATA.Expts{DATA.currentexpt}.gui.spkrange;
+DATA.Expts{DATA.currentexpt(1)}.Cluster{cl,p}.quality = 0;
+if isfield(DATA.Expts{DATA.currentexpt(1)}.gui,'spkrange')
+    ispk = DATA.Expts{DATA.currentexpt(1)}.gui.spkrange;
     ispk = [ispk(1):ispk(2)];
     if strncmp(DATA.filetype,'Grid',4)
         ctype = 1;
@@ -12475,7 +12513,7 @@ if isfield(DATA.Expts{DATA.currentexpt}.gui,'spkrange')
     end
 % Shouldn't need this. not deleting all clusters. And if we were would
 % imply that we are setting not clusters
-% DATA.Expts{DATA.currentexpt}.gui.classified = 0;
+% DATA.Expts{DATA.currentexpt(1)}.gui.classified = 0;
 end
 set(DATA.toplevel,'UserData',DATA);
 if cl > 1
@@ -12709,14 +12747,14 @@ plot(DATA.Spikes.cx(spkid),DATA.Spikes.cy(spkid),'.',...
 function PlotSpikeXYClusters(DATA, expspks, clusters)
 %do the xy plot for each defined ckuster.,
 ctype = 2;
-PlaySpikes(DATA, DATA.currentexpt, 'xyonly');
+PlaySpikes(DATA, DATA.currentexpt(1), 'xyonly');
 
-probe = GetProbe(DATA,DATA.currentexpt, DATA.probe);
+probe = GetProbe(DATA,DATA.currentexpt(1), DATA.probe);
 for j = clusters
             if isfield(DATA,'AllClusters')
                 if iscell(DATA.AllClusters)
                     ctype = 1;
-                    id = find(DATA.AllClusters{DATA.currentexpt}(probe).codes(expspks,ctype) == j-1);
+                    id = find(DATA.AllClusters{DATA.currentexpt(1)}(probe).codes(expspks,ctype) == j-1);
                 else
                     id = find(DATA.AllClusters(probe).codes(expspks,ctype) == j-1);
                 end
@@ -12740,9 +12778,9 @@ function ShowCellLabels(DATA)
     if ~isfield(DATA,'CellList')
         return;
     end
-    probe = GetProbe(DATA, DATA.currentexpt, DATA.probe);
-    if ndims(DATA.CellList) == 3 && DATA.currentexpt <= size(DATA.CellList,1)
-        cells = squeeze(DATA.CellList(DATA.currentexpt, probe,:));
+    probe = GetProbe(DATA, DATA.currentexpt(1), DATA.probe);
+    if ndims(DATA.CellList) == 3 && DATA.currentexpt(1) <= size(DATA.CellList,1)
+        cells = squeeze(DATA.CellList(DATA.currentexpt(1), probe,:));
         yl = get(gca,'ylim');
         xl = get(gca,'xlim');
         dh = 0;
@@ -12762,7 +12800,7 @@ function PlotDprime(DATA)
  Cx = DATA.Spikes.cx;
  Cy = DATA.Spikes.cy;
  Spks = DATA.AllData.Spikes;
- cspks = DATA.Expts{DATA.currentexpt}.gui.spks;
+ cspks = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
  C = DATA.cluster{DATA.currentcluster,DATA.probe};
  x = (Cx(cspks) - C.x(1))./C.x(3);
  y = (Cy(cspks) - C.y(1))./C.y(3);
@@ -12826,7 +12864,7 @@ if DATA.forceclusterid > 0 & DATA.forceclusterid ~= cl
 end
 if isfield(DATA,'AllClusters')
     if iscell(DATA.AllClusters)
-        expspks = 1:length(DATA.AllClusters{DATA.currentexpt}(p).times);
+        expspks = 1:length(DATA.AllClusters{DATA.currentexpt(1)}(p).times);
     else
         expspks = DATA.AllClusters(p).spklist;
     end
@@ -12865,14 +12903,14 @@ colors = mycolors;
 if mousept.mode ~= 5   || strcmp(get(src,'tag'),'AllProbeSpikes')
 [DATA, dprime, nc] = SetSpkCodes(DATA,expspks,p,2);
 if length(nc) > 1
-    fprintf('%s: %d Clusters for Probe %d\n',DATA.explabels{DATA.currentexpt},length(nc),p);
+    fprintf('%s: %d Clusters for Probe %d\n',DATA.explabels{DATA.currentexpt(1)},length(nc),p);
 end
 end
 DATA.state.recut = 1;
 SetGui(DATA);
 if isfield(DATA,'AllClusters')
     if iscell(DATA.AllClusters)
-        id = find(DATA.AllClusters{DATA.currentexpt}(p).codes(expspks) == 0);
+        id = find(DATA.AllClusters{DATA.currentexpt(1)}(p).codes(expspks) == 0);
     else
         id = find(DATA.AllClusters(p).codes(expspks) == 0);
     end
@@ -12890,15 +12928,15 @@ end
 %to DATA.cluster
 p = get(gca,'UserData');
 if isempty(p)
-DATA.Expts{DATA.currentexpt}.Cluster = DATA.cluster;
+DATA.Expts{DATA.currentexpt(1)}.Cluster = DATA.cluster;
 end
 
 if DATA.state.autoreplotgraph
-    DATA = CountSpikes(DATA, DATA.currentexpt,'replot');
+    DATA = CountSpikes(DATA, DATA.currentexpt(1),'replot');
 else
-    DATA = CountSpikes(DATA, DATA.currentexpt);
+    DATA = CountSpikes(DATA, DATA.currentexpt(1));
 end
-DATA.Expts{DATA.currentexpt}.gui.classified = 2;
+DATA.Expts{DATA.currentexpt(1)}.gui.classified = 2;
 if DATA.plot.showdprime
     GetFigure('DprimeCalc');
     PlotDprime(DATA);
@@ -12910,7 +12948,7 @@ if DATA.state.verbose
 DATA.cluster{DATA.currentcluster,DATA.probe}
 end
 if DATA.plot.quickspks
-    PlaySpikes(DATA,DATA.currentexpt,'quickspks');
+    PlaySpikes(DATA,DATA.currentexpt(1),'quickspks');
 end
 
 
@@ -12918,7 +12956,7 @@ function plotISI(DATA)
         
     if DATA.plot.showISI
         GetFigure('ISI');
-        isis = CalcISI(DATA.Expts{DATA.currentexpt}.Trials);
+        isis = CalcISI(DATA.Expts{DATA.currentexpt(1)}.Trials);
         id = find(isis < 1000)
         hist(isis(id),100);
     end
@@ -12988,7 +13026,7 @@ function [dprime, details] = CalcDprime(DATA,cluster, varargin)
 
     
 function dp = CalcClusterdp(DATA, cl)  %old method using ROC of radial distances.
-    expspks = DATA.Expts{DATA.currentexpt}.gui.spks;
+    expspks = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
     if strncmp(DATA.filetype,'Grid', 4)
         ctype = 1;
     elseif isfield(DATA,'AllClusters')
@@ -13004,9 +13042,9 @@ function dp = CalcClusterdp(DATA, cl)  %old method using ROC of radial distances
         id = find(DATA.AllSpikes{DATA.probe}.codes(expspks,ctype) == cl-1);
         nid = find(DATA.AllSpikes{DATA.probe}.codes(expspks,ctype) ~= cl-1);
     elseif isfield(DATA,'AllClusters')
-        probe = GetProbe(DATA,DATA.currentexpt, DATA.probe);
-        id = find(DATA.AllClusters{DATA.currentexpt}(probe).codes(expspks,ctype) == cl-1);
-        nid = find(DATA.AllClusters{DATA.currentexpt}(probe).codes(expspks,ctype) ~= cl-1);
+        probe = GetProbe(DATA,DATA.currentexpt(1), DATA.probe);
+        id = find(DATA.AllClusters{DATA.currentexpt(1)}(probe).codes(expspks,ctype) == cl-1);
+        nid = find(DATA.AllClusters{DATA.currentexpt(1)}(probe).codes(expspks,ctype) ~= cl-1);
     else
     id = find(DATA.AllData.Spikes.codes(expspks,ctype) == cl-1);
     nid = find(DATA.AllData.Spikes.codes(expspks,ctype) ~= cl-1);
@@ -13050,9 +13088,9 @@ function DATA = DrawXYPlot(DATA, expspks)
     end
     DATA.ptsize = CheckPtSize(DATA,length(expspks));
     delete(get(gca,'children'));
-    expid = DATA.currentexpt;
+    expid = DATA.currentexpt(1);
     if isfield(DATA,'AllSpikes')
-        expspks = DATA.Expts{DATA.currentexpt}.gui.spks;
+        expspks = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
         if ~isfield(DATA,'nclusters')
             DATA.nclusters = 0;
         end
@@ -13061,7 +13099,7 @@ function DATA = DrawXYPlot(DATA, expspks)
         end
     else
         if length(expspks) < 10 
-            expspks = DATA.Expts{DATA.currentexpt}.gui.spks;
+            expspks = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
         end
         if DATA.densityplot
             PlotXYDensity(DATA.Spikes.cx(expspks),DATA.Spikes.cy(expspks));
@@ -13082,8 +13120,8 @@ function DATA = DrawXYPlot(DATA, expspks)
             [a,b] = smhist(DATA.Spikes.cx(expspks));
             plot(b,(a-xl(1)).* diff(xl)./max(a));
         end
-    if ismember(DATA.plot.autoscale,[2 3]) && length(DATA.Expts{DATA.currentexpt}.gui.spks)
-        expspks = DATA.Expts{DATA.currentexpt}.gui.spks;
+    if ismember(DATA.plot.autoscale,[2 3]) && length(DATA.Expts{DATA.currentexpt(1)}.gui.spks)
+        expspks = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
         DATA.spklist = expspks;
         [xr, yr] = ClusterRange(DATA.cluster,DATA.probe);
         cx = DATA.Spikes.cx(expspks);
@@ -13124,7 +13162,7 @@ function DATA = DrawXYPlot(DATA, expspks)
     end
     
 function PlotDDF(DATA)
-    cspks = DATA.Expts{DATA.currentexpt}.gui.spks;
+    cspks = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
     plottype = 0;
     nclusters = size(DATA.cluster,1);
     p = DATA.probe;
@@ -13201,15 +13239,15 @@ function DATA = FinishXYPlot(DATA)
     else
         c = get(it,'value');
     end
-    ei = DATA.currentexpt;
-    if ~isempty(DATA.explabels{DATA.currentexpt})
-        expname = DATA.explabels{DATA.currentexpt};
-        expname = DATA.Expts{DATA.currentexpt}.Header.expname;
+    ei = DATA.currentexpt(1);
+    if ~isempty(DATA.explabels{DATA.currentexpt(1)})
+        expname = DATA.explabels{DATA.currentexpt(1)};
+        expname = DATA.Expts{DATA.currentexpt(1)}.Header.expname;
      else
-        expname = DATA.Expts{DATA.currentexpt}.Header.expname;
+        expname = DATA.Expts{DATA.currentexpt(1)}.Header.expname;
     end
     if DATA.firsttrial > 1
-        expname = [expname sprintf('from %d',DATA.Expts{DATA.currentexpt}.Trials(DATA.firsttrial).Trial)];
+        expname = [expname sprintf('from %d',DATA.Expts{DATA.currentexpt(1)}.Trials(DATA.firsttrial).Trial)];
     end
     p = DATA.probe;
     str = '';
@@ -13239,8 +13277,8 @@ function DATA = FinishXYPlot(DATA)
         DATA.spkvarnames{DATA.cluster{c,p}.params(2)},str,DATA.probe,...
         rate,length(id),length(DATA.spklist))); 
     elseif isfield(DATA,'AllClusters') && iscell(DATA.AllClusters)
-        probe = GetProbe(DATA, DATA.currentexpt, DATA.probe);
-        cluster = DATA.AllClusters{DATA.currentexpt}(probe);
+        probe = GetProbe(DATA, DATA.currentexpt(1), DATA.probe);
+        cluster = DATA.AllClusters{DATA.currentexpt(1)}(probe);
         title(sprintf('%s: Cell%d (P%d) Sufffix%d',expname,DATA.probe,probe,cluster.suffix));
     else
     title(sprintf('%s: C%d',expname,c)); 

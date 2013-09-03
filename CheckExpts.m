@@ -45,6 +45,8 @@ while j <= length(varargin)
         checkmode = 16;
     elseif strncmpi(varargin{j},'psign',4)
         checkmode = 32;
+    elseif strncmpi(varargin{j},'readmethod',6)
+        checkmode = 64;
     end
     j = j+1;
 end
@@ -53,7 +55,11 @@ if ischar(Expt)
     load(Expt)
 end
 
-
+if isfield(Expt.Header,'exptno')
+    eid = Expt.Header.exptno;
+else
+    eid = 0;
+end
 if checkmode == 1
     id = find(~isnan([Expt.Trials.delay]));
 
@@ -110,6 +116,14 @@ if bitand(checkmode,2)
     res.good = 1;
     else
         res.good = 0;
+    end
+end
+
+if bitand(checkmode,64) %Check Read Mode
+    if ~isfield(Expt.Header,'ReadMethod')
+        mycprintf('red','No ReadMethod in %s E%d\n',Expt.Header.ReadMethod,eid)
+    elseif Expt.Header.ReadMethod < 1
+        mycprintf('red','Old ReadMethod in %s E%d\n',Expt.Header.ReadMethod,eid)
     end
 end
 

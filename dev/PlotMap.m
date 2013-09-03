@@ -369,8 +369,14 @@ MapDefs;
 for j = 1:length(R)
     map.rf(j,:) = R{j}.rf;
     map.cellname{j} = R{j}.name;
-    map.area(1) = 1;
-    map.hemisphere(1) = 0;
+    map.area(j) = 1;
+    map.hemisphere(j) = 0;
+    if isfield(R{j},'date')
+        map.datestr{j} = datestr(R{j}.date);
+    else
+        map.datestr{j} = 'unknown';
+    end
+    map.depth(j) = R{j}.depth;
     monkey{j} = GetMonkeyName(R{j}.name);
     if strcmp(R{j}.electrode,'uProbe')
         map.types(j) = MULTICONTACT;
@@ -1319,7 +1325,7 @@ else
 end
 for j = 1:length(newpes)
     pe = newpes(j);
-    if pe > 0
+    if pe >= 1
         name = sprintf('/bgc/anal/%s/pens/pen%d.log',monkey,pe);
     else
         name = sprintf('/bgc/anal/%s/pens/pen%d.log',monkey,9000-pe);
@@ -1331,6 +1337,8 @@ for j = 1:length(newpes)
     end
     if isfield(map.pens{pe},'missed')
         map.missed(pe) = map.pens{pe}.missed;
+    else
+        map.missed(pe) = 0;
     end
 end
 if length(newpes)

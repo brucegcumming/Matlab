@@ -173,7 +173,7 @@ elseif plottype == 3
 
     end
 elseif plottype == 2
-    [nr,nc] = NSubplots(length(xvals));
+    [nr,nc] = Nsubplots(length(xvals));
     pmax = max(lfpm(:));
     pmin = min(lfpm(:));
     for k = 1:length(xvals)

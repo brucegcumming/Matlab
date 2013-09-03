@@ -277,11 +277,13 @@ if parallel && ns > 1
     res.workerid = workers;
 end
 
+
  res.end = now;
  res.args = args;
  if logfid > 0
      fclose(logfid);
  end
+CheckErrors(res,'AllVPcs');
 
 function need = FineUnsafes(res, findunsafe)
     need = [];
@@ -434,7 +436,7 @@ else
 end
 catch ME
     cprintf('errors','!!!ALLVPCS FAILED %s for file %s (line %d, m-file %s)\n',ME.message,outname,ME.stack(1).line,ME.stack(1).name);
-    res.exception = ME;
+    res.errstate = ME;
     res.time = now; 
     t = mygetCurrentTask();
     res.worker = t.ID;
@@ -842,9 +844,9 @@ function result = CheckReclassify(X, checktype, varargin)
                 catch
                     cprintf('errors','Error catting acts E%d\n',e);
                 end
-            elseif isfield(X.cls{j},'exception')
+            elseif isfield(X.cls{j},'errstate')
                 t = mygetCurrentTask();
-                s = sprintf('!!!Error (Exception) %s in %s line %d at %s Worker %d',X.cls{j}.exception.message,X.cls{j}.exception.stack(1).file,X.cls{j}.exception.stack(1).line,datestr(X.cls{j}.time),t.ID);
+                s = sprintf('!!!Error (Exception) %s in %s line %d at %s Worker %d',X.cls{j}.errstate.message,X.cls{j}.errstate.stack(1).file,X.cls{j}.errstate.stack(1).line,datestr(X.cls{j}.time),t.ID);
                 result.msg = {result.msg{:} s};
                 result.msgp = [result.msgp 0];
                 result.msge = [result.msge X.exptlist(j)];

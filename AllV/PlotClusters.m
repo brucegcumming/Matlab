@@ -3359,12 +3359,18 @@ elseif bt == 2
     if a
         cid = find(cl == setcl+offset);
         if isempty(cid) && setcl > cl
-            cid = cl; %if hit on 2 but only 1 is defined
+            cid = cl; %if hit on 2 but only 1 is defined as a cell
+            if DATA.nclusters(ex,p) >= setcl
+                cid = setcl;
+            end
         else
             cid = cl(cid);
         end
         if length(b) == 1
             set(c(tid),'Label',sprintf('E%dP%d Cell %d',ex,p,b));
+            if length(cid) == 1
+                set(c(tid),'foregroundcolor',DATA.colors{cid+1});
+            end
         elseif length(cid) == 1
             set(c(tid),'Label',sprintf('E%dP%d Cell %d (%s)',ex,p,b(cid),sprintf('%d ',b(b~=b(cid)))));
             set(c(tid),'foregroundcolor',DATA.colors{cid+1});
@@ -3409,7 +3415,8 @@ if strcmp(type,'CellRates')
 end
 fprintf('Hit %.0f,%.0f %.3f type %d,%d\n',ex,p,zval,type,bt);
 %If not cutting clusters, then set currentcluster to match hit
-if DATA.elmousept.shape < 0
+%if ht
+if DATA.elmousept.shape < 0 && DATA.nclusters(ex,p) >= setcl
     DATA.currentcluster = setcl;
 end
 if isempty(Clusters) || DATA.show.cellsummary

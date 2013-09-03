@@ -4,11 +4,22 @@ function ArrayConfig = GetArrayConfig(name,varargin)
 %struct returned from openNEV
 %if a config is already in the directory that is loaded. 
 %use GetArrayConfig(dirname, 'rebuild') to force a rebuild
+%
+%GetArrayConfig(dirname,'markbad',p)  
+%  records that probe p is bad. 
+
 rebuild = 0;
+markprobe = 0;
+setprobe=0;
+
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'rebuild',6)
         rebuild =1;
+    elseif strncmpi(varargin{j},'mark',4)
+        markprobe = find(strncmp(varargin{j},{'markbad', 'markdup'},7));
+        j = j+1;
+        setprobe = varargin{j};
     end
     j = j+1;
 end
@@ -16,6 +27,7 @@ end
 BlackRockPath();
 
 aname = [];
+badprobes = [];
 if isfield(name,'MetaTags')
     nsx = name;
 elseif isdir(name)
@@ -23,8 +35,16 @@ elseif isdir(name)
     if exist(aname,'file') && rebuild == 0
         load(aname);
         ArrayConfig.type = SetArrayType(ArrayConfig);
+        if setprobe && markprobe
+            ArrayConfig.badprobes(setprobe) = markprobe;
+            save(aname,'ArrayConfig');            
+        end
+        if ~isfield(ArrayConfig,'badprobes')
+            ArrayConfig.badprobes = [];
+        end
         if ~isfield(ArrayConfig,'id')
             rebuild = 1;
+            badprobes = ArrayConfig.badprobes;
         else
             return;
         end
@@ -35,6 +55,7 @@ elseif isdir(name)
         if isempty(ArrayConfig)
             fprintf('No .ns5 files in %s\n',name);
         else %used to be elseif rebuild. But getting here means need to save. 
+            ArrayConfig.badprobes = badprobes; %keep list if rebuild
             save(aname,'ArrayConfig');
         end
         return;
@@ -45,7 +66,7 @@ elseif ischar(name)
     if strcmp(c,'.ns5')
     nsx = openNSx(name);
     elseif strcmp(c,'.mat')
-        ArrayConfig = GetArrayConfig(a);
+        ArrayConfig = GetArrayConfig(a,varargin{:});
         return;
     end
 end

@@ -44,6 +44,9 @@ if size(C,1) == 1 && size(C,2) > 1
         end
     end
 else
+    if iscell(C{1})
+        C = C{1};
+    end
 for j = 1:size(C,1)
     for k = 1:size(C,2)
         if isfield(C{j,k},f)

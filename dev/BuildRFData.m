@@ -1,11 +1,14 @@
 function rfs = BuildRFData(dirname, varargin)
 
 recurse = 0;
+saverfs = 0;
 rfs = [];
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'find',4)
         recurse = 1;
+    elseif strncmpi(varargin{j},'save',4)
+        saverfs = 1;
     end
     j = j+1;
 end
@@ -24,8 +27,37 @@ if recurse
     end
     for j = 1:length(rfs)
     end
+else
+    rfs = GetRFFromDir(dirname);
 end
 
+if saverfs
+    for j = 1:length(rfs)
+        monk{j} = GetMonkeyName(rfs{j}.name);
+        newrfs{j} = rfs{j}.name;
+    end    
+    monkeys = unique(monk);
+    for j = 1:length(monkeys)
+        outfile = ['/bgc/anal/' monkeys{j} '/allrfs.mat'];
+        if exist(outfile)
+            load(outfile);
+            for k = 1:length(allrfs)
+                oldnames{k} = allrfs{k}.name;
+            end
+            [newnames, newid] = setdiff(newrfs,oldnames);
+            for k = 1:length(newnames)
+                fprintf('Adding %s to %s\n',newnames{k},outfile);
+            end
+            allrfs = {allrfs{:} rfs{newid}};
+        else 
+            allrfs = rfs;
+            newid = 1;
+        end
+        if ~isempty(newid)
+            save(outfile,'allrfs');
+        end
+    end
+end
 
 function therf = GetRFFromDir(dirname)
 d = mydir([dirname '/*.ufl']);
@@ -34,7 +66,16 @@ therf = [];
 if isempty(d)
     return;
 end
+
+rffile = dir2name(dirname, 'rf');
+if exist(rffile)
+    load(rffile);
+    return;
+end
+ts = now;
 nrf = 0;
+dates = [];
+depths = [];
 for j = 1:length(d);
     txt = scanlines(d(j).name);
     rid = find(strncmp('cm=rf',txt,5));
@@ -48,6 +89,42 @@ for j = 1:length(d);
     else
         types(j) = 2;
     end
+    did = find(strncmp('Created',txt,7));
+    if ~isempty(did) && length(txt{did(end)}) > 13
+        dates(nrf) = datenum(txt{did(end)}(9:end));
+    end
+    idxfile = strrep(d(j).name,'.ufl','idx.mat');
+    if exist(idxfile)
+        load(idxfile);
+        if isfield(Expt.Trials,'ed')
+            depths(nrf) = median(Expt.Trials.ed(Expt.Trials.ed > 0));
+        end
+    end
+    if isempty(dates > 0)
+        matfile = strrep(d(j).name,'.ufl','.mat');
+        dates(nrf) = CreationDate(matfile);
+    end
+end
+dates = dates(dates>0);
+if isempty(dates)
+    d = mydir([dirname '/*.online']);
+    if ~isempty(d)
+        txt = scanlines(d(1).name);
+        id = find(strncmp('Reopened',txt,8));
+        if ~isempty(id)
+            dates(1) = datenum(txt{id(1)}(14:end));
+        end
+        id = find(strncmp('ed',txt,2));
+    end
+end
+if ~isempty(dates)
+    therf.date = median(dates(dates>0));
+end
+depths = depths(depths > 0);
+if ~isempty(depths)
+    therf.depth = median(depths);
+else
+    therf.depth = NaN;
 end
 type = prctile(types,50);
 if type == 1
@@ -55,5 +132,17 @@ if type == 1
 else
     therf.electrode = 'Normal';
 end
-therf.rf = prctile(rfs,50);
+if size(rfs,1) > 2
+    therf.rf = prctile(rfs,50);
+else
+    therf.rf = rfs(end,:);
+end
 therf.name = dirname;
+therf.readtime = [ts now];
+try
+save(rffile,'therf');
+catch
+    cprintf('errors','Error Writing %s\n',rffile);
+    delete(rffile); %don't leave corrupt/empty file on disk
+    therf.saveerror = 1;    
+end

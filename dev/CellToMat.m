@@ -37,7 +37,9 @@ if size(C,1) == 1 && size(C,2) > 1
                 x = C{k}.(f).(fa);
             end
            if iscell(x) || isstruct(x) 
-            M{k,1:length(x)} = x;
+               M{k,1:length(x)} = x;
+            elseif ischar(x)
+                M{k} = x;
            else
             M(k,1:length(x)) = x;
            end

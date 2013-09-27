@@ -23,10 +23,14 @@ while j <= length(varargin)
      j = j+1;
 end
 
-if isempty(dat)
+if isempty(dat) 
     return;
 end
 
+if ~isfield(dat,'x')
+    cprintf('red','No X in %s\n',dat.name);
+    return;
+end
     if ~isfield(dat,'handles')
         dat.handles = [];
     end
@@ -39,18 +43,24 @@ if isfield(dat,'type')
     end
 end
 
+T = dat.Data.Trials;
+
 if isfield(dat,'bestdelay') %its an RC expt
-    if strmatch(dat.type{1},{'Op' 'Pp'})
+    if isnan(dat.bestdelay)
+        return;
+    elseif strmatch(dat.type{1},{'Op' 'Pp'})
         x = dat.x(:,1);
         y = sum(dat.y(:,1,dat.bestdelay),2);
         if strmatch(dat.type{2},'ph')
-        black = dat.y(:,1,dat.bestdelay);
-        white = dat.y(:,2,dat.bestdelay);
-        bnp = dat.sdfs.n(:,1);
-        wnp = dat.sdfs.n(:,2);
+            black = dat.y(:,1,dat.bestdelay);
+            white = dat.y(:,2,dat.bestdelay);
+            bnp = dat.sdfs.n(:,1);
+            wnp = dat.sdfs.n(:,2);
         else
         black = [];
-        white = []
+        white = [];
+        bnp = [];
+        wnp = [];
         end
         id = find(dat.sdfs.extraval == -1009);
         np = sum(dat.sdfs.n,2);
@@ -67,7 +77,8 @@ if isfield(dat,'bestdelay') %its an RC expt
            wnp = [wnp; dat.sdfs.extras{id}.n];
         end
         fit = FitGauss(x,y,'nreps',np,'freebase', fitargs{:});
-        fit.x = x;
+        fit.resp = y;
+        fit.x = x; %anybody need this too?  Tuning curve fits use x...
         fit.rcvar = (max(dat.vars)-bv)/sv;
         if length(black) > 1
             fit.bfit = FitGauss(x,black,'nreps',bnp,'freebase', fitargs{:});
@@ -82,10 +93,42 @@ if isfield(dat,'bestdelay') %its an RC expt
             fit.wtfit = FitGauss(dat.times,wvar','freebase', fitargs{:});
             fit.toverlap = (fit.btfit.mean-fit.wtfit.mean)./sqrt(mean([fit.btfit.sd^2 fit.wtfit.sd^2]));
         end
-        id = find(~isnan(fit.x));
-        xv = linspace(min(fit.x(id)),max(fit.x(id)));
-        fitted = FitGauss(xv,fit.params,fitargs{:},'eval');
-        
+        id = find(~isnan(fit.x) & ~isinf(fit.x));
+        fit.xv = linspace(min(fit.x(id)),max(fit.x(id)));
+        fit.fitcurve = FitGauss(fit.xv,fit.params,fitargs{:},'eval');
+        f = dat.type{1};
+        fit = CopyFields(fit, dat.Data.Stimvals,{'rOp' 'rPp' 'Op' 'Pp'});
+        if isfield(T,'xo') || isfield(T,'yo')
+            xo = [];
+            yo = [];
+            for j = 1:length(T)
+                if isfield(T,'xo')
+                    xo(j) = T(j).xo;
+                end
+                if isfield(T,'yo')
+                    yo(j) = T(j).yo;
+                end
+                op(j) = T(j).(f)(end);
+            end
+            id = find(op > -1000);
+            fit.(['stim' f]) = mean(op(id));
+            if isempty(xo)
+                fit.opdir(1) = 0;
+                fit.xo = dat.Data.Stimvals.xo;
+            else
+                fit.xo = mean(xo(id));
+            xf = polyfit(op(id),xo(id),1);
+            fit.opdir(1) = xf(1);
+            end
+            if isempty(yo)
+                fit.opdir(2) = 0;
+                fit.yo = dat.Data.Stimvals.yo;
+            else
+                fit.yo = mean(yo(id));
+            xf = polyfit(op(id),yo(id),1);
+            fit.opdir(2) = xf(1);
+            end
+        end
             
     elseif strmatch(dat.type{1},{'or'})
         x = dat.x(:,1);
@@ -139,6 +182,20 @@ elseif strmatch(dat.type{1},{'Op' 'Pp'}) %not RC expt
     fit.xv = linspace(min(fit.x(id)),max(fit.x(id)));
     fit.fitcurve = FitGauss(fit.xv,fit.params,fitargs{:},'eval');
     fit.peak = PeakFit(fit);
+    f = dat.type{1};
+    id = find([dat.Data.Trials.(f)] > -1000);
+    if isfield(dat.Data.Trials,'xo')
+        xf = polyfit([dat.Data.Trials(id).(f)],[dat.Data.Trials(id).xo],1);
+        fit.opdir(1) = xf(1);
+    end
+    if isfield(dat.Data.Trials,'yo')
+        yo = [dat.Data.Trials(id).yo];
+        if length(yo) == length(id)
+            xf = polyfit([dat.Data.Trials(id).(f)],yo,1);
+            fit.opdir(2) = xf(1);
+        end
+    end
+        
 
 elseif strmatch(dat.type{1},{'stimxy'}) %not RC expt
     amps = squeeze(var(dat.means));
@@ -314,6 +371,23 @@ else
 end
 
 if ~isempty(fit)
+if ~isfield(fit,'xv')
+    j = 1;
+end
+if isfield(dat.Data.Stimvals,'ve')
+    [fit.ve] = deal(dat.Data.Stimvals.ve);
+end
+
+if isfield(dat.Data.Trials,'xo')
+    xos = cat(1,dat.Data.Trials.xo);
+    xo = mean(xos(xos > -1000));
+    [fit.xo] = deal(xo);
+end
+if isfield(dat.Data.Trials,'yo')
+    xos = cat(1,dat.Data.Trials.yo);
+    yo = mean(xos(xos > -1000));
+    [fit.yo] = deal(yo);
+end
 if showplot == 1  
         id = find(~isnan(x) & ~isinf(x));
         plot(fit.x(id),fit.fitted(id));

@@ -461,7 +461,6 @@ end
 if revcor
         result = res;
         result.Data = Expt;
-        result.name = Expt.Header.Name;
     if plotpsych
         args = {Expt.Stimvals.et};
         args = CheckExpt(Expt, args);
@@ -634,6 +633,9 @@ end
 
 
 if ignorename
+    if ~isfield(Expt.Stimvals,'od')
+        Expt.Stimvals.od = 0;
+    end
         if strcmp(Expt.Stimvals.e2,'Pd') & strcmp(Expt.Stimvals.et,'sM')
             reverse = ~reverse;
         end

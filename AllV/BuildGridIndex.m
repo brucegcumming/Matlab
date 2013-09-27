@@ -111,7 +111,9 @@ elseif isdir(name)
        nidx = 0;
    end
    
-   
+   if exist(idxfile,'file') && reindex
+       BackupFile(idxfile,'print');
+   end
    if isempty(Expts)
        if isdir(name) %online files
            idx = BuildMatFiles(datdir);

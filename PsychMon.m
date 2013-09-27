@@ -4,6 +4,8 @@ function out = PsychMon(varargin)
 %
 % X = PsychMon(filename,'getexpts')
 % returns a cell array of Expt structures, one for each block.
+% X = PsychMon(filename,'getexpts','useall')
+%              includes trials that are fixation only
 %
 %PsychMon(filename,'name', name) 
 %  Adds name to figure tags, so that you can monitor more than one
@@ -92,11 +94,11 @@ if nargin
     if strncmpi(varargin{1},'update',5)
         update(DATA);
     elseif strncmpi(varargin{1},'close',5)
-        stop(DATA.timerobj);
         CloseTag(DATA.figtag);
         CloseTag(tag);
+        stop(DATA.timerobj);
     elseif strncmpi(varargin{1},'getexp',5) %% Get expt from DATA currently associated with figure
-        out = MakeExpt(DATA);
+        out = MakeExpt(DATA,varargin{:});
         return;
     elseif strncmpi(varargin{1},'newblock',5) %% tell binoc to run another block
         [a,b] = fileparts(DATA.filename);
@@ -141,7 +143,7 @@ if nargin
         DATA = SetDefaults(DATA);
         DATA.plot.noplot = 1;
         DATA = ReadFile(DATA,DATA.filename);
-        out = MakeAllExpts(DATA);
+        out = MakeAllExpts(DATA,varargin{j+1:length(varargin)});
         return;
     elseif strncmpi(varargin{j},'getexpt',4)
         DATA.online = 0;
@@ -258,7 +260,7 @@ tmp.times = DATA.times(ids);
 tmp.rwszs = DATA.rwszs(ids);
 tmp.rwsum = DATA.rwsum(ids);
 tmp.DURS = DATA.DURS(ids);
-Expt = MakeExpt(tmp);
+Expt = MakeExpt(tmp, varargin{:});
 f = fields(DATA.Block);
 n = (j * 2)-1;
 if isfield(Expt,'Trials') && length(Expt.Trials) > DATA.plot.mintrials
@@ -280,19 +282,26 @@ end
 
 function Expt = MakeExpt(DATA, varargin)
 
+useall = 0;
 skipblock = 0;
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'skipblock',5)
         j = j+1;
         skipblock = varargin{j};
+    elseif strncmpi(varargin{j},'useall',5)
+        useall = 1;
     end
     j = j+1;
 end
 sid = ismember(DATA.score, [1 2]); 
 if sum(sid) == 0 %no psych trials
+    if useall
+        sid = find(DATA.score ==51);
+    else
     Expt = [];
     return
+    end
 end
 [et, p] = GetType(DATA.xtype(sid));
 [e2, p] = GetType(DATA.ytype(sid));
@@ -307,7 +316,12 @@ end
 
 Expt.Header.rc = 0;
 Expt.Header.expname = DATA.filename;
-id = find(ismember(DATA.score,[0 1 3]));
+if useall
+    usetrials = [0 1 3 51];
+else
+    usetrials = [0 1 3];
+end
+id = find(ismember(DATA.score,usetrials));
 if length(id) > 1 && (length(unique(DATA.y(id))) > 1 || DATA.Stimvals.ve > 5 || DATA.Stimvals.ve < 2)
     Expt.Stimvals.e2 = e2;
     blocks(1) = id(1);
@@ -433,6 +447,7 @@ PLOT.x = DATA.x(tid);
 PLOT.times = DATA.times(tid);
 PLOT.sign = DATA.sign(tid);
 PLOT.rwszs = DATA.rwszs(tid);
+PLOT.dur = DATA.DURS(tid);
 sids = find(DATA.score == 4); %% Start of Expt
 eids = find(DATA.score == 5); %% End of Expt
 stime = DATA.DURS(sids(end));
@@ -446,20 +461,34 @@ PLOT.times = stime + (PLOT.times  .* 1/(24 * 60 * 60));
 nexpstim = DATA.rwszs(sids(end));
 ndone = sum(DATA.score(sids(end):end) < 2);
 ids = find(ismember(PLOT.score,[0 1 2 3 7 100 101 102 103]));
+rwsum = sum(PLOT.rwszs(find(ismember(PLOT.score,[1 51]))));
+if length(ids) < length(PLOT.score)/5  %not psychophysics
+ids = find(ismember(PLOT.score,[51 53]));
+ndone = sum(DATA.score(sids(end):end) == 51);
+b = histc(PLOT.score(ids),[51 53]);
+perfstr = sprintf('%s %d/%d correct  Expt %d/%d %.1fml',datestr(DATA.readtime,'HH:MM'),b(1),b(2)+b(1),ndone,nexpstim,rwsum)
+PLOT.ispsych = 0;
+else
 b = hist(PLOT.score(ids),[0 1 2 3 7 101 102 103]);
-rwsum = sum(PLOT.rwszs(find(PLOT.score==1)));
 perfstr = sprintf('%s %d/%d correct + %d Bad/Foul/Late %d microsacc Expt %d/%d %.1fml',datestr(DATA.readtime,'HH:MM'),b(2),b(2)+b(1),b(3)+b(4)+b(5)+b(6)+b(7)+b(8),b(5),ndone,nexpstim,rwsum);
+PLOT.ispsych = 1;
+end
 shortperfstr = sprintf(' %d/%d %.1fml',ndone,nexpstim,rwsum);
+    PLOT.exptover = 0;
 if eids & eids(end) > sids(end) & ~DATA.plot.noplot
     perfstr = [perfstr ' Over']
     shortperfstr = [shortperfstr ' Over']
+    PLOT.exptover = 1;
 elseif PLOT.score(end) > 99  %in correction loop
     perfstr = [perfstr '*']
     shortperfstr = [shortperfstr '*']
 end
 
 if ismember(plottype,[0 1])
-    ids = find(PLOT.score < 3 & PLOT.sign ~= 0);
+    ids = find(PLOT.score < 3  & PLOT.sign ~= 0);
+    if isempty(ids) %no psych. Use fixation trials
+        ids = find(PLOT.score == 51);
+    end
     rws = unique(PLOT.rwszs(ids));
     if DATA.plot.rwtype > 1 & DATA.plot.rwtype <= length(rws)+1
         ids = find(PLOT.score < 3 & PLOT.rwszs == rws(DATA.plot.rwtype-1));
@@ -560,10 +589,13 @@ elseif plottype == 5  %result types
     title(perfstr);
 
 elseif plottype == 6  %cumulative reward
-    ids = find(PLOT.score < 2); %rewared
+    ids = find(PLOT.score < 2 | PLOT.score == 51 | PLOT.score ==53); %rewared
     hold off;
+    score = PLOT.score(ids);
+    score(score ==51) = 1;
+    score(score ==53) = 0;
     fprintf('%d data',length(ids));
-    rwt = cumsum(PLOT.rwszs(ids) .* PLOT.score(ids));
+    rwt = cumsum(PLOT.rwszs(ids) .* score);
     
     plot([PLOT.times(ids)' PLOT.times(end)],[rwt' rwt(end)]); %make sure last time is plotted, even if not rewarded
     hold on;
@@ -581,6 +613,18 @@ elseif plottype == 6  %cumulative reward
     fprintf('Done at %s\n',datestr(PLOT.times(end)));
     
 elseif plottype == 7  % Trial signal/score
+    if PLOT.ispsych == 0
+        gid = find(PLOT.score ==51);
+        bid = find(PLOT.score ==53);
+        plot(PLOT.times(gid),PLOT.dur(gid),'o');
+        hold on;
+        plot(PLOT.times(bid),PLOT.dur(bid),'ro');        
+        datetick('x','HH:MM');
+        exid = find(PLOT.score == 4);
+        for j = 1:length(exid)
+            line([PLOT.times(exid(j)) PLOT.times(exid(j))],get(gca,'ylim'),'linestyle',':');
+        end
+    else
     respdir = zeros(size(PLOT.score));
     scores = 2.*(PLOT.score -0.5);
     subplot(1,1,1);
@@ -772,6 +816,7 @@ elseif plottype == 7  % Trial signal/score
     subplot(2,1,1);
     set(gca,'ylim',[0 max(maxs)]);
     end
+    end
 elseif plottype == 8  %Trial signal/score
     Expts = MakeAllExpts(DATA);
     ExptPsych(Expts, 'sum','sequence','shown');
@@ -848,10 +893,10 @@ elseif plottype == 10   %plot eye pos
     yl(1) = yl(1)-yr/2;
     set(gca,'ylim',yl);
 elseif plottype == 2
-    ids = find(PLOT.score < 4); %ITI all
+    ids = find(PLOT.score < 4 | ismember(PLOT.score,[51 53])); %ITI all
     [x,y] = xysmooth(PLOT.times(ids(2:end)),diff(PLOT.times(ids)).*(24 *60 * 60),DATA.plot.smooth);
     plot(x,y);
-    ids = find(PLOT.score < 3); %ITI for completed trials
+    ids = find(PLOT.score < 3 | PLOT.score == 51); %ITI for completed trials
     [x,y] = xysmooth(PLOT.times(ids(2:end)),diff(PLOT.times(ids)).*(24 *60 * 60),DATA.plot.smooth);
     hold on;
     plot(x,y,'r');
@@ -883,7 +928,11 @@ elseif plottype == 4 %%correct
     end
     title(perfstr);
 end
-
+if PLOT.exptover
+    set(gca,'color','k');
+else
+    set(gca,'color','w');
+end    
 
 function DATA = ReadFile(DATA,fname)
 %File format
@@ -1173,7 +1222,7 @@ if length(DATA.rwszs) ~=  length(DATA.score)
   DATA.score = DATA.score(1:n);
 end
 
-DATA.rwsum = cumsum(DATA.rwszs .* (DATA.score == 1));
+DATA.rwsum = cumsum(DATA.rwszs .* (ismember(DATA.score,[1 51])));
 if DATA.verbose
     fprintf('%d rws,', length(DATA.rwszs));
 end
@@ -1195,6 +1244,12 @@ if maxconsec > 20
     fprintf('Max corr loop length %d\n',maxconsec);
 end
 
+ids = find(ismember(DATA.score,[0 1 2 3 7 100 101 102 103]));
+if length(ids) < length(DATA.score)/5  %not psychophysics
+    DATA.ispsych = 0;
+else
+    DATA.ispsych = 1;
+end
 if ~DATA.plot.noplot
     set(DATA.toplevel,'UserData',DATA);
     PlotData(DATA);

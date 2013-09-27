@@ -4,8 +4,12 @@ function o = xy2op(x, angle, varargin)
 % converts a location in orhtog distance, paralell distance into x,y
 % (screen co-ordingate), given an RF orientation (in degrees).
 %
-% 0 degrees points down, not left, as in binoc
-
+% 0 degrees points down (as in binoc), not left
+% In binoc, if Ro = 90, Op+ -> -v X. Pp+ = +v y
+%              Ro=-90 Op+ -> +v X. Pp+ = -v y
+%              Ro=0 Op+ -> +v Y. Pp+ = +v x
+%              Ro=180 Op+ -> -v Y. Pp+ = -v x
+%
 theta = -pi/2 + angle * pi/180;
 j = 1;
 while j < nargin-1;
@@ -18,5 +22,9 @@ end
     sa = sin(theta);
 % need to recheck sign conventions here in replay...    
 
-mx = [cos(theta) -sin(theta); sin(theta) cos(theta)];
-o = x * mx;
+mx = [-cos(theta) -sin(theta); -sin(theta) cos(theta)];
+if size(x,1) == 2
+    o = x' * mx';
+else
+    o = x * mx;
+end

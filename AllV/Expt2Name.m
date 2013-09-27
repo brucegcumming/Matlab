@@ -4,8 +4,6 @@ function [expname, exptypename, suff, stimname]  = Expt2Name(Expt, varargin)
 SpkDefs;
 suff = [];
 addsuff = 0;
-crtrial = 0;
-nt = length(Expt.Trials);
 
 j = 1;
 while j <= length(varargin)
@@ -58,7 +56,7 @@ end
         exptypename = strrep(exptypename, 'or','dir');
     end
     
-    if strcmp(Expt.Stimvals.et,'tf') & crtrial > nt/2 %Counterphase
+    if strcmp(Expt.Stimvals.et,'tf') & strfind(Expt.Header.Options,'+cr') %Counterphase
         exptypename = ['C' exptypename];
     end
     if isfield(Expt.Stimvals,'rb') & Expt.Stimvals.rb ~= 0
@@ -88,7 +86,7 @@ end
         
     end
     if strncmp(exptypename,'dxXce',5)
-        if isfield(Expt.Stimvals,'n2') && Expt.Stimvals.n2 > 2
+        if Expt.Stimvals.n2 > 2
             exptypename = strrep(exptypename,'dxXce','dxXces');
         elseif Expt.Stimvals.i2 < 2 %not +- 1
             exptypename = strrep(exptypename,'dxXce','dxXces');

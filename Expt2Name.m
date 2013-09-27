@@ -56,7 +56,7 @@ end
         exptypename = strrep(exptypename, 'or','dir');
     end
     
-    if strcmp(Expt.Stimvals.et,'tf') & crtrial > nt/2 %Counterphase
+    if strcmp(Expt.Stimvals.et,'tf') & strfind(Expt.Header.Options,'+cr') %Counterphase
         exptypename = ['C' exptypename];
     end
     if isfield(Expt.Stimvals,'rb') & Expt.Stimvals.rb ~= 0

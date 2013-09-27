@@ -55,7 +55,11 @@ Array = [];
 if isempty(MetaTags.ElecLabel)
     return;
 end
-for j = 1:size(MetaTags.ElecLabel,1); 
+np = size(MetaTags.ElecLabel,1);
+if np > 96 && MetaTags.CreateDateTime(1) < 2014
+    np = 96;
+end
+for j = 1:np
     E(j) = sscanf(MetaTags.ElecLabel(j,:),'elec%d'); 
 end
 

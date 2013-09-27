@@ -426,6 +426,7 @@ elseif strmatch(list,'save')
         end
     end
     fprintf('Saving Data to %s\n',OTTF.statefile);
+    BackupFile(OTTF.statefile,'print');
     save(OTTF.statefile,'OTTF');
 elseif strmatch(list,'loadstate')
     if length(varargin) > 0 & ischar(varargin{1})

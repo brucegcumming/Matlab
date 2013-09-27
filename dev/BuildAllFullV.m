@@ -14,7 +14,8 @@ function res = BuildAllFullV(name, varargin)
 %
 %BuildAllFullV(..., 'recalcall') forces rebuilding of index files (from .spkblk.)
 %
-%BuildAllFullV(..., 'nocut') make FullV files but don't do auto cutting.(E.G. if Clustering done already)
+%BuildAllFullV(..., 'nocut') make FullV files but don't do auto
+%cutting.(E.G. if Clustering done already)
 %
 %BuildAllFullV(..., 'remakeV')    forces rebuilding of FullV file
 %
@@ -29,6 +30,7 @@ function res = BuildAllFullV(name, varargin)
 bysuffix = 0;
 scanfiles = 0;
 recalc = 0;
+reindex = 0;
 X.checkv = 0;
 sizecheck = 0;  %set to max safe bytes for FullV to control if FullV is kept in memory
 runautocut = 1;
@@ -54,6 +56,7 @@ expts = [];
 byname = 0;
 logfid = fopen(logfile,'a');
 X.logfid = logfid;
+X.nocut = 0;
 
 j = 1;
 while j <= length(varargin)
@@ -72,12 +75,18 @@ while j <= length(varargin)
         expts = varargin{j};
     elseif strncmpi(varargin{j},'nocut',4)
         runautocut = 0;
-        args = {args{:} 'nocut'};
+        X.nocut = 1;
+    elseif strncmpi(varargin{j},'quickautocut',4)
+        runautocut = 2;
+        args = {args{:} 'quickautocut'};
     elseif strncmpi(varargin{j},'refcut',4)
         runautocut = 0;
+        X.nocut = 2;
         args = {args{:} 'reapply' 'refclusters'};
     elseif strncmpi(varargin{j},'parallel',6)
         parallel = 1;
+    elseif strncmpi(varargin{j},'reindex',5)
+        reindex = 1;
     elseif strncmpi(varargin{j},'remakeV',7)
         recalc = 4;
     elseif strncmpi(varargin{j},'recalcsuffix',8)
@@ -87,6 +96,7 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'recalc',3)
         if recalc == 4
             recalc = 5;
+            reindex = 1;
         elseif byname %just redo auto cuts
             recalc = 1;
         else
@@ -113,6 +123,7 @@ if isdir(name)
 else
 [path, fname] = fileparts(name);
 end
+X.catcherrs = 0;
 if exist('FullV','var')
     Expts(1)  = 1;
     probelist = 1:size(FullV.V,1);
@@ -132,8 +143,10 @@ else
             ProcessGridFullV(name);
         end
     end
+    
 
 X.recalc = recalc;
+X.reindex = reindex;
 X.sizecheck = sizecheck;
 
 ns = 1;
@@ -174,11 +187,7 @@ elseif scanfiles
         end
         for j = 1:length(newsuff);
             fprintf(logfid,'%s Processing %s %d %s\r\n',datestr(now),path,newsuff(j),datestr(now));
-            if runautocut == 2
-            res.cls{newsuff(j)} = ProcessSuffix(path, probes, newsuff(j), 0, X, {args{:} 'nocut'});
-            else
             res.cls{newsuff(j)} = ProcessSuffix(path, probes, newsuff(j), 0, X, args);
-            end
             donesuff = [donesuff newsuff(j)];
         end
         ti = now;
@@ -213,7 +222,7 @@ elseif scanfiles
 return;
 else
 
-    if recalc == 3
+    if reindex
         probes = MakeProbeIndex(path,'recalc');
     elseif length(expts) && recalc == 4 %take probe ids from exist
         probes = MakeProbeIndex(path,'suffix',expts);
@@ -237,6 +246,7 @@ end
 
 if parallel
     X.logfid = -1;
+    X.catcherrs = 1;
     cls = {};
     parfor (ex = expts)
         starts(ex) = now;
@@ -269,8 +279,7 @@ if parallel
     res.cls=cls;
     res.starts = starts;
 else
-    
-    
+    X.catcherrs = 0;        
     for ex = expts
         res.starts = [res.starts now];
         err = 0;
@@ -326,14 +335,15 @@ if runautocut == 2  %do all teh cutting after building all the files
 end
 res.end = now;
 if logfid > 0
-fclose(logfid);
+    try
+        fclose(logfid);
+    end
 end
 
 function [res, details] = ProcessSuffix(path, probes, ex, lastblk, X, args)
 
 details.loadtime = 0;
 template = [];
-nocut = 0;
 mkint = 1;
 readint = 0;
 res = {};
@@ -352,8 +362,6 @@ while j <= length(args)
         mkint = 0;
     elseif strncmpi(args{j},'mkint',5)
         mkint = 1;
-    elseif strncmpi(args{j},'nocut',5)
-        nocut = 1;
     elseif strncmpi(args{j},'noframes',5)
         exptargs = {exptargs{:} args{j}};
     elseif strncmpi(args{j},'refclusters',9)
@@ -378,8 +386,27 @@ if readint
     outname = strrep(outname,'FullV','FullVi');
 end
 probelist = unique([probes.probe]);
-if exist(outname,'file') && X.recalc < 2
+eid = find([probes.suffix] == ex);
+d = dir(outname);
+ClustersUptoDate = 0;
+if isempty(d) || d(1).datenum < max([probes(eid).filetime]);
+    FullvUptoDate = 0;
+else
+    FullvUptoDate = 1;
+end
+if ~isempty(d)
+    cname = regexprep(outname,'FullV','ClusterTimes');
+    b = dir(cname);
+    if ~isempty(b) && b(1).datenum > d(1).datenum
+        fprintf('%s is up to date\n',cname);
+        ClustersUptoDate = 1;
+    end
+end
+if exist(outname,'file') && X.recalc < 2 && FullvUptoDate
     ts = now;
+    if checkexpts == 0 && ClustersUptoDate %Don't need to load FullV
+        return;
+    end
     fprintf('Loading %s\n',outname);
     d = dir(outname);
     clear FullV;
@@ -409,8 +436,12 @@ end
 fprintf('File Load/Build tood %.2f\n',res.loadtime);
 details.loadtime = res.loadtime;
 if mkint && ~isfield(FullV,'intscale')
+    if ~isfield(FullV,'V')
+        cprintf('red','%s Missing V!!\n',outname);
+        return;
+    end
     for j = 1:size(FullV.V,1)
-    vm(j) = max(abs(FullV.V(j,:)));
+        vm(j) = max(abs(FullV.V(j,:)));
     end
     vm = max(vm);
     FullV.V = int16(FullV.V .* 32700/vm);
@@ -445,7 +476,11 @@ end
 if ismember(X.recalc, [4 5]) %just make FullV
     return;
 end
-Expt = LoadExpt(FullV.matfile, ex, X.recalc > 1, X.logfid, exptargs);
+if isfield(FullV,'matfile')
+    Expt = LoadExpt(FullV.matfile, ex, X.recalc > 1, X.logfid, exptargs{:});
+else
+    Expt = [];
+end
 if isfield(Expt,'Trials')
 ts = Expt.Trials(1).Start./10000;
 te = Expt.Trials(end).End./10000;
@@ -460,8 +495,7 @@ else
     fprintf('Expt %d has no trials\n',ex);
     return;
 end
-if nocut
-    
+if X.nocut == 1
     return;
 end
 fprintf('Cutting Clusters for Expt %d\n',ex);
@@ -477,10 +511,21 @@ if X.sizecheck > 0
         FullV = outname;
     end
 end
-if refcut
+if refcut %make refcut if Clustertimes is out of date/non-existent
     res = {};
     for j = probelist
-        res{j} = AllVPcs(FullV,'tchan',j,'logfid',X.logfid,'savespikes','noninteractive',args{:});
+        if X.catcherrs
+        try
+        res{j} = AllVPcs(FullV,'tchan',j,'savespikes','noninteractive',args{:});
+        catch ME
+            res{j}.errstate = ME;
+            if isfield(FullV,'loadname')
+            res{j}.fullvfile = FullV.loadname;
+            end
+        end
+        else
+            res{j} = AllVPcs(FullV,'tchan',j,'savespikes','noninteractive',args{:});
+        end
     end
     clear ms;
 

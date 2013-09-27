@@ -27,15 +27,18 @@ while j <= length(varargin)
     j = j+1;
 end
 [a,b,c] = fileparts(name);
-backdir = [a '/backup'];
+if isempty(a)
+    backdir = './backup';
+else
+    backdir = [a '/backup'];
+end
 if ~exist(name,'file')
     return;
 end
 if ~exist(backdir,'dir')
     mkdir(backdir);
 end
-if exist(a,'dir')
-    bname = strrep(name,a,[a '/backup']);
+if exist(backdir,'dir')
     backfile = [backdir '/' b datestr(now,datefmt) suffix c];
     ts = now;
     if docopy

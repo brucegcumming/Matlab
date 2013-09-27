@@ -50,6 +50,8 @@ minrw = 0;
 setrw = 0;
 ftseed = 0;
 bw = 130;
+signalbw = 60;
+
 or = [];
 sf = 2;
 wi = 1;
@@ -57,7 +59,7 @@ kbw = 130;  %BW of stim to use for kernel
 kor = 0;
 savemode.save = 0;
 savemode.seedseq = 0;
-minseedcount = 200; %need to lower this for recording sessions
+minseedcount = [];
 rebuild = 0;
 pwrargs = {};
 
@@ -96,6 +98,7 @@ while j <= length(varargin)
             bw(nk) = 130;
             or(nk) = 0;
         end
+        na = j;
         for j = 1:length(bws)
             for k = 1:length(ors)
                 id = find([Expt.Trials.or] == ors(k) & [Expt.Trials.ob] == bws(j));
@@ -109,15 +112,17 @@ while j <= length(varargin)
             end
         end
         details.allkernels = [];
-        
+        if isempty(minseedcount)
+            minseedcount = 50;
+        end
 %Then build the kernels        
         if parallel
             parfor (j = 1:nk)
-                Ks{j} = BuildStimKernel(Expt, bw(j), or(j));
+                Ks{j} = BuildStimKernel(Expt, bw(j), or(j),minseedcount);
             end
         else
             for j = 1:nk
-                Ks{j} = BuildStimKernel(Expt, bw(j), or(j));
+                Ks{j} = BuildStimKernel(Expt, bw(j), or(j),minseedcount);
                 nk = 0;
             end
         end
@@ -134,6 +139,7 @@ while j <= length(varargin)
                 details.allkernels(nk,:,:) = Ks{j}.kernel;
                 details.allpsum(nk,:,:) = Ks{j}.psum;
                 details.allnsum(nk,:,:) = Ks{j}.nsum;
+                details.stimsum(nk,:,:) = Ks{j}.truesum;
                 details.or(nk) = or(j);
                 details.bw(nk) = bw(j);
                 details.nf(nk,:) = Ks{j}.nframes;
@@ -274,6 +280,7 @@ while j <= length(varargin)
         minseedcount = varargin{j};
     elseif strncmpi(varargin{j},'parallel',5)
         parallel = 1;
+        filterargs = {filterargs{:} 'parallel'};
     elseif strncmpi(varargin{j},'predictall',10)
         predictall = 1;
     elseif strncmpi(varargin{j},'predict',4)
@@ -379,6 +386,10 @@ while j <= length(varargin)
         recorddate = varargin{j};    
     end
     j = j+1;
+end
+
+if isempty(minseedcount)
+    minseedcount = 200; %need to lower this for recording sessions
 end
 
 if iscell(Expt) && isfield(Expt{1},'kernel') && isfield(Expt{1},'predchoice')
@@ -548,7 +559,7 @@ else
 end
 spid = find([Expt.Trials.RespDir] == 1 & [Expt.Trials.ob] <= 75 & gid);
 snid = find([Expt.Trials.RespDir] == -1 & [Expt.Trials.ob] <= 75 & gid);
-RespOris = [median([Expt.Trials(snid).or]) median([Expt.Trials(spid).or]); or or+90];
+RespOris = [median([Expt.Trials(spid).or]) median([Expt.Trials(snid).or]); or or+90];
 OriCounts = Counts([Expt.Trials([pid nid]).or]);
 
 if length(nid) < 2 || length(pid) < 2
@@ -632,11 +643,17 @@ else
 end
 
 if isempty(ftpwr)
-    if mksigkernel %caccl mean diff between signal containing images, so show what ideal kernel would be
+    if mksigkernel %calc mean diff between signal containing images, so show what ideal kernel would be
+        if signalbw == 0
         sig = min([Expt.Trials.ob]);
+        else
+            sig = signalbw;
+        end
         nfts = filterim([sf sf/2], [or sig], wi, 'seedoffset', seedoffset, 'pix2deg', px,'nseeds', 1000, 'getft','noplot',filterargs{:});
         pfts = filterim([sf sf/2], [or+90 sig], wi, 'seedoffset', seedoffset, 'pix2deg', px,'nseeds', 1000, 'getft','noplot',filterargs{:});
-        sigkernel = fftshift(squeeze(mean(abs(pfts),1)-mean(abs(nfts),1)));
+        %Pk is Respdir == 1 (smallest ori) - RespDir==-1 (largest ori)
+        sigkernel = fftshift(squeeze(mean(abs(nfts),1)-mean(abs(pfts),1)));
+        sigors = [or or+90];
     end
     
     %restrict to trials with enough reps to be worth calculating images
@@ -904,6 +921,15 @@ end
 
 if mksigkernel & exist('sigkernel','var');
     details.sigkernel = sigkernel;
+    details.sigor = AddOriSum(sigkernel','noplot');
+    details.sigors = sigors;
+    [details.Trials.idealresp] = deal(NaN);
+    for j = 1:length(zid);
+        details.Trials(zid(j)).idealresp = details.sigor * details.Trials(zid(j)).rsum';        
+    end
+    ipid = find([details.Trials.idealresp] > 0);
+    inid = find([details.Trials.idealresp] < 0);
+    details.idealpkor = mean(cat(1,details.Trials(ipid).rsum))-mean(cat(1,details.Trials(inid).rsum));
 end
 if sprc < 2
     details.kb = CalcPKernel(Expt,pid(2:end), nid, pwr, tpwr(2:end));
@@ -1199,17 +1225,14 @@ end
 details.fts = fts;
 
 
-function [details, b] = BuildStimKernel(Expt, bw, or)
-    [a,b] = BuildBWPsychRCa(Expt,'rebuild','nosigkernel','bw',[bw or],'minseedcount',50);
+function [details, b] = BuildStimKernel(Expt, bw, or, minseedcount)
+    [a,b] = BuildBWPsychRCa(Expt,'rebuild','nosigkernel','bw',[bw or],'minseedcount',minseedcount);
     if isfield(b,'nframes')
         details.nframes = b.nframes;
         details.kernel = a;
-        details.psum = b.psum;
-        details.nsum = b.nsum;
-        details.n = b.nframes;
-        details.zid = b.zid;
-        detials.zid = b.zid;
+        details = CopyFields(details,b,{'psum' 'nsum' 'nframes' 'zid' 'truesum'});
         details.Trials(b.zid) = b.Trials(b.zid);
+        details
     else
         details = [];
     end
@@ -1221,6 +1244,8 @@ if ischar(Expt)
     name = Expt;
     [a,Expt] = ReadSerialFile(name,'readexpt','exptype','ORBW');
     Expt.filename = name;
+elseif isfield(Expt,'Header') && isfield(Expt.Header,'loadname')
+    Expt.filename = Expt.Header.loadname;
 elseif isfield(Expt,'Header') && isfield(Expt.Header,'name')
     Expt.filename = Expt.Header.name;
 end

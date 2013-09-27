@@ -101,8 +101,9 @@ FullV.loadtime = mytoc(ts);
 if keepsmooth
     FullV.highpass = smoothw;
 end
-if isfield(FullV,'chspk') &&  ~isempty(strfind(name,'p1FullV')) && FullV.chspk == 96
-    FullV.chspk = 1;
+if isfield(FullV,'chspk') &&  isempty(strfind(name,'p96FullV')) && FullV.chspk(1) == 96    
+    FullV.chspk = GetProbeFromName(name);
+    mycprintf('red','\nSetting FullV.chspk to %d\n',FullV.chspk);
 end
 if highpass && isfield(FullV,'highpass') && ~isnan(FullV.highpass)
     ts = now;

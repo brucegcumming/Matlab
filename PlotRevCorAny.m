@@ -418,7 +418,7 @@ if isfield(Expt.Trials,'Fr') & length(unique([Expt.Trials.Fr])) > 1
     result = subres{j};
     result.subres = {subres{1:j-1}};
     result.ctype = 'Fr';
-    result.name = Expt.Header.Name;
+    result.name = GetEval(Expt,'name');
     GetFigure(labelb);
     hold off;
     PlotRC(result,'best','label',labelb);
@@ -443,7 +443,7 @@ if ~isempty(ctype)
     end
     result = subres{j};
     result.subres = {subres{1:j-1}};
-    result.name = Expt.Header.Name;
+    result.name = GetEval(Expt,'name');
     return;
     end
 end
@@ -523,7 +523,12 @@ if ~isfield(Expt.Header,'RCparams')
     starts = [Expt.Trials.Start];
 
     Expt.Header.Name = strrep(Expt.Header.Name,'\','/');
-    result.name = Expt.Header.Name;
+    result.name = [];
+    result.expname = [];
+    [result.name, result.expname] = GetEval(Expt,'name');
+    if isfield(Expt.Header,'expname');
+        result.expname = Expt.Header.expname;
+    end
     if isfield(Expt.Header,'probe') || isfield(Expt,'probes')
         if isfield(Expt,'probes')
             result.probe = median(Expt.probes);
@@ -596,8 +601,8 @@ end
             btype = [];
         end
     end
-    if ~isfield(Expt.Trials,btype)
-        mycprintf('error','Expt.Trials has no field %s\n',btype);
+    if ~isempty(btype) && ~isfield(Expt.Trials,btype)        
+        mycprintf('error','Expt.Trials (%s: %s) has no field %s\n',result.name,result.expname,btype);
         btype = [];
     end
 %NB NOT types. So that it matches PlotExpt
@@ -629,11 +634,14 @@ end
     end
 
     if res.spksum == 0
-        if isfield(Expt.Header,'expname') & isfield(Expt.Header,'probe')
-            fprintf('No Spikes in %s,%s,%d\n',Expt.Header.Name,Expt.Header.expname,Expt.Header.probe);
+        probe = GetEval(Expt,'probe');
+        if probe > 0
+            pstr = sprintf(' P%.1f',probe);
         else
-            fprintf('No Spikes in %s\n',Expt.Header.Name);
+            pstr = [];
         end
+        estr = GetEval(Expt,'Name');
+        fprintf('No Spikes in %s%s\n',estr,pstr);
         return;
     end
     else
@@ -1374,8 +1382,10 @@ end
 np = np+nex;
 end
 
+%remove any extras that were empty
 while length(sdfs.extras) > 0 && isempty(sdfs.extras{1})
     sdfs.extras = {sdfs.extras{2:end}};
+    sdfs.extraval = sdfs.extraval(2:end);
 end
 
 if secondorder

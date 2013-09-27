@@ -228,15 +228,22 @@ if isfield(Expt.Trials,'tr') %some guided responses included
     end
 end
 
+colors = mycolors;
 j = 1;
 while j <= length(varargin)
    if strncmpi(varargin{j},'nmin',3)
        j = j+1;
        minreps = varargin{j};
        psfargs = {psfargs{:} 'nmin' varargin{j}};
-   elseif strncmpi(varargin{j},'color',5)
+   elseif strncmpi(varargin{j},'color',7)
        j = j+1;
        coloroff = varargin{j};
+   elseif strncmpi(varargin{j},'forcecolor',7)
+       j = j+1;
+       forcecolor = varargin{j};
+       for j = 1:length(colors)
+           colors{j} = forcecolor;
+       end
    elseif strncmpi(varargin{j},'collapse',5)
        j = j+1;
        collapse = varargin{j};
@@ -573,7 +580,7 @@ elseif pntrials(1) > 0
     return;
 elseif smoothw
    hold off;
-   colors = mycolors;
+
     if strcmp(type{1},'cv')
         signs = vals{2} - mean(uvals{2});
         signvals{1} = vals{1} .* sign(signs);
@@ -789,7 +796,6 @@ end
 else
     yv = unique([pp.expno]);
 
-    cols = mycolors;
     for j = 1:length(yv)
         icolor = j+coloroff;
         id = find([pp.expno] == yv(j) & [pp.n] >= minreps);
@@ -802,7 +808,7 @@ else
             Expt.Stimvals.bias = fit.fit(1);
 %            plot([pp(id).x],[pp(id).resp]./[pp(id).n],'o');
             if length(id) > 1
-                ph = fitpsf(fit.data,'showfit',fit,psfargs{:},'color',cols{j+coloroff});
+                ph = fitpsf(fit.data,'showfit',fit,psfargs{:},'color',colors{j+coloroff});
                 fit.fith = ph.fith;
                 h(j) = ph.fith;
                 if j > length(labels)
@@ -822,7 +828,7 @@ else
                     
                 end
             else
-                h(j) = plot([pp(id).x],[pp(id).resp]./[pp(id).n],'s','color',cols{j+coloroff});
+                h(j) = plot([pp(id).x],[pp(id).resp]./[pp(id).n],'s','color',colors{j+coloroff});
                 if shown
                     text([pp(id).x],[pp(id).resp]./[pp(id).n],num2str(pp(id).n));
                 end
@@ -865,7 +871,7 @@ else
             end
 
             if showplot
-                pfits{j} = fitpsf(ppp,'showfit','expno',yv(j),psfargs{:},'color',cols{j+coloroff+1});
+                pfits{j} = fitpsf(ppp,'showfit','expno',yv(j),psfargs{:},'color',colors{j+coloroff+1});
             else
                 pfits{j} = fitpsf(ppp,'showfit','expno',yv(j),psfargs{:});
             end
@@ -877,7 +883,7 @@ else
             else
                 icolor = j+coloroff;
             end
-            plot(pp(id).x,pp(id).resp./pp(id).n,'s','color',cols{icolor});
+            plot(pp(id).x,pp(id).resp./pp(id).n,'s','color',colors{icolor});
             hold on;
             l = text(pp(id).x,pp(id).resp./pp(id).n,sprintf('%s=%.2f n= %d',type{2},pp(id).y,pp(id).n));
         end

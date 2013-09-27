@@ -51,6 +51,8 @@ end
     G = exp(-(gx).^2/sx - (gy).^2/sy);
     G = G./sum(G(:));
 
+    y(isnan(y)) = 0;
+    x(isnan(x)) = 0;
     
     dx = diff(xrange)./nbins(1);
     dy = diff(yrange)./nbins(2);

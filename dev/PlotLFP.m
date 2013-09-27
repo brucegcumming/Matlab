@@ -253,8 +253,10 @@ for nc = 1:length(cvals)
                 result.x(ix,ie) = x;
                 result.y(ix,ie) = result.linevals(ie);
                 result.n(ix,ie) = length((idx));
-                fts = abs([Expt.Trials(idx).FTlfp]);
-                ft = mean(abs([Expt.Trials(idx).FTlfp]),2);
+                ftlfp = cat(3,Expt.Trials(idx).FTlfp);
+                ftlfp = squeeze(ftlfp(:,lfpch,:));
+                fts = abs(ftlfp);
+                ft = mean(abs(ftlfp),2);
                 if exist('btype','var')
                     stimlab = [val2str(result.x(ix,ie),type,stimtype,Expt,[]) val2str(result.y(ix,ie),btype,stimtype,Expt,[])];
                 else
@@ -274,7 +276,7 @@ for nc = 1:length(cvals)
                     if plotlfp == 2 %time domain
                         lfph(nlfp) = plot(ts,mean([Expt.Trials(idx).LFP],2),'color',colors{ix+addn+addl});
                     else
-                        lfph(nlfp) = plot(ftfrq(fidx),ft(fidx),'color',colors{ix+addn+addl});
+                        lfph(nlfp) = plot(ftfrq(fidx),smooth(ft(fidx),5),'color',colors{ix+addn+addl});
                     end
                     lfplabels{nlfp} = stimlab;
                     nlfp = nlfp + 1;

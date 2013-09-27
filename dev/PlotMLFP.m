@@ -1,5 +1,11 @@
 function lfpm = PlotMLFP(Expt, varargin)
-
+%fpm = PlotMLFP(Expt, ..)
+%Plot LFP Data for Arrays
+%Default is a line plot, one for each probe
+%
+%fpm = PlotMLFP(Expt, 'stack')
+%fpm = PlotMLFP(Expt, 'image')
+%fpm = PlotMLFP(Expt, 'split')
 plottype = 1;
 nfreq = 50;
 checkdim = 0;
@@ -7,6 +13,7 @@ minlen = 0;
 chscale = 0;
 needft = 0;
 stackoff = 0.05;
+timerange = [];
 freqs = 1:nfreq;
 j = 1;
 while j <= length(varargin)
@@ -46,6 +53,9 @@ while j <= length(varargin)
             j = j+1; 
             nfreq = varargin{j};
         end
+    elseif strncmpi(varargin{j},'timerange',5)
+            j = j+1; 
+            timerange = varargin{j};
     elseif strncmpi(varargin{j},'ftstack',4)
         plottype = 6;
         if length(varargin) > j && isnumeric(varargin{j+1})
@@ -172,24 +182,27 @@ elseif plottype == 3
         end
 
     end
-elseif plottype == 2
+elseif plottype == 2 'image'
     [nr,nc] = Nsubplots(length(xvals));
     pmax = max(lfpm(:));
     pmin = min(lfpm(:));
     for k = 1:length(xvals)
         subplot(nr,nc,k);
-        imagesc(squeeze(lfpm(k,:,:)));
+        imagesc(Expt.Header.LFPtimes,size(lfpm,2),squeeze(lfpm(k,:,:)));
         title(sprintf('%.2f',xvals(k)));
         caxis([pmin pmax]);
     end
-elseif plottype == 4
+    if ~isempty(timerange)
+        set(gca,'xlim',timerange);
+    end
+elseif plottype == 4 %ftimage
     pmax = max(max(max(lfpft(:,:,1:nfreq))));
-    [nr,nc] = NSubplots(length(xvals));
+    [nr,nc] = Nsubplots(length(xvals));
     for k = 1:length(xvals)
         subplot(nr,nc,k);
-        imagesc(squeeze(lfpft(k,:,1:nfreq)));
+        imagesc(log(squeeze(lfpft(k,:,1:nfreq))));
         title(sprintf('%.2f',xvals(k)));
-        caxis([0 pmax]);
+        caxis([0 log(pmax)]);
     end
 elseif plottype == 5  % stacked time
     subplot(1,1,1);

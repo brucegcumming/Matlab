@@ -8,7 +8,10 @@ function res = AllVPcs(V, varargin)
 %recaptiulates
 %AllVPcs(V,'tchan',c,'reapply')  uses saved clustering parameters, but
 %appies them to new data (e.g. changes in trigger, new probe).
-%AllVPcs(V,'tchan',c,'reapply', Clusters{p}) uses cluster given
+%AllVPcs(V,'tchan',c,'reapply', Clusters{p}) uses cluster given 
+%
+%AllVPcs(name, 'tchan', c, 'refcut')    Applies the cluster defined in RefClusters.mat, if no cluster is yet defined
+%AllVPcs(name, 'tchan', c, 'refclusterforce') forces application of cluster defined in RefClusters.mat;
 %
 %AllVPcs(V, 'tchan',c,'trigdt') or AllVPcs(V, 'tchan',c,'dtthr')  trigggers off dVdt
 %AllVPcs(V, 'tchan',c,'dtthr2') Triggers off second temporal derivative
@@ -191,6 +194,7 @@ DATA.errs = {};
 DATA.errstates = {};
 DATA.saveallspikes = 1;
 DATA.ArrayConfig = [];
+DATA.xyplot.density = 0;
 Expts = {};
 
 forcetrigger = 0;
@@ -270,7 +274,7 @@ DATA.tag.xcorr = 'Xcorrs';
 DATA.tag.oldxy = 'previousXY';
 DATA.tag.comparexy = 'CompareXY';
 DATA.tag.preferences = 'Preferences';
-DATA.probeswitchmode = 'reclassify';
+DATA.probeswitchmode = 'reapply';
 DATA.probe = 0; % if no fields, tests cause errors
 DATA.tag.allxy = 'AllXY';
 DATA.tag.celllist = 'AllCellList';
@@ -634,6 +638,10 @@ if isstruct(V)
             else
                 [DATA.Expt, DATA.matfile] = LoadExpt(DATA,Vall.exptno);
             end
+            if isempty(DATA.Expt)
+                res.error = sprintf('No Expt in %s\n',Vall.matfile);
+                return;
+            end
             if isfield(DATA.Expt.Stimvals,'po') && DATA.Expt.Stimvals.po > DATA.postperiod
                 DATA.postperiod = DATA.Expt.Stimvals.po;
                 DATA.Expt.Header.postperiod = DATA.postperiod .*10000;
@@ -974,7 +982,7 @@ while j <= length(varargin)
         end
         DATA.savespikes = 1;
         passonargs = {passonargs{:} varargin{j}};
-        if j ==1 && saveautocut ~= 2 %savespikes before anything else = save current GUI spikes
+        if j ==1 && saveautocut ~= 2 && length(varargin) == 1 %savespikes lone argument  = save current GUI spikes
             it = findobj('type','figure','tag',DATA.tag.top);
             if length(it) == 1
                 DATA = get(it,'UserData');
@@ -2559,6 +2567,7 @@ pcplots = [1 2; ...
 
 %need to reset vpts for new probes, because probe # is added   
 vsmps = DATA.vsmps;
+
 DATA.dvpts = [0 9 0 13; ...
            0 9 0 16; ...
            0 9 -1 9; ...
@@ -2567,7 +2576,17 @@ DATA.dvpts = [0 9 0 13; ...
            0 10 -1 5; ...
            0 10 0 30; ...
            0 9 0 12];
-
+if length(ispk) == 1
+    DATA.dvpts = [0 9 0 13; ...
+           0 9 0 16; ...
+           0 9 0 13; ...
+           0 9 0 5; ...
+           0 9 0 20; ...
+           0 5 0 13; ...
+           0 5 0 20; ...
+           0 5 0 16; ...
+           0 12 0 20];
+end
  if newdata == 1
     DATA.tmplots(1,:) = [1 3];
     DATA.tmplots(2,:) = [1 4];
@@ -3486,6 +3505,9 @@ end
 
 if DATA.profiling
     fprintf('recluster done at  %.4f\n',mytoc(tt(1).time));
+end
+if ~isfield(DATA.cluster,'auto')
+    DATA.cluster.auto = 0;
 end
 if calcclscores
     k = 0;
@@ -5478,11 +5500,11 @@ end
      end
  nerr = sum(missing);
  if nerr
-     errordlg(sprintf('Missing %d Clusters at %s',nerr,str),'Cluster Load error','modal');
+     cprintf('red','Missing %d Clusters at %s',nerr,str);
  end
  nm = sum(missing == 2);
  if nm
-     errordlg(sprintf('Missing %d MeanSpikes at %s',nm,str),'Cluster Load error','modal');
+     cprintf('red','Missing %d MeanSpikes at %s',nm,str);
  end
             
 
@@ -6091,6 +6113,8 @@ function name = SpkFilename(DATA, varargin)
     name = sprintf('%s/%s.p%dt%d%s.mat',spkdir,b,p,floor(DATA.Expt.exptno),xs);
         
 function probe = ProbeNumber(DATA)
+% ProbeNumber returns Real Probe number
+% not the index to the current AllV Array.
     if isfield(DATA,'probelist')
         if DATA.probe(1) > length(DATA.probelist)
             probe = DATA.probe(1);
@@ -7469,7 +7493,7 @@ elseif strmatch(fcn,{'retrigger'})
     args = RetriggerDialog(a,b,'popup');
     fprintf('Retriggering\n');
     if ~isempty(args)
-        AllVPcs(DATA.toplevel,'tchan',DATA.probe, args{:});
+        AllVPcs(DATA.toplevel,'tchan',ProbeNumber(DATA), args{:});
     end
 elseif strmatch(fcn,{'showfullv' 'includeprepost'})
     DATA.plotspk.(fcn) = ~DATA.plotspk.(fcn);
@@ -7683,7 +7707,7 @@ function ProbeSelector(DATA)
            it = uicontrol(X,'style','radiobutton','string',num2str(j),'UserData', j,...
                'units','norm','position',[x, y, w, h]);
            [a, b] = isacell(DATA, DATA.exptno, j);
-           if b
+           if a
                set(it,'foregroundcolor','y');
            elseif C(j) > 0 %Cells one other expts, this probe
                set(it,'foregroundcolor','c');
@@ -7696,8 +7720,17 @@ function ProbeSelector(DATA)
            else
                set(it,'foregroundcolor',fc);
            end
-           set(it,'uicontextmenu',cmenu);
+           set(it,'uicontextmenu',cmenu,'backgroundcolor',bc);
        end
+       pos = get(it,'position');
+       bp(1) = pos(1)+pos(3);
+       bp(2) = pos(2);
+       bp(4) = pos(4);
+       bp(3) = 1-bp(1);
+       it = uicontrol(X,'style','text','string','Rclick for colorscheme','units','norm','position',bp,...
+           'foregroundcolor',fc,'backgroundcolor',bc);
+       
+       set(it,'uicontextmenu',cmenu);
        set(X,'uicontextmenu',cmenu);
        set(gcf,'uicontextmenu',cmenu);
    else
@@ -7746,7 +7779,7 @@ elseif ismember(fcn,[1 2 3])
     set(DATA.toplevel,'UserData',DATA);
 elseif fcn == 4
     DATA.dvdt = ~DATA.dvdt;
-    set(a,'Checked',onoff{DATA.plotdvdt+1});
+    set(a,'Checked',onoff{DATA.dvdt+1});
 end
     
     
@@ -7845,7 +7878,7 @@ PlotCellIm(DATA.CellList, DATA.CellDetails, DATA.nclusters,DATA.Comments);
 if isfield(DATA,'tagged')
 PlotCellIm('mark',DATA.tagged,'y');
 end
-if isfields(DATA.Comments, 'ec')
+if isfield(DATA.Comments, 'ec')
     PlotCellIm('marklist',[ [DATA.Comments.ex]; [DATA.Comments.p];],'g');
 end
 text(ProbeNumber(DATA),0,sprintf('P%d',ProbeNumber(DATA)),'color','r','fontsize',DATA.gui.fontsize(1));
@@ -8022,7 +8055,7 @@ function DATA = AddAxisContextMenu(DATA, ax)
         else
             ccell = 0;
         end
-        for k = 1:20
+        for k = 1:30
             c = uimenu(cmenu,'label',sprintf('Cell %d',k),'Callback',{@SetCellFromLine, j-1,  k});
             if k == 1
                 set(c,'separator','on');
@@ -8125,6 +8158,7 @@ function SetPlot(a,b, fcn)
         DATA.plottype = 11;
     end
     ReplotPCs(DATA,[]);
+    SetFigure(DATA.tag.tmplscore, DATA);
     set(DATA.toplevel,'UserData',DATA);
     
 function PCCluster(a,b, fcn)
@@ -8475,7 +8509,13 @@ elseif fcn == 19  %make Automatic cut
     DATA.cboundary = E;
     PlotHistogram(DATA,E);
 elseif fcn == 20
-    DATA.plottype = 8;
+    if DATA.plottype ~= 8
+        DATA.plottype = 8;
+        set(a,'checked','on');
+    else
+        DATA.plottype = 1;
+        set(a,'checked','off');
+    end
     set(DATA.toplevel,'UserData',DATA);
     DATA = ReplotPCs(DATA,[]);
     return;
@@ -9516,7 +9556,7 @@ if isnew
         uimenu(hm,'Label','StdTemplate','Callback',{@PCCluster, 32});
         uimenu(hm,'Label','PC &Line','Callback',{@PCCluster, 'Ellipse0'},'accelerator','L');
         sm = uimenu(hm,'Label','E&xtras','Tag','ClusterMenu');
-        uimenu(sm,'Label','&Flip Sign','Callback',{@PCCluster, 'flipsign'});
+        uimenu(sm,'Label','&Flip Line Criterion','Callback',{@PCCluster, 'flipsign'});
         uimenu(sm,'Label','PC &Line2','Callback',{@PCCluster, 11});
         uimenu(sm,'Label','&Optimize Cluster','Callback',{@PCCluster, 18});
         uimenu(sm,'Label','&Iterate Fit','Callback',{@PCCluster, 'iteratefit'});
@@ -9545,7 +9585,7 @@ if isnew
         uimenu(sm,'Label','Recalc without cell','Callback',{@PCCluster, 33});
         uimenu(sm,'Label','csd','Callback',{@SetOption},'tag','csd');
         uimenu(sm,'Label','dvdy','Callback',{@SetOption},'tag','dvdy');
-        uimenu(sm,'Label','dvdy','Callback',{@SetOption},'tag','dvdt');
+        uimenu(sm,'Label','dvdt','Callback',{@SetOption},'tag','dvdt');
         
         sm = uimenu(hm,'Label','&Plot','Tag','ClusterMenu');
         uimenu(sm,'Label','&PCS','Callback',{@PCCluster, 9});
@@ -9761,12 +9801,20 @@ if isnew
         uimenu(sm,'Label','Show Full V','Tag','FullVToggle','Callback',{@OptionMenu, 'showfullv'});
         uimenu(sm,'Label','Include Pre/Post period','Tag','PrePostToggle','Callback',{@OptionMenu, 'includeprepost'});
         hm= uimenu(sm,'Label','Define ADC sample','Tag','ADCSetButton');
-        uimenu(hm,'Label','#1 (All probes)','Tag','ADCSetButton1' , 'Callback', {@SetADC ,[1 5]});
-        uimenu(hm,'Label','#2 (Main probe)','Tag','ADCSetButton2', 'Callback', {@SetADC ,[2]});
-        uimenu(hm,'Label','#1 (Other probes)','Tag','ADCSetButton3', 'Callback', {@SetADC ,3});
-        uimenu(hm,'Label','#2 (Other probes)','Tag','ADCSetButton3', 'Callback', {@SetADC ,3});
-        uimenu(hm,'Label','#3 (Main probe)','Tag','ADCSetButton1' , 'Callback', {@SetADC ,4});
-        uimenu(hm,'Label','#4 (Main probe)','Tag','ADCSetButton2', 'Callback', {@SetADC ,5});
+        if length(DATA.chspk) == 1
+            uimenu(hm,'Label','#1 (All probes)','Tag','ADCSetButton1' , 'Callback', {@SetADC ,[1]});
+            uimenu(hm,'Label','#2 (Main probe)','Tag','ADCSetButton2', 'Callback', {@SetADC ,[2]});
+            uimenu(hm,'Label','#3','Tag','ADCSetButton3', 'Callback', {@SetADC ,3});
+            uimenu(hm,'Label','#4','Tag','ADCSetButton1' , 'Callback', {@SetADC ,4});
+            uimenu(hm,'Label','#5','Tag','ADCSetButton2', 'Callback', {@SetADC ,5});
+        else
+            uimenu(hm,'Label','#1 (All probes)','Tag','ADCSetButton1' , 'Callback', {@SetADC ,[1 5]});
+            uimenu(hm,'Label','#2 (Main probe)','Tag','ADCSetButton2', 'Callback', {@SetADC ,[2]});
+            uimenu(hm,'Label','#1 (Other probes)','Tag','ADCSetButton3', 'Callback', {@SetADC ,3});
+            uimenu(hm,'Label','#2 (Other probes)','Tag','ADCSetButton3', 'Callback', {@SetADC ,3});
+            uimenu(hm,'Label','#3 (Main probe)','Tag','ADCSetButton1' , 'Callback', {@SetADC ,4});
+            uimenu(hm,'Label','#4 (Main probe)','Tag','ADCSetButton2', 'Callback', {@SetADC ,5});
+        end
         uimenu(sm,'Label','Select Probes Plotted','Callback',{@OptionMenu, 'plottedprobes'});
         uimenu(sm,'Label','Keep','Tag','KeepButton','Callback',{@OptionMenu, 'keepspikes'});
         uimenu(sm,'Label','Keep Means','Tag','KeepMeans','Callback',{@OptionMenu, 'keepmeanspikes'});
@@ -9786,11 +9834,13 @@ if isnew
         end
 %        uicontrol(F,'style','pop','string','1|2|3','Units','Normalized','Position',bp,'Tag','ChooseTrial',...
 %            'Callback', @SelectTrial);
-    elseif strcmp(lb,'TemplateScores')
-        DATA.parentfigtag = toptag;
-        set(F,'UserData',DATA);
+    elseif strcmp(lb,DATA.tag.tmplscore)
+        setappdata(F,'ParentFigure',DATA.toplevel);
         hm = uimenu(F,'Label','Scroll','Tag','Classify');
         uimenu(hm,'Label','Line','Callback',{@PCCluster, 6});
+        uimenu(hm, 'label','Density','Callback',{@XYplot, 'density'});
+        AddParameterMenu(F,@XYplot, 'X');
+        AddParameterMenu(F,@XYplot, 'Y');
     elseif strcmp(lb,DATA.tag.meanspike)
         hm = uimenu(F,'Label','&Options','Tag','MeanSpikeMenu');
         uimenu(hm, 'label','Image + Line plot','CallBack', {@PlotMenu, 'meanmenu' 'image+lines'});
@@ -9800,7 +9850,7 @@ if isnew
         for j = 1:DATA.allnprobes
             uimenu(sm, 'label',num2str(j),'CallBack', {@CompareMean, j});
         end
-        set(F,'UserData',PCDATA.toplevel);
+        set(F,'UserData',DATA.toplevel);
     elseif strcmp(lb,DATA.tag.xcorr)
         hm = uimenu(F,'Label','&Plot');
         uimenu(hm, 'label','Shape/Efficacy','CallBack', {@ReplotXcorrs, 'Shape/efficacy'});
@@ -9811,18 +9861,113 @@ if isnew
         uimenu(hm, 'label','&Histograms','CallBack', {@ReplotXcorrs, 'histograms'});
     elseif strcmp(lb,DATA.tag.allxy)
         hm = uimenu(F,'Label','Keep', 'callback', @KeepFigure);
-        set(F,'UserData',PCDATA.toplevel);        
+        set(F,'UserData',DATA.toplevel);        
     elseif strcmp(lb,DATA.tag.spikes)
         hm = uimenu(F,'Label','Keep', 'callback', @KeepFigure);
-        set(F,'UserData',PCDATA.toplevel);        
+        set(F,'UserData',DATA.toplevel);        
     elseif isfield(PCDATA,'toplevel');
-        set(F,'UserData',PCDATA.toplevel);
+        setappdata(F,'ParentFigure',PCDATA.toplevel);
     end
     if ~isempty(PCDATA)
         SetFigPos(PCDATA,lb);
     end
 end
 
+function XYplot(a,b,tag,fcn)
+    DATA = GetDataFromFig(a);
+onoff = {'off' 'on'};    
+    if strcmp(tag,'density')
+        DATA.xyplot.density = ~DATA.xyplot.density;
+        set(a,'Checked',onoff{1+DATA.xyplot.density});
+        set(DATA.toplevel,'UserData',DATA);
+        PlotOneXY(DATA,DATA.xyplot.xy);
+        return;
+    end
+    xydim = find(strcmp(tag,{'X' 'Y'}));
+    tid = find(strmatch(fcn,DATA.TemplateLabels));
+    DATA.xyplot.xy{xydim} = fcn;
+    PlotOneXY(DATA,DATA.xyplot.xy);
+    set(DATA.toplevel,'UserData',DATA);
+    
+function x = GetValues(DATA, name)
+    x = [];
+    tid = find(strcmp(name,DATA.TemplateLabels));
+    if isempty(tid)
+        if sum(strncmp(name,{'ADC', 'Cen'},3))
+            AllV = GetAllV(DATA);
+        end
+        if strncmp(name,'PC',2)
+           pc = sscanf(name,'PC%d');
+           x = DATA.pcs(:,pc);
+        elseif strncmp(name,'ADC',3)
+            if strfind(name,'dvdt')
+                AllV = diff(AllV,[],2);
+            end
+            if strncmp(name,'ADC1',4)
+                x = squeeze(AllV(DATA.vpts(1,1),DATA.vpts(1,2),:));
+            elseif strncmp(name,'ADC2',4)
+                x =squeeze(AllV(DATA.vpts(1,3),DATA.vpts(1,4),:));
+            end
+        elseif strcmp(name,'energy')
+            x = DATA.energy';
+        elseif strcmp(name,'spkvar')
+            x = DATA.spkvar';
+        elseif strcmp(name,'CentroidSplit')
+%Area under poisitive region post spike
+            t = find(DATA.spts ==0);
+            C = squeeze(AllV(DATA.probe(1),t:end,:));
+            C(C < 0) = 0;
+            x = sum(C.^2)';
+        elseif strcmp(name,'CentroidSplit')
+%centroid of positiv points only            
+            C = squeeze(AllV(DATA.probe(1),:,:));
+            C(C < 0) = 0;
+            x = C' * DATA.spts'./sum(C)';
+        elseif strcmp(name,'Centroid')
+            C = squeeze(AllV(DATA.probe(1),:,:)).^2;
+            x = C'.^2 * DATA.spts'./sum(C.^2)';
+        end
+    else
+        x = DATA.TemplateScores(:,tid(1));
+    end
+        
+    
+function PlotOneXY(DATA,names) 
+    if length(names) < 2
+        return;
+    end
+    x = GetValues(DATA,names{1});
+    y = GetValues(DATA,names{2});
+    if DATA.xyplot.density
+        args = {'density'};
+    else
+        args = {};
+    end
+    if length(x) == length(y)
+        GetFigure(DATA.tag.tmplscore);
+        PlotND([x y],[],'idlist',DATA.clst,'colors',DATA.colors,args{:});
+    else
+        cprintf('red','length mismatch %d vs %d\n',length(x),length(y));
+    end
+    xlabel(names{1});
+    ylabel(names{2});
+    
+function AddParameterMenu(F, callback, tag)
+    DATA = GetDataFromFig(F);
+    hm = uimenu(F,'label',tag);
+    for j = 1:8
+        s = sprintf('PC%d',j);
+        uimenu(hm,'Label',s,'callback',{callback, tag, s});
+    end
+    for j = 1:length(DATA.TemplateLabels)
+        s = DATA.TemplateLabels{j};
+        uimenu(hm,'Label',s,'callback',{callback, tag, s});
+    end
+    strs = {'energy' 'spkvar' 'ADC1' 'ADC2' 'ADC1dvdt' 'ADC2dvdt' 'Centroid' 'CentroidSplit'};
+    for j = 1:length(strs)
+        uimenu(hm,'Label',strs{j},'callback',{callback, tag, strs{j}});
+    end
+        
 function CompareMean(a,b, p)
     DATA = getDataFromFig(a);
     DATA.plot.comparemean = p;
@@ -9861,7 +10006,11 @@ function DATA = LoadCellFile(DATA)
     
 function [true, cellid] = isacell(DATA, ei, p)
 % [true, cellid] = isacell(DATA, ei, p)
-% true is any clusters on this expt(ei_ and probe(p) is in the cell list
+% true if any clusters on this expt(ei) and probe(p) is in the cell list
+    if nargin == 1
+        ei = DATA.exptno;
+        p = ProbeNumber(DATA);
+    end
     cellid = 0;
     if ~isfield(DATA,'CellList') || ei > size(DATA.CellList,1)
         true = 0;
@@ -9898,7 +10047,7 @@ function AddCellMenu(DATA)
     pchars = ['1':'9' '0' 'a':'z'];
     for j = cellids
         if j < 10
-            uimenu(sm,'Label',['&' num2str(j)] ,'Callback',{@ChangeCell, j});
+            h = uimenu(sm,'Label',['&' num2str(j)] ,'Callback',{@ChangeCell, j});
         elseif j <= length(pchars)
             uimenu(sm,'Label',[num2str(j) ' (&'  pchars(j) ')'] ,'Callback',{@ChangeCell, j});
         else
@@ -9939,6 +10088,17 @@ if length(DATA.chspk > 2)
 else
     c = a+1;
 end
+
+if length(DATA.chspk) == 1 %only one probe
+    vpts = [a vsmps(1) a vsmps(2); ...
+            a vsmps(1) a vsmps(3); ...
+            a vsmps(1) a vsmps(4); ...
+            a vsmps(1) 1 vsmps(5); ...
+            a vsmps(2) a vsmps(3); ...
+            a vsmps(2) c vsmps(4); ...
+            a vsmps(2) a vsmps(5); ...
+            a vsmps(3) b vsmps(4)];
+else
     vpts = [a vsmps(1) a vsmps(2); ...
             a vsmps(1) a vsmps(3); ...
             a vsmps(1) a vsmps(4); ...
@@ -9947,7 +10107,7 @@ end
             a vsmps(1) c vsmps(5); ...
             a vsmps(4) a vsmps(5); ...
             a vsmps(1) b vsmps(3)];
-        
+end        
 id = find(vpts(:,1) < 1);
 vpts(id,1) = 1;
 id = find(vpts(:,1) > np);
@@ -9971,6 +10131,7 @@ function SetADC(a,b,fcn)
     if fcn == 10
         DATA.vsmps(DATA.setadcpos) = DATA.adcmousept.x;
         DATA.vpts = SetVsamples(DATA,DATA.probe, DATA.npallv, DATA.nvpts);
+        DATA.dvpts = DATA.vpts;
         set(gcf,'ButtonDownFcn',{@ShowADCPos, 0});
         set(gca,'ButtonDownFcn',{@ShowADCPos, 0});
         set(gcf,'WindowButtonMotionFcn',{@ShowADCPos, 0});
@@ -10336,7 +10497,7 @@ function PlotGridSpikes(DATA, nspk, varargin)
             yl = get(gca,'ylim');
         end
         if isacell(DATA, DATA.exptno, j)
-            c = MarkAxes(gca, 2);
+            c = MarkAxes(gca, 100);
         elseif isfield(Clusters{j},'marked')
             c = MarkAxes(gca, Clusters{j}.marked);
             if Clusters{j}.marked == 0 && isfield(Clusters{j},'recluster')
@@ -10941,8 +11102,10 @@ function PlotAllProbes(DATA,type, varargin)
         h = AddCellLabel(DATA, DATA.exptno,j);
         set(h,'ButtonDownFcn',{@SummaryHit, j});
         set(gca,'linewidth',linewidth);
-        if isfield(Clusters{j},'marked')
-        c = MarkAxes(gca, Clusters{j}.marked);
+        if isacell(DATA, DATA.exptno, j)
+            c = MarkAxes(gca, 100);
+        elseif isfield(Clusters{j},'marked')
+            c = MarkAxes(gca, Clusters{j}.marked);
         else
             c = 'b';
         end
@@ -10952,9 +11115,12 @@ function PlotAllProbes(DATA,type, varargin)
     
 function c = MarkAxes(ax, mark)
     c = 'k';
-    if mark == 2 %good
+    if mark == 100 %cell
         set(gca,'Xcolor','r','Ycolor','r','linewidth',2);
         c = 'r';
+    elseif mark == 2 %good
+        set(gca,'Xcolor','m','Ycolor','m','linewidth',2);
+        c = 'm';
     elseif mark == 3 %bad
         set(gca,'Xcolor','g','Ycolor','g','linewidth',2);
         c = 'g';
@@ -11504,6 +11670,7 @@ function r = CalcRadius(E,xy)
 function PlotVals(DATA, a,b, type, id, colors, varargin)
 ptsz = 1;
 fixrange  = 0;
+xstr = [];
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'fixrange',5)
@@ -11545,6 +11712,10 @@ if type == 0
         end        
     else
         AllV = GetAllV(DATA);
+        if DATA.plottype == 8
+            AllV = diff(AllV,[],2);
+            xstr = '(dvdt)';
+        end
         for j = 1:length(ids)
         plot(squeeze(AllV(a(1),a(2),ids{j})),squeeze(AllV(b(1),b(2),ids{j})),'.','markersize',ptsz(1),'color',colors{j});
         hold on;
@@ -11558,9 +11729,12 @@ if type == 0
         set(gca,'xlim',xl);
         set(gca,'ylim',yl);
     end
-    title(sprintf('%d:%d vs %d:%d',a(1),a(2),b(1),b(2)),'position',[mean(xl) yl(2)],'VerticalAlignment','Top');
+    title(sprintf('%d:%d vs %d:%d%s',a(1),a(2),b(1),b(2),xstr),'position',[mean(xl) yl(2)],'VerticalAlignment','Top');
 else
     AllV = GetAllV(DATA);
+        if DATA.plottype == 8
+            AllV = diff(AllV,[],2);
+        end
     DensityPlot(AllV(a(1),a(2),:),AllV(b(1),b(2),:),'sd',[2 2],'ynormal');
 end
 
@@ -12084,6 +12258,9 @@ function [cl, cluster, xy] = ClassifySpikes(DATA, E, varargin)
             quickmode.quick = 1;
         elseif strncmpi(varargin{j},'recluster',4) %Not chnaging
             recluster = 1;
+            if isfield(E,'sign')
+                forcesign = E.sign;
+            end
         elseif strncmpi(varargin{j},'sign',4)
             j = j+1;
             forcesign = varargin{j};
@@ -12904,12 +13081,20 @@ else
     T = MeanSpike;
 end
 
+npts = size(T,2);
 if isfield(MeanSpike,'othermeans')  && sum(size(MeanSpike.othermeans{1}) == size(MeanSpike.ms)) > 1
     oT = MeanSpike.othermeans;
 else
     oT{1} =T;    
 end
-
+for j = 1:length(oT)
+    sz = size(oT{j});
+    if npts > sz(2)
+        oT{j}(:,sz(2):npts) = 0;
+    elseif npts > sz(2)
+        oT{j} = oT{j}(:,1:npts);
+    end
+end
     if DATA.chspk(end) == DATA.allnprobes
     else
         dspk = [DATA.chspk DATA.chspk(end) + 1];
@@ -13049,8 +13234,8 @@ function Labels = TemplateLabels(DATA, usestd)
         Labels{4} = sprintf('std2');
         Labels{6} = sprintf('%d:dp',ispk);
         Labels{5} = sprintf('%dr-otherr',ispk);
-        Labels{7} = sprintf('%d:dp',chspk(1));
-        Labels{3} = sprintf('Std1',chspk(1));
+        Labels{7} = sprintf('dp');
+        Labels{3} = sprintf('mu:dvdt');
         Labels{10} = sprintf('dp wieghted');
         Labels{11} = sprintf('trigger');
         Labels{12} = sprintf('dvdt Std1',ispk);
@@ -13238,6 +13423,9 @@ function [out, TemplateUsed, DprimeUsed] = TemplatePlot(DATA, varargin)
         TemplateUsed = DATA.StdTemplate;
         DprimeUsed = [];
     else
+%TemplateScores(p,1) is meanspike
+%TemplateScores(p,2) is mu
+%TemplateScores(p,3) is sprimt weighted
         for k = length(DATA.chspk):-1:1
             j = DATA.chspk(k);
             meanV = repmat(mean(AllV(j,:,:),2),[1  size(AllV,2) 1]);
@@ -13328,9 +13516,11 @@ function [out, TemplateUsed, DprimeUsed] = TemplatePlot(DATA, varargin)
                 vpts = 1:size(AllV,2);
             end
             meanV = repmat(mean(AllV(DATA.chspk,:,:),2),[1  size(AllV,2) 1]); %mean for each spike
-            TemplateScores(1,7,:) = DATA.StdTemplate(1,vpts) * squeeze(AllV(DATA.chspk,vpts,:) - meanV);
+            TemplateScores(1,7,:) = squeeze(diff(mu(j,:),1,2)) * squeeze(diff(AllV(j,:,:),1,2)); %mu dvdt
+%            TemplateScores(1,7,:) = DATA.StdTemplate(1,vpts) * squeeze(AllV(DATA.chspk,vpts,:) - meanV);
             TemplateScores(1,8,:) = DATA.StdTemplate(2,vpts) * squeeze(AllV(DATA.chspk,vpts,:) - meanV);
             TemplateScores(1,12,:) = squeeze(diff(DATA.StdTemplate(1,vpts),1,2)) * squeeze(diff(AllV(j,vpts,:),1,2));
+%13-18 also free            
         end
     end
     DATA.DprimeUsed = DprimeUsed;
@@ -13408,7 +13598,7 @@ function [out, TemplateUsed, DprimeUsed] = TemplatePlot(DATA, varargin)
         TMPL.pcs(:,4) = TemplateScores(ispk,8,:); %std 2
         TMPL.pcs(:,6) = TemplateScores(ispk,3,:); %dprime weighted
         TMPL.pcs(:,7) = TemplateScores(1,3,:); %dprime weighted
-        TMPL.pcs(:,3) = TemplateScores(1,7,:);
+        TMPL.pcs(:,3) = TemplateScores(1,7,:); %mu dvdt
         TMPL.pcs(:,4) = TemplateScores(1,19,:); %dvdt for other cluster
         TMPL.pcs(:,10) = TemplateScores(1,3,:); %dprime
         TMPL.pcs(:,11) =DATA.rV;
@@ -13621,13 +13811,15 @@ elseif DATA.plottype == 12 %Try new scores
     pcs(:,3) = squeeze(AllV(p,tpt-6,:))-tvals;
     if p < size(AllV,1)
         pcs(:,4) = squeeze(AllV(p+1,tpt,:));
-    else
+    elseif p > 1
         pcs(:,4) = squeeze(AllV(p-1,tpt+8,:));
     end
-    if p > 0
+    if p > 1
         pcs(:,5) = squeeze(AllV(p-1,tpt,:));
-    else
+    elseif p< size(AllV,1)
         pcs(:,5) = squeeze(AllV(p+1,tpt+8,:));
+    else
+        pcs(:,5) = squeeze(AllV(p,tpt+8,:));
     end
     plots = DATA.pcplots;
 elseif DATA.plottype == 11 %show spaces needed for all cells

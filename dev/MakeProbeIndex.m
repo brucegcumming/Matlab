@@ -203,7 +203,12 @@ for m = 1:length(ids)
     if length(sid) & ~ismember(filesuff(idlist(m)),oldsuff) & ismember(filesuff(idlist(m)),dosuffs);
         fname = [dname '/' d(j).name];
         tl = now;
+        timefix = 0;
         a = load(fname);
+        if isfield(a,'timefix')
+            timefix = a.timefix;
+            cprintf('blue','Adjusting times in %s by %.2f\n',fname,timefix);
+        end
         ltimes(m) = mytoc(tl);
         f = fields(a);
         filenames{j} = fname;
@@ -213,8 +218,8 @@ for m = 1:length(ids)
             nc = nc+1;
             probe = sscanf(C.title,'Spike %d');
             probes(nc).probe = probe;
-            probes(nc).start = a.(f{k}).start;
-            probes(nc).end = C.start+C.length .* C.interval;
+            probes(nc).start = a.(f{k}).start+timefix;
+            probes(nc).end = timefix+C.start+C.length .* C.interval;
             probes(nc).var = f{k};
             probes(nc).file = d(j).name;
             probes(nc).fileid = sscanf(d(j).name(sid+6:end),'%d');

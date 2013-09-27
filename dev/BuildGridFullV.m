@@ -191,7 +191,7 @@ vid  = [];
                 FullV.HLratio = ratio;
                 FullV.coilnoiseratio = details.coilratio;
             end
-            FullV.V = int16(roune(FullV.V * xscale));
+            FullV.V = int16(round(FullV.V * xscale));
             FullV.savetime = now;
             result.buildtime(p) = FullV.savetime;
             t = mygetCurrentTask();

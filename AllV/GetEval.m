@@ -35,6 +35,26 @@ stimtypes = {'none' 'gabor' 'rds' 'grating' 'bar' 'circle' 'rect' 'square' 'prob
 if strcmp(type,'probesep')
     [tf, tflist] = ReadPenSep(Expt.Header);
     return;
+elseif strcmpi(type,'probe')
+    if isfield(Expt.Header,'probe')
+       tf = Expt.Header.probe;
+       tflist = Expt.Header.probe;
+    else
+        tf = GetProbeFromName(GetEval(Expt,'name'));
+    end
+    return;
+elseif strcmpi(type,'name')
+    if isfield(Expt.Header,'expname')
+        tflist = Expt.Header.expname;
+    else
+        tflist = '';
+    end
+    if isfield(Expt.Header,'loadname')
+        tf = Expt.Header.loadname;
+    elseif isfield(Expt.Header,'name')
+        tf = Expt.Header.loadname;
+    end
+    return;
 end
 
 if(isfield(Expt.Trials,type))
@@ -131,4 +151,4 @@ if isnan(d)
 end
 
 
-dlist(1) = d;
+dlist(1) = d(1);

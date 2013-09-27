@@ -1363,6 +1363,10 @@ ExptStart = Events.times(exstartid);
 exendid = exendid(exendid > exstartid(1));
 ExptEnd = Events.times(exendid);
 ExptCode = Events.codes(exendid,1);
+if isempty(ExptEnd)
+    ExptEnd = Events.times(end);
+    ExptCode = 2; %Crahsed out files treated as good
+end
 ExptStart(length(exstartid)+1) = ExptEnd(end) +1;
 
 for j = 1:length(exstartid)

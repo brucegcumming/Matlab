@@ -250,9 +250,7 @@ elseif strncmpi(name,'checkspikes',7)
     varargout{1} = res;
 
 elseif strncmpi(name,'checkclusters',7)
-    CheckClusters(DATA,'exclusions');
-    CheckClusters(DATA,'nclusters');
-    CheckClusters(DATA,'fitspace');
+    GuiMenu(DATA,[],'checkclusters');
 elseif strncmpi(name,'checklist',7)
     CheckExclusion(DATA);
 elseif strncmpi(name,'convertlist',7)
@@ -479,7 +477,8 @@ function DATA = SetDefaults(DATA)
     DATA.proberange = [];
     DATA.selectprobe = []; % not zero, else won't make it a matrix later
     DATA.currentcell = 1;
-    DATA.currentcluster = 1;  %cluster for cutting
+    DATA.currentcluster = 1;  %cluster to display
+    DATA.currentcutcluster = 1;  %cluster for cutting
     DATA.currentcellcluster = 1; %cluster of currently setelcted cell
 DATA.usesavedcodes = 0;
 DATA.useautoclusters = 0;
@@ -606,6 +605,8 @@ DATA.markcell.quick = 0; %show incomplet quantifications
 DATA.markcell.grid = 1; %show grid lines
 DATA.markcell.tagged = 0; %cells with manual tags added
 DATA.markcell.expnames = 0; %show names on cell plot
+DATA.markcell.goodmu=0;
+DATA.markcell.goodcell=0;
 DATA.allvpcsmode = 'fromspikes';
 
 
@@ -616,6 +617,10 @@ function TagMenu(a, b, fcn)
     set(DATA.toplevel,'UserData',DATA);
     if strcmp(fcn,'comment')
         PlotComments(DATA.datadir,'parent',DATA.toplevel);
+    return;
+    end
+    if strcmp(fcn,'flipline')
+        FlipLineCrit(DATA);
     return;
     end
     if sum(strcmp(fcn,{'poor isolation' 'dropping spikes' 'poor stability'}))
@@ -680,6 +685,12 @@ function GuiMenu(a,b, type)
         DATA.mahalcrit = str2num(get(a,'string'));
     elseif strcmp(type,'CallAllVPcs')
         CallAllVPcs(DATA, (DATA.currentpoint(1)),DATA.currentpoint(2));
+    elseif strcmp(type,'checkclusters')
+        CheckClusters(DATA,'exclusions');
+        CheckClusters(DATA,'nclusters');
+        CheckClusters(DATA,'fitspace');
+        CheckClusters(DATA,'fittimes');
+        DATA = CheckClusterLineSign(DATA);
     end
     set(DATA.toplevel,'UserData',DATA);
     
@@ -716,11 +727,16 @@ function SetGUI(DATA)
 function [C, ok] = GetClusterInfo(C, cl)
         ok = 1;
   if cl > 1 
-      if length(C.next) > cl-1 && isfield(C.next{cl-1},'mahal')
+      if ~isfield(C,'next')
+          ok = 0;
+      elseif length(C.next) > cl-1 && isfield(C.next{cl-1},'mahal')
           C = C.next{cl-1};
       elseif cl >= length(C.next)-1 || ~isfield(C.next{cl-1},'mahal')
           ok = 0;
       end
+  end
+  if ~isfield(C,'mahal')
+      ok = 0;
   end
   
 function DATA = CalcDistances(DATA)
@@ -788,8 +804,9 @@ function PrintComments(DATA,e,p)
         return;
     end
     
+    exid = sum(ismember(cat(1,DATA.Comments.ex),e),2)';
     for j = 1:length(p)
-        id = find([DATA.Comments.ex] == e & [DATA.Comments.p] == p(j));
+        id = find(exid > 0 & [DATA.Comments.p] == p(j));
         for k = 1:length(id)
             fprintf('E%.0f P%d %s\n',DATA.Comments(id(k)).exptno,p(j),DATA.Comments(id(k)).comment);
         end
@@ -1263,6 +1280,7 @@ gaps(1) = Expts{exid(1)}.Header.timeoffset;
         X.timeadjust = cumsum(gaps);
     end
     X.currentexpt = exid(1);
+    np = size(DATA.CellList,2); %this is the important np for calc below
     for j = 1:length(cellids)
         aExpts = {};
         [a,b] = find(DATA.CellList == cellids(j));
@@ -2571,7 +2589,7 @@ function plots = PlotClusterXY(DATA, C, varargin)
     e = C.exptid;
     if length(clnum) > 1
         CC = C;
-    elseif clnum > 1 && length(C.next) > clnum-2;
+    elseif clnum > 1 && length(C.next) > clnum-2 && isfield(C.next{clnum-1},'xy');
         CC = C.next{clnum-1};
     else
         CC = C;
@@ -2657,6 +2675,7 @@ function plots = PlotClusterXY(DATA, C, varargin)
         end
         end
     end
+    setappdata(0,'control_is_down',0);
     if isacell(DATA,e,p)
         sz = get(h,'fontsize');
         sz = sz .* 1.4;
@@ -2685,8 +2704,13 @@ function plots = PlotClusterXY(DATA, C, varargin)
                 
         rx = E.xyr(3);
         ry = E.xyr(4);
-        xys = xyrotate(xy(:,1)-E.xyr(1),xy(:,2)-E.xyr(2),E.angle);
-        r = ((xys(:,1))./rx).^2 + ((xys(:,2))./ry).^2;
+        if isfield(E,'aspectratio') & E.aspectratio > 0
+            xys = xyrotate(xy(:,1)-E.xyr(1),(xy(:,2)-E.xyr(2)) ./E.aspectratio,E.angle);
+            r = ((xys(:,1))./rx).^2 + ((xys(:,2))./(ry./E.aspectratio)).^2;
+        else
+            xys = xyrotate(xy(:,1)-E.xyr(1),xy(:,2)-E.xyr(2),E.angle);
+            r = ((xys(:,1))./rx).^2 + ((xys(:,2))./ry).^2;
+        end
         if nargout > 1
             y = xys(:,2);
         end
@@ -2844,8 +2868,11 @@ function  DATA = ConditionalPlotXY(DATA, C, force)
     hold off;
     PlotClusterXY(DATA,C,'cellid',DATA.currentcluster);
     AddCellLabels(DATA, DATA.currentpoint(1), DATA.currentpoint(2),'NW');
-    DATA.NewCut.exptid = 0;
-    DATA.NewCut.probe = 0;
+%If this is a new Expt/Probe, clear newcut
+    if DATA.currentpoint(1) ~= DATA.NewCut.exptid || DATA.currentpoint(2) ~= DATA.NewCut.probe
+        DATA.NewCut.exptid = 0;
+        DATA.NewCut.probe = 0;
+    end
     if DATA.plottrighist
         AddTrigHist(DATA,C,DATA.currentcluster);
     end
@@ -2910,6 +2937,7 @@ if isfield(C,'bestspace')
     bestspace = C.bestspace(2);
 else
     bestspace = NaN;
+    C.bestspace = 0;
 end
 DATA.cellplotmenu = AddContextMenu(DATA,'cellplot');
 DATA = MarkCurrentCluster(DATA);
@@ -3064,9 +3092,10 @@ function result = PlotClusterHistogram(DATA, C, refit, varargin)
     ex = C.exptid;
     p = C.probe;
     if cl > 1 && cl <= length(C.next)+1 && isfield(C.next{cl-1},'xy')
-        clst = C.clst;
+        X = C;
         C = C.next{cl-1};
-        C.clst = clst;
+        C.clst = X.clst;
+        C.exptid = X.exptid;
     end
     if DATA.plot.showgm
     GMfits = getappdata(DATA.toplevel,'GMfits');
@@ -3409,24 +3438,30 @@ elseif bt == 2
     [a,b,cl] = isacell(DATA,ex,p);
     if a
         cid = find(cl == setcl+offset);
-        if isempty(cid) && setcl > cl
-            cid = cl; %if hit on 2 but only 1 is defined as a cell
-            if DATA.nclusters(ex,p) >= setcl
-                cid = setcl;
+        if isempty(cid) && setcl+offset > max(cl)
+            cid = max(cl); %if hit on 2 but only 1 is defined as a cell
+            thiscell = 0;
+            if DATA.nclusters(ex,p) >= setcl+offset
+                cid = setcl+offset;
             end
         else
             cid = cl(cid);
+            thiscell = b(cid);
         end
         if length(b) == 1
             set(c(tid),'Label',sprintf('E%dP%d Cell %d',ex,p,b));
             if length(cid) == 1
                 set(c(tid),'foregroundcolor',DATA.colors{cid+1});
             end
-        elseif length(cid) == 1
-            set(c(tid),'Label',sprintf('E%dP%d Cell %d (%s)',ex,p,b(cid),sprintf('%d ',b(b~=b(cid)))));
+        elseif length(cid) == 1 && cid <= length(b)
+            othercell = setdiff(b,thiscell);
+            set(c(tid),'Label',sprintf('E%dP%d Cell %d (%s)',ex,p,b(cid),sprintf('%d ',othercell)));
             set(c(tid),'foregroundcolor',DATA.colors{cid+1});
         else
             set(c(tid),'Label',sprintf('E%dP%d Cells%s',ex,p,sprintf('%d ',b)));
+            if length(cid) == 1
+                set(c(tid),'foregroundcolor',DATA.colors{cid+1});
+            end
         end
     else
         if setcl+offset > DATA.nclusters(ex,p)
@@ -3467,12 +3502,16 @@ end
 fprintf('Hit %.0f,%.0f %.3f type %d,%d\n',ex,p,zval,type,bt);
 %If not cutting clusters, then set currentcluster to match hit
 %if ht
-if DATA.elmousept.shape < 0 && DATA.nclusters(ex,p) >= setcl
+if DATA.nclusters(ex,p) >= setcl
     DATA.currentcluster = setcl;
 end
 if isempty(Clusters) || DATA.show.cellsummary
     DrawBox(ex, p,3,'color','w');
     PlotCellSummary(DATA, ex, p);
+    return;
+end
+if ~isfield(Clusters{ex}{p},'clst')
+    cprintf('red','No clst For E%dP%d\n',ex,p);
     return;
 end
 if ismember(type, [1 3]) % 3 = hit cell image - set cell#
@@ -3498,12 +3537,16 @@ if ismember(type, [1 3]) % 3 = hit cell image - set cell#
            id = a(a > offset & a <= offset+2);
            if setcl == 2 & length(id) == 2
                id = id(2);
+           elseif isempty(id)
+               id = offset+1;
            else
                id = id(1);
            end
-           DATA.cellcluster = id;
-           
+           DATA.cellcluster = id;         
            DATA.currentcell = DATA.CellList(ex,p,id);
+           if DATA.currentcell == 0
+               DATA.currentcell = lastcell;
+           end
            set(it,'value',DATA.currentcell);
            cit = findobj('Tag','CellCluster');
            set(cit,'value',id+offset);
@@ -3701,7 +3744,7 @@ function [Expt, AllExpt] = PlotSelectedExpts(DATA, varargin)
             nc = size(colormap,1);
             cmap = colormap;
             ci = round(nc * (get(it,'value')-cl(1))./diff(cl));
-            if ci <= nc
+            if ci <= nc & ci > 0
             set(it,'backgroundcolor',cmap(ci,:),'foregroundcolor',1-cmap(ci,:));
             end
         end
@@ -4393,24 +4436,15 @@ function DATA = LoadCellFile(DATA)
         else
             CellChanges = [];
         end
-        if DATA.cellbackup == 0
-        bakfile = strrep(cellfile,'.mat',[dstr '.mat']);
-        try
-        save(bakfile,'CellList','CellDetails','CellChanges');
-        end
-        [a,b] = NetFilename(bakfile);
-        if exist(b,'dir')
-            fprintf('Backing up Cell List to %s\n',a);
+        if DATA.cellbackup == 0 %not backed up, so do this now
+            bakfile = strrep(cellfile,'.mat',[dstr '.mat']);
             try
-                save(a,'CellList','CellDetails','CellChanges');
+                save(bakfile,'CellList','CellDetails','CellChanges');
             catch
-                fprintf('Couldn''t Save %s\n',a);
+                cprintf('red','COuld not back up Cell list to %s\n',bakfile);
             end
-        else
-            fprintf('Can''t Backup CellList to Network\n');
-        end
-        DATA.cellbackup = 1;
-        set(DATA.toplevel,'UserData',DATA);
+            DATA.cellbackup = 1;
+            set(DATA.toplevel,'UserData',DATA);
         end
     elseif isfield(DATA,'exptid')
         DATA.CellList = zeros([length(DATA.exptid) DATA.nprobes 2]);
@@ -4551,6 +4585,8 @@ function [f, isnew] = SetFigure(DATA, tag, varargin)
             uimenu(hm,'Label','&Quick','Callback',{@PlotMenu, 'cells' 'markquick'});
             uimenu(hm,'Label','Old readmethod','Callback',{@PlotMenu, 'cells' 'markreadmethod'});
             uimenu(hm,'Label','Tagged','Callback',{@PlotMenu, 'cells' 'marktagged'});
+            uimenu(hm,'Label','Good Cell','Callback',{@PlotMenu, 'cells' 'markgoodcell'});
+            uimenu(hm,'Label','Good MU','Callback',{@PlotMenu, 'cells' 'markgoodmu'});
             uimenu(hm,'Label','Grid','Callback',{@PlotMenu, 'cells' 'markgrid'});
             uimenu(hm,'Label','Expt &Names','Callback',{@PlotMenu, 'cells' 'markexpnames'});
             sm = uimenu(hm,'Label','&Expts','Tag','ExptMarkMenu');
@@ -4691,18 +4727,24 @@ function [f, isnew] = SetFigure(DATA, tag, varargin)
         elseif strfind(tag,'XYplot');
                 hm = uimenu(f,'Label','&Cluster','Tag','Cluster');
                 uimenu(hm,'Label','&SaveChanges','Callback',{@XYCluster, 'save'});
-                uimenu(hm,'Label','&QuickSave','Callback',{@XYCluster, 'quicksave'});
+                uimenu(hm,'Label','&QuickSave (q)','Callback',{@XYCluster, 'quicksave'});
 %                uimenu(hm,'Label','Cut Ellipses','Callback',{@XYCluster, 'ellipses'});
                 sm = uimenu(hm,'Label','Cut &Ellipse','Tag','EllipseMenu');
                 uimenu(sm,'Label','Cluster &1','foregroundcolor',DATA.colors{2},'Callback',{@XYCluster, 'ellipse1'},'accelerator','1');
                 uimenu(sm,'Label','Cluster &2','foregroundcolor',DATA.colors{3},'Callback',{@XYCluster, 'ellipse2'},'accelerator','2');
                 uimenu(sm,'Label','Cluster &3','foregroundcolor',DATA.colors{4},'Callback',{@XYCluster, 'ellipse3'},'accelerator','3');
                 uimenu(sm,'Label','Cluster &4','foregroundcolor',DATA.colors{5},'Callback',{@XYCluster, 'ellipse4'},'accelerator','4');
+                sm = uimenu(hm,'Label','&View Cluster','Tag','EllipseMenu');
+                uimenu(sm,'Label','Cluster &1','foregroundcolor',DATA.colors{2},'Callback',{@XYCluster, 'select1'});
+                uimenu(sm,'Label','Cluster &2','foregroundcolor',DATA.colors{3},'Callback',{@XYCluster, 'select2'});
+                uimenu(sm,'Label','Cluster &3','foregroundcolor',DATA.colors{4},'Callback',{@XYCluster, 'select3'});
+                uimenu(sm,'Label','Cluster &4','foregroundcolor',DATA.colors{5},'Callback',{@XYCluster, 'select4'});
                 sm = uimenu(hm,'Label','&Delete','Tag','EllipseMenu');
                 uimenu(sm,'Label','Cluster &2','foregroundcolor',DATA.colors{3},'Callback',{@XYCluster, 'clear2'});
                 uimenu(sm,'Label','Cluster &3','foregroundcolor',DATA.colors{4},'Callback',{@XYCluster, 'clear3'});
                 uimenu(sm,'Label','Cluster &4','foregroundcolor',DATA.colors{5},'Callback',{@XYCluster, 'clear4'});
                 uimenu(hm,'Label','Cut &Lines','Callback',{@XYCluster, 'lines'},'accelerator','L');
+                uimenu(hm,'Label','Flip Line Criterion (f)','Callback',{@XYCluster, 'flip'},'accelerator','F');
  %               uimenu(hm,'Label','Ellipse for Cl2','Callback',{@XYCluster, 'ellipse2'});
                 uimenu(hm,'Label','&No Cutting','Callback',{@XYCluster, 'nocut'});
                 uimenu(hm,'label','TwoCluster Space','Callback',{@XYCluster, 'twoplot'});
@@ -5122,6 +5164,8 @@ tag = GetFigureTag(src);
         subtype = strmatch(type,{'bestangle' 'quickangle'});
     if sum(strcmp(type,{'save' 'quicksave'}))
         DATA = SaveCluster(DATA, [e p], strcmp(type,'quicksave'));
+    elseif strcmp(type,'flip')
+        DATA = FlipLineCrit(DATA);
     elseif strcmp(type,'optimize')
         axdata = get(gca,'userdata')
         if isfield(axdata,'eid')
@@ -5190,6 +5234,9 @@ tag = GetFigureTag(src);
         setappdata(DATA.toplevel,'Clusters',EClusters);
         set(DATA.toplevel,'UserData',DATA);
         PlotClusterXY(DATA,EClusters{e}{p});
+    elseif strncmp(type,'select',6)
+        DATA.currentcluster = sscanf(type(7:end),'%d');
+        PlotClusterXY(DATA,C,'cellid',DATA.currentcluster);
     elseif strncmp(type,'ellipse',7) || strcmp(type,'lines')
         F = get(get(src,'parent'),'parent');
         if ~isfigure(F) %if called from submenu, go up one more
@@ -5214,8 +5261,9 @@ tag = GetFigureTag(src);
         end
         DATA.elmousept.color = [1 0 0];
         DATA.currentcluster = DATA.elmousept.cluster;
-        if DATA.currentcluster > 1 && length(C.next) >= DATA.currentcluster-1
-            if ~isfield(C.next{DATA.currentcluster-1},'xy')
+        DATA.currentcutcluster = DATA.elmousept.cluster;
+        if DATA.currentcutcluster > 1 && length(C.next) >= DATA.currentcutcluster-1
+            if ~isfield(C.next{DATA.currentcutcluster-1},'xy')
 %  Count available spaces. NB Counting over C.next, so there is one more in
 %  C
                 for j = 1:length(C.next)
@@ -5228,14 +5276,14 @@ tag = GetFigureTag(src);
                 gid = find(gotxy)+1;
                 switch sum(gotxy)
                     case 1, 
-                        str = questdlg(sprintf('No XY for Cluster %d: Choose Space',DATA.currentcluster),'Select Space','Cluster1',sprintf('Cluster%d',gid(1)),'Cluster1');
+                        str = questdlg(sprintf('No XY for Cluster %d: Choose Space',DATA.currentcutcluster),'Select Space','Cluster1',sprintf('Cluster%d',gid(1)),'Cluster1');
                         usespace = sscanf(str,'Cluster%d')-1;
                     case 2, 
-                        str = questdlg(sprintf('No XY for Cluster %d: Choose Space',DATA.currentcluster),'Select Space','Cluster1',sprintf('Cluster%d',gid(1)),sprintf('Cluster%d',gid(2)),'Cluster1');
+                        str = questdlg(sprintf('No XY for Cluster %d: Choose Space',DATA.currentcutcluster),'Select Space','Cluster1',sprintf('Cluster%d',gid(1)),sprintf('Cluster%d',gid(2)),'Cluster1');
                         usespace = sscanf(str,'Cluster%d')-1;
                     otherwise,
                     usespace = 0;
-                    errordlg(sprintf('No XY for Cluster %d: Using 1',DATA.currentcluster));
+                    errordlg(sprintf('No XY for Cluster %d: Using 1',DATA.currentcutcluster));
                 end
                 figure(F);
                 if usespace == 0
@@ -5243,23 +5291,23 @@ tag = GetFigureTag(src);
                 else
                     XY = C.next{usespace}.xy;
                 end
-                C.next{DATA.currentcluster-1}.xy = XY;
-                C.next{DATA.currentcluster-1}.exptid = C.exptid;
+                C.next{DATA.currentcutcluster-1}.xy = XY;
+                C.next{DATA.currentcutcluster-1}.exptid = C.exptid;
                 DATA.elmousept.xyspace = usespace;
             else
-                XY = C.next{DATA.currentcluster-1}.xy;
+                XY = C.next{DATA.currentcutcluster-1}.xy;
             end
-            if isfield(C.next{DATA.currentcluster-1},'pos');
-                DATA.elmousept.pos = C.next{DATA.currentcluster-1}.pos;
+            if isfield(C.next{DATA.currentcutcluster-1},'pos');
+                DATA.elmousept.pos = C.next{DATA.currentcutcluster-1}.pos;
             else
                 DATA.elmousept.pos = C.pos;
             end
-            if ~isfield(C.next{DATA.currentcluster-1},'xyr')
+            if ~isfield(C.next{DATA.currentcutcluster-1},'xyr')
                 DATA.elmousept.xyr = C.xyr;
                 DATA.elmousept.angle = C.angle;
             else
-                DATA.elmousept.xyr = C.next{DATA.currentcluster-1}.xyr;
-                DATA.elmousept.angle = C.next{DATA.currentcluster-1}.angle;
+                DATA.elmousept.xyr = C.next{DATA.currentcutcluster-1}.xyr;
+                DATA.elmousept.angle = C.next{DATA.currentcutcluster-1}.angle;
             end
         else
             XY = C.xy;
@@ -5273,7 +5321,8 @@ tag = GetFigureTag(src);
             DATA.elmousept.xyr(3) = 0;
         end
         hold off;
-        PlotClusterXY(DATA,C,'cellid',DATA.currentcluster);
+        PlotClusterXY(DATA,C,'cellid',DATA.currentcutcluster);
+        AddCellLabels(DATA, DATA.currentpoint(1), DATA.currentpoint(2),'NW');
         FastAxes(gca);
 %        DATA.elmousept.dragfcn = get(F,'WindowButtonMotionFcn');
         %should get old Fcns, then reset them after button release
@@ -5317,8 +5366,10 @@ function DATA = SaveCluster(DATA, pt, quick, varargin)
     C = EClusters{e}{p};
     ex = C.exptno;
 %if saved == -1, means a cluster was deleted
-    if DATA.NewCut.saved >= 0
-    C = DATA.NewCut;
+    if DATA.NewCut.saved >= 0 && DATA.NewCut.probe > 0
+        C = DATA.NewCut;
+    else
+        mycprintf('red','Saving - but no new cluster\n');
     end
     if rem(ex,1) > 0.001
         xs = 'a';
@@ -5454,6 +5505,12 @@ function DATA = SaveCluster(DATA, pt, quick, varargin)
         xl = get(ax,'Xlim');
         yl = get(ax,'Ylim');
       in = pt(1,1) > xl(1) & pt(1,1) < xl(2) & pt(1,2) > yl(1) & pt(1,2) < yl(2);
+
+function xy = AxPos(ax, pos)
+    xl = get(ax,'Xlim');
+    yl = get(ax,'Ylim');
+    xy(1) = xl(1) + diff(xl) .* pos(1);         
+    xy(2) = yl(1) + diff(yl) .* pos(2);         
     
 function XYButtonPressed(src, data)
     DATA = GetDataFromFig(src);
@@ -5467,10 +5524,22 @@ function XYButtonPressed(src, data)
         set(DATA.toplevel,'UserData',DATA);
         return;
     end
+    if DATA.elmousept.shape < 0
+        return;
+    end
 DATA.ts = now;
 start = get(gca,'CurrentPoint');
 if InGraph(start,gca)
     mode = strmatch(get(gcf,'SelectionType'),{'normal' 'alternate'  'extend'  'open'})
+    if DATA.currentcluster ~= DATA.currentcutcluster
+        Clusters = getappdata(DATA.toplevel,'Clusters');
+        fprintf('Replotting XY for cluster %d\n',DATA.currentcutcluster);        
+        PlotClusterXY(DATA,Clusters{DATA.currentpoint(1)}{DATA.currentpoint(2)},'cellid',DATA.currentcutcluster);
+        AddCellLabels(DATA, DATA.currentpoint(1), DATA.currentpoint(2),'NW');
+        xy = AxPos(gca,[1 1]);
+        text(xy(1),xy(2),sprintf('Reset to cl%d',DATA.currentcutcluster),'HorizontalAlignment','right','verticalalignment','top');
+        DATA.currentcluster = DATA.currentcutcluster;
+    end
     DATA.elmousept.mode = mode;
     distance = DistanceToEllipse(DATA.elmousept,start(1,1:2));
     DATA.elmousept.steps = 0;
@@ -5611,6 +5680,11 @@ figure(src);
 
 
 function C = ClassifySpikes(DATA, E, mode)
+    C = [];
+    if E.shape < 0 && ~strcmp(mode,'flip')
+        cprintf('blue','Can''t Classify Spikes until set cluster\n');
+        return;
+    end
     Clusters = getappdata(DATA.toplevel,'Clusters');
     e = DATA.currentpoint(1);
     p = DATA.currentpoint(2);
@@ -5620,6 +5694,10 @@ function C = ClassifySpikes(DATA, E, mode)
         C = Clusters{e}{p};
     end
     C.exptid = e;
+    if E.shape < 0 || strcmp(mode,'flip') %no mouse input - just flipping
+        E = C;
+        E.mode = 3;
+    end
     C.cluster = E.cluster;
     if E.cluster > 1
         nx = E.cluster-1;
@@ -5717,11 +5795,14 @@ function C = ClassifySpikes(DATA, E, mode)
         E.pos(6) = mean(E.pos([4 2]));
         E.pos(8) = E.pos(6);
 %        C.angle = 0;
-        PlotClusterPoints(C,[],E.cluster,'xydata',C.xy);
-        FinishXYPlot(gca, DATA, C.exptid,C.probe(1));
+        if ~strcmp(mode,'flip')
+            PlotClusterPoints(C,[],E.cluster,'xydata',C.xy);
+            FinishXYPlot(gca, DATA, C.exptid,C.probe(1));
         fprintf('%.2f ',E.pos);
         fprintf('\n');
         DrawEllipse(E);
+        C.pos = E.pos;
+        end
         DATA.elmousept.pos = E.pos;
         if C.space(1) == 6
         end
@@ -5780,7 +5861,7 @@ end
     end
     if DATA.plothist
         SetFigure(DATA, DATA.tag.hist);
-        PlotClusterHistogram(DATA, C, 1,'cluster',DATA.currentcluster);
+        PlotClusterHistogram(DATA, C, 1,'cluster',DATA.currentcutcluster);
     end
     
 function ScrollWheel(src, evnt)
@@ -5805,7 +5886,7 @@ function XYButtonDragged(src, data)
 DATA = GetDataFromFig(src);
 if isfield(DATA,'elmousept') &&  DATA.elmousept.down >0
 %    fprintf('D%d,%d %.2f %.2f\n',DATA.elmousept.down,DATA.elmousept.steps,DATA.elmousept.pos(1),DATA.elmousept.pos(3));
-alt_is_down = getappdata(0,'alt_is_down');
+control_is_down = getappdata(0,'control_is_down');
 cc = get(gcf,'currentcharacter');
  DATA.elmousept.steps = DATA.elmousept.steps +1;
 
@@ -5814,7 +5895,7 @@ cc = get(gcf,'currentcharacter');
     DATA.elmousept.pos(3) = start(1,1);
     DATA.elmousept.pos(4) = start(1,2);
 %    axes(DATA.xyax);
-    if ~alt_is_down %%Alt stops the ellipse from drawing. Speeds things up in and AllXY plot
+    if ~control_is_down %%cntrl stops the ellipse from drawing. Speeds things up in and AllXY plot
         DATA.elmousept.h = DrawEllipse(DATA.elmousept, DATA.elmousept.plotargs{:});
     end
 %    axes(DATA.allxyax);
@@ -6427,6 +6508,7 @@ function DATA = PlotExptsProbe(DATA, type);
     fname  = get(gcf,'Name');
     set(gcf,'name',sprintf('Building Plot E%dP%d...',expts(1),p(1)));
     setappdata(0,'alt_is_down',0);
+    setappdata(0,'control_is_down',0);
     drawnow;
     figure(newf);
     for j = 1:length(expts)
@@ -6911,6 +6993,7 @@ function cmenu = AddContextMenu(DATA, type)
         uimenu(pm,'label','All Spks This Expt','Callback',{@SetCellFromLine, 1,  'allspksexpt'});
         pm = uimenu(cmenu,'label','Other');
         uimenu(pm,'label','Comment','Callback',{@TagMenu, 'comment'});
+        uimenu(pm,'label','Flip Line Crit','Callback',{@TagMenu, 'flipline'});
         cells = unique(DATA.CellList(:));
         cells = cells(cells > 0);
         if max(cells) > 20
@@ -7289,13 +7372,16 @@ function mspid = GetMeanSpikeProbe(C, p)
                
 function plotpos = SetPlotPos(DATA,np, nr, nc)
     if isfield(DATA.ArrayConfig,'X')
-        if length(unique(DATA.ArrayConfig.X)) == nr
-            for j = 1:np
-                plotpos(j) = DATA.ArrayConfig.Y(j) + (DATA.ArrayConfig.X(j)-1).*nr;
-            end
+        nx = length(unique(DATA.ArrayConfig.X));
+        if ismember(nx,[np 1]) %simple linear array
+            plotpos = 1:np;
         else
             if length(unique(DATA.ArrayConfig.X)) == 2 && np == 24
                 plotpos = [1 7 2 8 3 9 4 10 5 11 6 12 13 19 14 20 15 21 16 22 17 23 18 24];
+            else
+                for j = 1:np
+                    plotpos(j) = DATA.ArrayConfig.Y(j) + (DATA.ArrayConfig.X(j)-1).*nr;
+                end
             end
         end
     else
@@ -7319,6 +7405,12 @@ function ReplotXY(a,b,eid, probe,cid)
     if DATA.elmousept.down > 0
         return;
     end
+    if cid ~= DATA.currentcluster
+        newcluster = 1;
+    else
+        newcluster = 0;
+    end
+    DATA.currentcluster = cid;
     Clusters = getappdata(DATA.toplevel,'Clusters');
     fprintf('Replotting E%dP%dC%d\n',eid,probe,cid);
     PlotClusterXY(DATA,Clusters{eid}{probe},'shorttitle','cellid',cid,'tight');
@@ -7326,7 +7418,16 @@ function ReplotXY(a,b,eid, probe,cid)
         AddTrigHist(DATA,Clusters{eid}{probe},DATA.currentcluster);
     end
     set(gca,'Xtick',[],'Ytick',[],'ButtonDownFcn',callback,'UserData',axdata);
-    AddCellLabels(DATA, eid, probe);
+    AddCellLabels(DATA, eid, probe, 'NW');
+    if newcluster
+        set(DATA.toplevel,'UserData',DATA);
+        F = gcf;
+        if DATA.plothist
+            SetFigure(DATA,DATA.tag.hist,'front');
+            PlotClusterHistogram(DATA, Clusters{eid}{probe}, DATA.refitgm,'cluster', DATA.currentcluster);
+            figure(F);
+        end
+    end
     
 function DATA = PlotAllProbeXY(DATA,varargin)
     %plots all probes for one expt
@@ -7623,7 +7724,7 @@ function PlotAllCellXY(DATA)
         mysubplot(nr,nc,j);
         hold off; 
         plots = PlotClusterXY(DATA,Clusters{eid(j)}{cid(j)},'shorttitle','cellid',clid(j),'allxy');
-        if clid(j) ~= 1 
+        if clid(j) ~= 1 && length(plots) > 1
             np = clid(j)+1;
             if length(plots) >= np
                 set(plots(np),'color','r');
@@ -8062,17 +8163,20 @@ for j = 1:size(DATA.CellList,1)
         end
     end
 end
-cmenu = AddContextMenu(DATA,'cellplot');
 
 nc = max(ncls); %max # clusters in any one expt, for each probe
 %so nc has length = to number of probes
 offset = DATA.clusteroffset;
 if plotmahal
-    imagesc(im,'buttondownfcn',{@HitImage, 1});
+    imh = imagesc(im,'buttondownfcn',{@HitImage, 1});
     caxis([0 5]);
 else
     for j = 1:size(DATA.CellList,2)*2
+        if size(DATA.CellList,3) > offset
         CellIm(:,j) = DATA.CellList(:,ceil(j/2),1+offset);
+        else
+            CellIm(:,j) = 0;
+        end
     end
     id = find(nc >1);
     if size(DATA.CellList,3) > offset+1
@@ -8083,10 +8187,30 @@ else
     end
         
 CellIm(CellIm<0) = -1;
-imagesc([0.75 size(DATA.CellList,2)+0.25],[1 size(DATA.CellList,1)],CellIm,'buttondownfcn',{@HitImage, 3},'uicontextmenu',cmenu);
+imh = imagesc([0.75 size(DATA.CellList,2)+0.25],[1 size(DATA.CellList,1)],CellIm,'buttondownfcn',{@HitImage, 3});
 end
 hold on;
+showlines = 2;  %may reactivate one day....
 
+%Get cell colors before making context menu
+if showlines == 2
+    cells = unique(DATA.CellList);
+    cells = cells(cells > 0);
+    cm = colormap(gca);
+    yl = get(gca,'ylim');
+    for j = 1:length(cells)
+        id = find(DATA.CellList == cells(j));
+        [a,y,b] = ind2sub(size(DATA.CellList),id);
+        h = text(mean(y)-1+mean(b)/3,yl(1),sprintf('%d',cells(j)));
+        set(h,'verticalalignment','bottom');
+        cid = round(j .*length(cm)./length(cells));
+        set(h,'color',cm(cid,:));
+        DATA.cellcolors{cells(j)} = cm(cid,:);
+    end
+end
+
+cmenu = AddContextMenu(DATA,'cellplot');
+set(imh,'uicontextmenu',cmenu);
 
 
 if DATA.plot.cellgrid > 0 && DATA.markcell.grid
@@ -8101,7 +8225,6 @@ end
 cells = unique(DATA.CellList(eid,:,1+offset));
 cells = cells(cells > 0);
 
-showlines = 2;  %may reactivate one day....
 
 if showlines == 1
     for j = 1:length(cells)
@@ -8132,19 +8255,6 @@ if showlines == 1
         end
     end
 else
-    cells = unique(DATA.CellList);
-    cells = cells(cells > 0);
-    cm = colormap(gca);
-    yl = get(gca,'ylim');
-    for j = 1:length(cells)
-        id = find(DATA.CellList == cells(j));
-        [a,y,b] = ind2sub(size(DATA.CellList),id);
-        h = text(mean(y)-1+mean(b)/3,yl(1),sprintf('%d',cells(j)));
-        set(h,'verticalalignment','bottom');
-        cid = round(j .*length(cm)./length(cells));
-        set(h,'color',cm(cid,:));
-        DATA.cellcolors{cells(j)} = cm(cid,:);
-    end
 end
 
 
@@ -8173,6 +8283,18 @@ if DATA.markcell.candidates
     end
     end
 end
+if DATA.markcell.goodmu
+    [x,y] = find(DATA.marked ==4);
+    for j = 1:length(x)
+        DrawBox(x(j),y(j),3,'color','g');
+    end
+end
+if DATA.markcell.goodmu
+    [x,y] = find(DATA.marked ==2);
+    for j = 1:length(x)
+        DrawBox(x(j),y(j),3,'color','g');
+    end
+end
 if DATA.markcell.dropi > 0 && isfield(DATA,'dropi')
     DATA.dropi(DATA.dropi == 0) = NaN;
     [x,y] = find(squeeze(DATA.dropi(:,:,1+offset)) < DATA.markcell.dropi & iscellim);
@@ -8199,7 +8321,7 @@ if DATA.markcell.ellipses > 0
         DrawBox(x(j),y(j),3,'color','m');
     end
 end
-if DATA.markcell.tagged > 0
+if DATA.markcell.tagged > 0 && isfield(DATA,'tagged');
     [x,y] = find(DATA.tagged);
     for j = 1:length(x)
         DrawBox(x(j),y(j),3,'color','y');
@@ -8479,6 +8601,7 @@ function DATA = InitInterface(DATA)
     uimenu(hm,'Label','&Load All','Callback',{@LoadAll, 'force'});
     uimenu(hm,'Label','&ReLoad New','Callback',{@LoadAll, 'ifnew'});
     uimenu(hm,'Label','Use Current as &Template','Callback',{@PlotClusters, 'followcorr'});
+    uimenu(hm,'Label','Check Clusters','Callback',{@GuiMenu, 'checkclusters'});
     uimenu(hm,'Label','Reexamine raw &V','Callback',{@GuiMenu, 'CallAllVPcs'},'accelerator','a');
     uimenu(hm,'Label','Load All FullV','Callback',{@LoadFullVs, 'fullv'});
     uimenu(hm,'Label','&Close','Callback',{@PlotClusters, 'close'});
@@ -8772,9 +8895,11 @@ function DATA = LoadAll(a,b, type, varargin)
                     else
                         id = length(DATA.strings)+1;
                     end
-                    eid = sscanf(d(j).name,'Expt%d');
+                    exptno = sscanf(d(j).name,'Expt%d');
+                    eid = find(DATA.exptid == exptno);
+                    
                     fprintf('Loading %s (expt %d)\n',d(j).name, eid);
-                    [C, FullV, details] = LoadCluster(DATA.name, eid,'rawxy','alltimes');
+                    [C, FullV, details] = LoadCluster(DATA.name, exptno,'rawxy','alltimes');
                     ClusterInfo{eid}.loadname = details.loadname;
                     ClusterInfo{eid}.loadtime = details.loadtime;
                     for c = 1:length(C)
@@ -8849,15 +8974,15 @@ function DATA = LoadAll(a,b, type, varargin)
                 if strcmp(type,'ifnew') %Only Change modified Clusters, so hat don't lose bits from AutoClusters
                     details.exptno = Clusters{k}{1}.exptno;
                     if 0 %%dont need this any more
-                    fprintf('Loading %s\n',DATA.strings{k});
-                    [C, details] = LoadClusters([DATA.name '/' DATA.strings{k}]);
-                    for k = 1:length(C)
-%if only cluster 2 has changed, ctime for cluster 1 does not. But savetime does.                        
-                        if isfield(C{k},'xy') & (C{k}.ctime > Clusters{j}{k}.ctime || C{k}.savetime(1) > Clusters{j}{k}.savetime(1)) 
-                            Clusters{j}{k} = C{k};
-                            reloaded(j,k)=1;
+                        fprintf('Loading %s\n',DATA.strings{k});
+                        [C, details] = LoadClusters([DATA.name '/' DATA.strings{k}]);
+                        for k = 1:length(C)
+                            %if only cluster 2 has changed, ctime for cluster 1 does not. But savetime does.
+                            if isfield(C{k},'xy') & (C{k}.ctime > Clusters{j}{k}.ctime || C{k}.savetime(1) > Clusters{j}{k}.savetime(1))
+                                Clusters{j}{k} = C{k};
+                                reloaded(j,k)=1;
+                            end
                         end
-                    end
                     end
                 else
                     fprintf('Loading %s\n',DATA.strings{k});
@@ -8905,10 +9030,10 @@ function DATA = LoadAll(a,b, type, varargin)
                         A = AutoClusters{j}{k};
                     end
                         
+                    if isfield(Clusters{j}{k},'nspks')  %absent if bad probe/no cut
                     if k >1 && length(Clusters{j}{k}.probe) ==1 && Clusters{j}{k}.probe < k 
                         Clusters{j}{k}.probe = k;
                     end
-                    if isfield(Clusters{j}{k},'nspks')  %absent if bad probe/no cut
                     if ~isfield(Clusters{j}{k},'clst')
                         DATA = AddError(DATA,'Missing clst for %d,%d',exptno(j),k);
                     end
@@ -9014,7 +9139,6 @@ function DATA = LoadAll(a,b, type, varargin)
             DATA.electrodedepth(j) = mean(GetEval(Expts{j,1},'ed'));
         end
         setappdata(DATA.toplevel,'Expts',Expts);
-        DATA.electrodedepth = DATA.electrodedepth(id);
         ExptList.expnames = DATA.expnames;
     else
         ExptList.expnames = [];
@@ -9047,7 +9171,7 @@ function DATA = LoadAll(a,b, type, varargin)
     if isappdata(DATA.toplevel,'GMfits')
         X = getappdata(DATA.toplevel,'GMfits');
         for j = 1:length(GMfits)
-            if ~isempty(GMfits{j})Cg
+            if ~isempty(GMfits{j})
                 X{j} = GMfits{j};
             end
         end
@@ -9073,6 +9197,7 @@ function DATA = LoadAll(a,b, type, varargin)
         set(DATA.toplevel,'UserData',DATA);
         fprintf('\n');
     end
+    CheckClusters(DATA, 'fittimes');
     
     function [Expt, DATA]  = LoadExpt(DATA, e)    
         mnk = GetMonkeyName(DATA.name);
@@ -9232,6 +9357,46 @@ elseif strcmp(type,'build')
      fprintf('%d Files need building\n',sum(need(:)));
 end
 
+function DATA = CheckClusterLineSign(DATA)
+    
+Clusters = getappdata(DATA.toplevel,'Clusters');
+Expts = getappdata(DATA.toplevel,'Expts');
+sgn = CellToMat(Clusters,'sign');
+shp = CellToMat(Clusters,'shape');
+angles = CellToMat(Clusters,'angle');
+
+if isfield(DATA,'tagged')
+    oldsum = sum(DATA.tagged(:) ==2);
+    DATA.tagged(DATA.tagged ==2) = 0;
+else
+    oldsum = 0;
+end
+p = find(sum(sgn < 0) & sum(sgn > 0));
+for j =1:length(p)
+    [a,b] = Counts(sgn(:,p(j)));
+    if a(b == -1) > a(b == 1)
+        id = find(sgn(:,p(j)) == 1);
+        gid = find(sgn(:,p(j)) == -1);
+    else
+        id = find(sgn(:,p(j)) == -1);
+        gid = find(sgn(:,p(j)) == 1);
+    end
+    shape = prctile(shp(gid,p(j)),50);
+    angle = prctile(angles(gid,p(j)),50);
+    for k = 1:length(id)
+        if shp(id(k),p(j)) == shape && cos(angle - angles(id(k),p(j))) > 0
+            mycprintf('blue','E%d P%d Cluster Line Inverted\n',id(k),p(j));
+            DATA.tagged(id(k),p(j)) = 2;
+        end
+    end     
+end
+
+if isfield(DATA,'tagged') && sum(DATA.tagged(:) == 2) || oldsum > 0
+    DATA.markcell.tagged = 1;
+    PlotCellList(DATA);
+    set(DATA.toplevel,'UserData',DATA);
+end
+
  function CheckClusters(DATA, type)
     
 Clusters = getappdata(DATA.toplevel,'Clusters');
@@ -9259,6 +9424,10 @@ end
              end
          elseif strcmp(type,'fitspace')
              CheckFitDim(C);
+         elseif strcmp(type,'fittimes')
+             if isfield(C,'savetime') && C.savetime(end)-C.savetime(1) < -0.1
+                 cprintf('blue','Expt%d(Row%d)P%d Fit is old\n',DATA.exptid(j),j,k);
+             end
          end
      end
  end
@@ -10485,7 +10654,8 @@ for j = 1:size(DATA.mahal,1)
 end
 Clusters = getappdata(DATA.toplevel,'Clusters');
         for j = 1:length(Clusters)
-            for k = 1:length(Clusters{j})
+            good = find(sum(CellToMat(Clusters{j},'space'),2) > 0)';
+            for k = good
                 if Clusters{j}{k}.auto == 0 && DATA.plot.markmanual
                     DrawBox(j,k,1,'color','r','uicontextmenu',cmenu);
                 end
@@ -10735,8 +10905,7 @@ if strcmp(tag,DATA.tag.allxy) && DATA.allclustering
     elseif strcmp(ks.Key,'4')
         XYCluster(src, [],'ellipse4');
     elseif strcmp(ks.Key,'f')
-        C =  ClassifySpikes(DATA,DATA.elmousept,'flip');
-        DATA = ConditionalPlotXY(DATA, C, 1);
+        DATA = FlipLineCrit(DATA);
     elseif strcmp(ks.Key,'q')
         XYCluster(src, [],'quicksave');
     elseif strcmp(ks.Key,'n')
@@ -10744,13 +10913,12 @@ if strcmp(tag,DATA.tag.allxy) && DATA.allclustering
     end
 else
     if strcmp(ks.Key,'f')
-        C =  ClassifySpikes(DATA,DATA.elmousept,'flip');
-        DATA = ConditionalPlotXY(DATA, C, 1);
+        DATA = FlipLineCrit(DATA);
     elseif strcmp(ks.Key,'d')
         DATA.plot.density = ~DATA.plot.density;
         ReplotXY(DATA,[],DATA.currentpoint(1),DATA.currentpoint(2),DATA.currentcluster);
         set(DATA.toplevel,'UserData',DATA);
-    elseif strcmp(ks.Key,'q')
+    elseif strcmp(ks.Key,'q')       
         XYCluster(src, [],'quicksave');
     elseif strcmp(ks.Key,'add') | ks.Character == '+' %characte can be empty
         DATA = AddSelectedCells(DATA);    
@@ -10768,6 +10936,17 @@ elseif strcmp(ks.Key,'s')
     SpoolSpikes(DATA, DATA.currentpoint);
 end
 set(DATA.toplevel,'UserData',DATA);
+
+function DATA = FlipLineCrit(a,b)
+    DATA = GetDataFromFig(a);
+    
+    if DATA.NewCut.probe > 0
+        DATA.elmousept.pos = DATA.NewCut.pos
+    else
+    end
+    C =  ClassifySpikes(DATA,DATA.elmousept,'flip');
+    DATA = get(DATA.toplevel,'UserData');
+    DATA = ConditionalPlotXY(DATA, C, 1);
 
 
 function DATA = AddSelectedCells(DATA)
@@ -10862,6 +11041,10 @@ elseif strcmp(ks.Key,'downarrow')
 elseif strmatch(ks.Key,'uparrow')
     DATA = NextButton(src, ks, 'u');
     n =1;
+elseif strmatch(ks.Key,'f')
+    DATA = FlipLineCrit(DATA);
+elseif strmatch(ks.Key,'q')
+    DATA = SaveCluster(DATA, DATA.currentpoint, 1);
 elseif strmatch(ks.Key,'add')
 elseif strmatch(ks.Key,'subtract')
 elseif strmatch(ks.Key,'space')

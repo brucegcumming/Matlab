@@ -1,18 +1,17 @@
-function [hostname, details] = gethostname(varargin)
+function hostname = gethostname(varargin)
 
-os = computer;
-if strncmp(os,'PCWIN',5)
-    hostname=getenv('COMPUTERNAME');
+if ispc 
+    hostname = getenv('COMPUTERNAME');
     if isempty(hostname)
-    hostname=getenv('USERDOMAIN');
+        hostname=getenv('USERDOMAIN');
     end
-elseif strncmp(os,'GLNXA64',7)
-    hostname=getenv('HOSTNAME');
 else
-    [a, hostname] =system('hostname');
+    [status, hostname] = system('hostname');
 end
+
+%elseif strncmp(os,'GLNXA64',7)
+%    hostname=getenv('HOSTNAME');
 if isempty(hostname)
     hostname = 'UNKNOWNHOST';
 end
-details.hostid = hostid;
 hostname = deblank(hostname); %in case trailing cr etc

@@ -1,34 +1,45 @@
 function rfs = BuildRFData(dirname, varargin)
+%rfs = BuildRFData(dirname, ...)
+%Reads .ufl/rf.mat  files and builds table for PlotMatp
+%BuildRFData(dirname, 'save') appends any new rsf to
+% /bgc/anal/monkey/newrfs.mat
+% if dirname is a cell string array, searches each directory
+
 
 recurse = 0;
 saverfs = 0;
+rebuild = 0;
 rfs = [];
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'find',4)
         recurse = 1;
+    elseif strncmpi(varargin{j},'rebuild',4)
+        rebuild = 1;
     elseif strncmpi(varargin{j},'save',4)
         saverfs = 1;
     end
     j = j+1;
 end
 
-if recurse
+if iscellstr(dirname)
     nc = 0;
-    d = mydir(dirname);
-    for j= 1:length(d)
-        if d(j).isdir
-            rf = GetRFFromDir(d(j).name);
-            if ~isempty(rf)
-                nc = nc+1;
-                rfs{nc} = rf;
-            end
+    for j= 1:length(dirname)
+        rf = GetRFFromDir(dirname{j}, rebuild);
+        if ~isempty(rf)
+            nc = nc+1;
+            rfs{nc} = rf;
         end
     end
-    for j = 1:length(rfs)
+elseif recurse
+    names = {};
+    d = mydir(dirname);
+    if d(j).isdir
+        names = {names{:} d(j).name};
     end
+    rfs = BuildRFData(dirname,varargin{:});
 else
-    rfs = GetRFFromDir(dirname);
+    rfs = GetRFFromDir(dirname, rebuild);
 end
 
 if saverfs
@@ -59,7 +70,7 @@ if saverfs
     end
 end
 
-function therf = GetRFFromDir(dirname)
+function therf = GetRFFromDir(dirname,rebuild)
 d = mydir([dirname '/*.ufl']);
 therf = [];
 
@@ -68,14 +79,19 @@ if isempty(d)
 end
 
 rffile = dir2name(dirname, 'rf');
-if exist(rffile)
+if exist(rffile,'file') && ~rebuild
+    try
     load(rffile);
     return;
+    catch ME
+        cprintf('red','Error Loading %s\n',rffile);
+    end
 end
 ts = now;
 nrf = 0;
 dates = [];
 depths = [];
+StartDepth = [];
 for j = 1:length(d);
     txt = scanlines(d(j).name);
     rid = find(strncmp('cm=rf',txt,5));
@@ -99,6 +115,10 @@ for j = 1:length(d);
         if isfield(Expt.Trials,'ed')
             depths(nrf) = median(Expt.Trials.ed(Expt.Trials.ed > 0));
         end
+        if isfield(Expt.Trials,'StartDepth')
+            sd = Expt.Trials.StartDepth;
+            StartDepth = median(sd(sd>0));
+        end
     end
     if isempty(dates > 0)
         matfile = strrep(d(j).name,'.ufl','.mat');
@@ -109,12 +129,17 @@ dates = dates(dates>0);
 if isempty(dates)
     d = mydir([dirname '/*.online']);
     if ~isempty(d)
-        txt = scanlines(d(1).name);
+        txt = scanlines(d(1).name,'bufsize',9192);
         id = find(strncmp('Reopened',txt,8));
         if ~isempty(id)
             dates(1) = datenum(txt{id(1)}(14:end));
         end
         id = find(strncmp('ed',txt,2));
+        id = find(strncmp('StartDepth',txt,8));
+        if ~isempty(id)
+            a = sscanf(txt{id(1)},'StartDepth%d');
+            StartDepth = [StartDepth a];
+        end
     end
 end
 if ~isempty(dates)
@@ -125,6 +150,10 @@ if ~isempty(depths)
     therf.depth = median(depths);
 else
     therf.depth = NaN;
+end
+StartDepth = unique(StartDepth);
+if ~isempty(StartDepth)
+    therf.StartDepth = StartDepth;
 end
 type = prctile(types,50);
 if type == 1

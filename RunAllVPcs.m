@@ -6,6 +6,9 @@ function res = RunAllVPcs(name, varargin)
 %Uses existing cluster boundary an recalculates statisitcs (finishining
 %"quick" saves)
 %
+%res = RunAllVPcs(dirname,'reclassifyall','savespikes')
+%rebuilds all files using clusters currently defined on disk.
+%
 %RunAllVPcs(dirname,'expts',exlist, 'tchan',tlist, 'savespikes', 'refineall',Clusters)
 %Uses clusters defined in Clusters and reapplies these to probes named in
 %tlist. If Clusters is not provided, it loads existing Cluster Files for

@@ -37,13 +37,18 @@ if size(C,1) == 1 && size(C,2) > 1
                 x = C{k}.(f).(fa);
             end
            if iscell(x) || isstruct(x) 
-            M{k,1:length(x)} = x;
+               M{k,1:length(x)} = x;
+            elseif ischar(x)
+                M{k} = x;
            else
             M(k,1:length(x)) = x;
            end
         end
     end
 else
+    if iscell(C{1})
+        C = C{1};
+    end
 for j = 1:size(C,1)
     for k = 1:size(C,2)
         if isfield(C{j,k},f)

@@ -6,6 +6,12 @@ function res = RunAllGridFiles(name, varargin)
 %To apply quantification of quick saves, use
 %RunAllGridFiles(file,'quantify','savespikes')  
 %
+%To remake all files using saved clusterse
+%RunAllGridFiles(file,'savespikes','reclassifyall')  
+%
+%To Apply clusters from RefClusters
+%RunAllGridFiles(file,'refcut', 'savespikes')  
+%
 %RunAllGridFiles(file,'expts', exlist, 'probes', probelist, ...)  
 %    sets expts/probes to be done. (can set 
 
@@ -227,6 +233,8 @@ if strcmp(checktype,'quantify')
     for j = 1:length(d)
         name = [path '/' d(j).name];
         load(name,'Clusters');
+        dname = strrep(name,'ClusterTimes','ClusterTimesDetails');
+        load(dname,'ClusterDetails');
         ex = sscanf(d(j).name(5:end),'%d');
         for c = 1:length(Clusters)
             need = 0;
@@ -237,10 +245,27 @@ if strcmp(checktype,'quantify')
                 fprintf('%s need Probe %d C1\n',d(j).name,c);
             elseif length(Clusters{c}.next) > 0
                 for k = 1:length(Clusters{c}.next)
-                if isfield(Clusters{c}.next{k},'manual') && Clusters{c}.next{k}.manual == 2
-                    need = 1;
-                    fprintf('%s need Probe %d C%d\n',d(j).name,c,k+1);
+                    if isfield(Clusters{c}.next{k},'manual') && Clusters{c}.next{k}.manual == 2
+                        need = 1;
+                        fprintf('%s need Probe %d C%d\n',d(j).name,c,k+1);
+                    elseif isfield(Clusters{c}.next{k},'clusterprog') & strncmp(Clusters{c}.next{k}.clusterprog,'PlotClusters',9)
+                        need = 1;
+                        fprintf('%s need Probe %d C%d - last cut in PlotClusters\n',d(j).name,c,k+1);
+                    end
                 end
+            end
+            if c > length(ClusterDetails) || ~isfield(ClusterDetails{c},'clst')
+                need = 1;
+                fprintf('%s need Probe %d C%d - No ClusterDetails.clst\n',d(j).name,c,k+1);
+            elseif length(ClusterDetails{c}.clst) ~= length(ClusterDetails{c}.xy)
+                need = 1;
+                fprintf('%s need Probe %d C%d - clst/xy mismatch\n',d(j).name,c,k+1);
+            elseif isfield(ClusterDetails{c},'next')
+                for k = 1:length(ClusterDetails{c}.next)
+                    if isfield(ClusterDetails{c}.next{k},'xy') && length(ClusterDetails{c}.next{k}.xy) ~= length(ClusterDetails{c}.xy)
+                        fprintf('%s need Probe %d C%d - next xy mismatch\n',d(j).name,c,k+1);
+                        need = 1;
+                    end
                 end
             end
             if need
@@ -445,7 +470,15 @@ function myprintf(stream, varargin)
  end
 
 function res = DoFile(name, cfile, ctype, varargin)
-     res = [];
+debugging = 0;
+j = 1;
+while j <= length(varargin)
+    if strncmpi(varargin{j},'debug',5)
+        debugging = 1;
+    end
+    j = j+1;
+end
+    res = [];
      if ctype ==2
          if exist(cfile)
              load(cfile);
@@ -469,6 +502,10 @@ function res = DoFile(name, cfile, ctype, varargin)
      elseif ~exist(cfile)
          fprintf('No Cluster File %s\n',cfile);
      else
+         if debugging
+             load(cfile);
+             res = AllVPcs(name, varargin{:},'noninteractive');
+         else
          try
              load(cfile);
              try
@@ -481,6 +518,7 @@ function res = DoFile(name, cfile, ctype, varargin)
          catch ME
              cprintf('errors','!!!Error Reading %s\n',cfile);
              res.errstate = ME;
+         end
          end
      end
      if isfield(res,'logfid') && res.logfid > 0

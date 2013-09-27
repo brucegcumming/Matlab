@@ -39,6 +39,8 @@ while(j < nargin -1)
     elseif(strncmpi(varargin{j},'nolabel',5))
         ylabels = {};
         xlabels = {};
+    elseif(strncmpi(varargin{j},'paper',5))
+        fontname = 'Arial'
     end
     j = j+1;
 end

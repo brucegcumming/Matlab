@@ -65,6 +65,12 @@ errs = {};
 
 mkidx =0;  %%need this up here so taht relist works
 
+
+if isdir(name)
+    [Expt, Expts] = ReadExptDir(name, varargin{:});
+    return; 
+end
+
 j = 1;
 while j <= length(varargin)
     vg = varargin{j};
@@ -1091,7 +1097,10 @@ if ~mkidx
         Expt.Trials.ve(end:length(Expt.Trials.End)) = ve;
     end
     Expt.Trials = AddStimValsFromFile(strrep(name,'.mat','.SetStim'),Expt.Trials);
-
+    if isfield(Expt.Trials,'badexpts')
+        Expt.badexpt = Expt.Trials.badexpts;
+        Expt.Trials = rmfield(Expt.Trials,'badexpts');
+    end
     if isfield(Expts,'firsttrial')
             if timeoffset
         argon = {argon{:} 'timeoffset' timeoffset};
@@ -1354,13 +1363,20 @@ elseif length(bstimes) == length(estimes)+1 %crash can leave trailing start e.g.
     bstimes = bstimes(1:end-1);
 end
 
+txt = scanlines(strrep(name,'.mat','Add.txt'),'silent');
+badexpts = [];
+for j = 1:length(txt)
+    if strfind(txt{j},'badexpt');
+    badexpts(j) = sscanf(txt{id(j)},'%d');
+    end
+end
 
 if ~isempty(stimchange)
     ds = diff(stimchange.times);
     [minds, id] = min(ds);
     if minds < 0.02;
         err = sprintf('Very Short Stimchange intervals at %.2f',stimchange.times(id));
-        Expt = AddError(err, Expt, state.showerrs);
+        Expt = AddError( Expt, err);
     end
 end
 
@@ -1370,7 +1386,7 @@ id = find(isi < 400); %shouldnt happen, but see lemM209.5
 if length(id)
     nerr = nerr+1;
     err = sprintf('Bad ISIs (%d), starting at %.0f)\n',length(id),bstimes(id(1)));
-    Expt = AddError(err, Expt, state.showerrs);
+    Expt = AddError(Expt, err);
     Result.badisi = id;
     fprintf('%d impossible isis\n',length(id));
 % if this is a rapid pulse sequence, sometimes sent by binoc.
@@ -1406,15 +1422,38 @@ bsstimes = Text.times(id);
         id = strmatch('ess',Text.text);
     end
 esstimes = Text.times(id);
-exendid = find((Events.codes(:,1) == ENDEXPT | Events.codes(:,1) == CANCELEXPT) & Events.store > 0);
+%Only find expts where storage was on at expt start. But any endexpt event
+%will end, even if storage is off. E.G. a binoc crash. when binoc restarts
+%can send EndExpt before setting storage on
 exstartid = find(Events.codes(:,1) == STARTEXPT & Events.store > 0);
+exendid = find((Events.codes(:,1) == ENDEXPT | Events.codes(:,1) == CANCELEXPT));
+%exendid = find((Events.codes(:,1) == ENDEXPT | Events.codes(:,1) == CANCELEXPT) & Events.store > 0);
+texstartid = find(Text.codes(:,1) == STARTEXPT);
 
-if length(bsstimes) < length(bstimes)
+%bstimes has an artificial extra on the end
+if length(bsstimes) < length(bstimes)-1
     t = bsstimes(1)-bstimes;
-    id = find(t > -1000 & t  <10000);  %only 1 event from -500ms to + 100ms) from text mark
-    fprintf('%d StimOns before first saved trial\n',id(end));
-    bstimes = bstimes(id:end);
-    estimes = estimes(id:end);
+%only 1 event from -1000ms to + 100ms) from text mark = safe to assume any before this are related to file open
+    id = find(t > -1000 & t  <10000); 
+    if isempty(id)
+        Expt.t = bsstimes(1);
+        Expt = AddError(Expt, 'First Stimon %.2f before first bss\n',t(1));
+        if t(1) > 100000
+            id = find(t > 10000);
+            bstimes = bstimes(id(end)+1:end);
+            estimes = estimes(id(end)+1:end);
+            Expt = AddError(Expt, '%s Stimons first bss',length(id));
+        end            
+    else
+        Expt.t = bsstimes(1);
+        if (id(end) > 3)
+            Expt = AddError(Expt, '%d StimOns before first saved trial (%.2f)\n',id(end));
+        else
+            cprintf('blue', '%d StimOns before first saved trial (%.2f)\n',id(end));
+        end
+        bstimes = bstimes(id:end);
+        estimes = estimes(id:end);
+    end
 end
 evid = [];
 bsid = [];
@@ -1423,7 +1462,7 @@ ExptStart = Events.times(exstartid);
 exendid = exendid(exendid > exstartid(1));
 ExptEnd = Events.times(exendid);
 if isempty(ExptEnd) %% sometimes .mat file is missing EndExpt Marker. But best to fix .smr
-    Expt = AddError('No EndExpt Marker', Expt, state.showerrs);
+    Expt = AddError(Expt, 'No EndExpt Marker', Expt);
     ExptEnd = Events.times(end);
     exendid = length(Events.times)+1;
     Events.codes(exendid,1) = ENDEXPT;
@@ -1452,7 +1491,7 @@ for j = 1:length(exstartid)
 %take care of any hanging estime after expt end. Can happen with
 %fixed/crashed files
     eid = find(estimes > ts & estimes < te);
-    if isempty(eid)  %no trials in this expt
+    if isempty(eid)  || ismember(j,badexpts) %no trials in this expt
         Expts(j).result = -1;
     else
 %if final trial in expt is a badfix, and its short, then final FRAMESIGNAL
@@ -1467,16 +1506,31 @@ for j = 1:length(exstartid)
     allfsid = cat(1, allfsid, id(fsid));
     Result.startcounts = [length(fsid) length(bid)];
     Result.name = name;
-    if sum(Result.startcounts) == 0
-        fprintf('No Trials for block %d\n',j);
+    if ~isempty(fsid)
+        td = (bstimes(bid(end))-Events.times(id(fsid(end))))./10000;
+    end
+    if sum(Result.startcounts == 0) %either fsid or bid is empty
+        fprintf('No Trials for block %d %.1f - %.1f\n',j,ts,te);
         Result.bsdelay = [];
+        fsids{j} = [];
+        bids{j} = [];
+        bsid = bsid(1:end-length(bid));
+    elseif length(fsid)+1 == length(bid) &&  td > 10
+%if there is StimON at the end of hte expt that trails by a long way, probaly an error
+%E.G. jbeG016 at 7496.0
+        cprintf('blue','Ex %d Unmatched final Stimlevel at %.1f, %.1f after last bss\n',j,bstimes(bid(end))./10000,td);
+        bid = bid(1:end-1);
+        bsidx(id(fsid)) = bid;
+        Result.bsdelay = Events.times(id(fsid)) - bstimes(bid);
+        bids{j} = bid;
+        bsid = bsid(1:end-1);
     elseif length(fsid) == length(bid)
-        fprintf('Ex %d Stimlevel and FrameSignal Lengths match %d)\n',j,length(fsid));
+        fprintf('Ex %d Stimlevel and FrameSignal Lengths match %d(%.1f-%.1f)\n',j,length(fsid),bstimes(bid(1)),bstimes(bid(end)));
         bsidx(id(fsid)) = bid;
         Result.bsdelay = Events.times(id(fsid)) - bstimes(bid);
     else
-        fprintf('Length Mismatch for Stimlevel (%d) and FrameSignal (%d)\n',length(bid),length(fsid));
-        FindMissingTimes(Events, Text, bstimes, estimes);
+        fprintf('Length Mismatch for Stimlevel (%d) and FrameSignal (%d) Last gap %.1f\n',length(bid),length(fsid),td);
+        FindMissingTimes(Events, Text, bstimes, estimes,bid,fsid,ts,te);
         Result.bsdelay = [];
     end
     end
@@ -1500,6 +1554,9 @@ fstimes = Events.times(fsid);
 for j = 1:length(Expts)
     Expts(j).firsttrial = find(bsid == Expts(j).starti);
     Expts(j).lasttrial = find(bsid == Expts(j).endi);
+    if isempty(Expts(j).lasttrial) && ~isempty(Expts(j).firsttrial)
+        cprintf('red','Empty Last Trial Expt %d\n',j);
+    end
     good(j) =  ~isempty((Expts(j).firsttrial));
 end
 rwid = find(Events.codes(:,1) == 'q');
@@ -1527,6 +1584,7 @@ if length(fsid) == length(bsid)
       Trials.estimes(j) = Trials.End(j);
       Trials.Trial(j) = j+starttrial;
       Trials.Result(j) = 1;
+      Trials.bsdelay(j) = fstimes(j)-bstimes(bsid(j));
       id = find(esstimes > fstimes(j));
       if length(id) == 0
           Trials.Result(j) = -1;
@@ -1694,7 +1752,7 @@ if settrials == 0 %were not set by new method
         if nt > 1 & length(Trials.End) < nt-1
             nerr = nerr+1;
             err = sprintf('Missing end Trial %d (EX %.0f, start %.0f)\n',nt-1,inexpt,Trials.Start(nt-1));
-            Expt = AddError(err, Expt, state.showerrs);
+            Expt = AddError(Expt, err);
         end
         Trials.Trial(nt) = nt+starttrial;
         instim = 1;
@@ -1755,7 +1813,7 @@ if settrials == 0 %were not set by new method
 %                    & Events.codes(j-1) == STARTSTIM ... %< 1ms to next = probably early
                 err = sprintf('StimON at %.2f is %.1f ms late but STARTSTIM at %.2f',...
                 bstimes(id(end)+1),(bstimes(id(end)+1)-Events.times(j))./10,Events.times(j-1));
-                Expt = AddError(err, Expt, state.showerrs);
+                Expt = AddError(Expt, err);
                 Trials.FalseStart(nt) = 0;
                 
             else
@@ -1765,7 +1823,7 @@ if settrials == 0 %were not set by new method
                 Trials.Start(nt) = bstimes(id(end));
                 
                  err = sprintf('Missing StimON at %.2f %.2f), but STARTSTIM at %.2f',Events.times(j),bstimes(id(end)),Events.times(j-1));
-                 Expt = AddError(err, Expt, state.showerrs);
+                 Expt = AddError(Expt, err);
                 id = find(frametimes > Trials.Start(nt));
                 if ~isempty(id) 
                     Trials.delay(nt) = frametimes(id(1)) - Trials.Start(nt);
@@ -1851,7 +1909,7 @@ if settrials == 0 %were not set by new method
                if dur > 1000
                    err = sprintf('End Trial without End stim: %d (%.2f) dur %.1fms',...
                        nt-1,Events.times(j)/10000,(Events.times(j) - Trials.Start(nt))/10,dur/10);
-                   Expt = AddError(err, Expt, state.showerrs);                   
+                   Expt = AddError(Expt, err);
                    Trials.Result(nt) = -2;  % this will be set to 0 if a BadFix is found.
                end
            end
@@ -1873,17 +1931,19 @@ if settrials == 0 %were not set by new method
         inexpt = 1;
     elseif Events.codes(j,1) == STARTEXPT % non stored
         inexpt = 0;
-    elseif Events.codes(j,1) == ENDEXPT & nx & storestate
+    elseif Events.codes(j,1) == ENDEXPT & nx & inexpt %storage was on at start expt
         Expts(nx).end = Events.times(j);
         Expts(nx).lasttrial = nt;
         inexpt = 0;
         Expts(nx).result = ENDEXPT;
-    elseif Events.codes(j,1) == CANCELEXPT & nx & storestate
+    elseif Events.codes(j,1) == CANCELEXPT & nx && inexpt %Cancel cancels an expt, even if storage off
         Expts(nx).end = Events.times(j);
         Expts(nx).lasttrial = nt;
         Expts(nx).result = CANCELEXPT;
         inexpt = 0;
     elseif Events.codes(j,1) == ENDEXPT
+        nx = nx;        
+    elseif Events.codes(j,1) == CANCELEXPT
         nx = nx;        
     end
 end
@@ -2027,13 +2087,19 @@ for j = 1:length(aText.text)
     if length(txt)>1;
         ss = txt(1:2);
         slen = 2;
-        for f = {'puA' 'puF' 'USd' 'USp' 'USf' 'nph' 'ijump' 'mixac' 'baddir' ...
-                'e1max' 'backMov' 'FakeSig' 'pBlack' 'aOp' 'aPp' 'seof' 'serange' ...
-                'nimplaces' 'usenewdirs' 'choicedur' 'cha' 'imi' 'choicedur' 'ePr' ...
-                'coarsemm' 'psyv' }
-            if sum(strncmp(txt,f,length(f{1})))
-                ss = txt(1:length(f{1}));
-                slen = length(f{1});
+        id = findstr(txt,'=');
+        if ~isempty(id)
+            slen = id(1)-1;
+            ss = txt(1:slen);
+        else
+            for f = {'puA' 'puF' 'USd' 'USp' 'USf' 'nph' 'ijump' 'mixac' 'baddir' ...
+                    'e1max' 'backMov' 'FakeSig' 'pBlack' 'aOp' 'aPp' 'seof' 'serange' ...
+                    'nimplaces' 'usenewdirs' 'choicedur' 'cha' 'imi' 'choicedur' 'ePr' ...
+                    'coarsemm' 'psyv' }
+                if sum(strncmp(txt,f,length(f{1})))
+                    ss = txt(1:length(f{1}));
+                    slen = length(f{1});
+                end
             end
         end
         vartype = 'N';
@@ -2044,7 +2110,7 @@ for j = 1:length(aText.text)
                 vartype = 'C';
             end
         end
-        if length(txt) > 2 & txt(3) == '='
+        if length(txt) > 2 & txt(slen+1) == '='
             val= txt(slen+2:end);
         else
             val= txt(slen+1:end);
@@ -2085,6 +2151,15 @@ for j = 1:length(aText.text)
             
         elseif strncmp(txt,'EndStim',7) %finished reading all text related to last stim
             gotend = 1;
+        elseif strncmp(txt,'manexpt=',8)
+            Stimulus.manexpt = txt(9:end);
+        elseif strncmp(txt,'manexvals',8)
+            stimid = sscanf(txt,'manexvals%d');
+            id = strfind(txt,' ');
+            if ~isempty(id)
+                a = sscanf(txt(id(1)+1:end),'%f');
+            end
+            Stimulus.exvals = a;
         elseif strncmp(txt,'exvals',6)
             a = sscanf(txt,'exvals %f %f %f %d');
             if isfield(Stimulus,'et')
@@ -2165,6 +2240,10 @@ for j = 1:length(aText.text)
             if Stimulus.id == 6136 || Stimulus.id > 570
                 trial;
             end
+        elseif strncmp(txt,'mtFl=',5) 
+            if length(txt) > 5
+                Stimulus.mtFl = sscanf(txt(6:end),'%d');
+            end                
         elseif strncmp(txt,'mtFn=',5) && length(txt) > 50
             framets = sscanf(txt(6:end),'%f');
             id = find(diff(framets(1:end-1)) > 1.5);
@@ -2281,7 +2360,7 @@ for j = 1:length(aText.text)
                 Expts(ix).e1vals = sscanf(txt(6:end),'%f');            
             else
                 err = sprintf('No Expt for mtei at trial %d',trial);
-                Expt = AddError(err, Expt, state.showerrs);
+                Expt = AddError(Expt, err);
                 ix = lastix;
             end
             end
@@ -2401,6 +2480,7 @@ for j = 1:length(aText.text)
             if regexp(ss,'^[0-9]')
                 ss = ['x' ss];
             end
+
             try
             [Stimulus.(ss), ok] = sscanf(val,'%f');
             if ~ok
@@ -2546,7 +2626,7 @@ for j = 1:length(aText.text)
     elseif t > Trials.Start(trial) && instim == 0 && aText.codes(j,4) ~= 2
         instim = 1;
     end
-    if mod(j,100) == 0
+    if mod(j,1000) == 0
         waitbar(j/length(aText.text));
     end
 end
@@ -2808,11 +2888,6 @@ if mkidx == 1
         Expt.bstimes = bstimes;
         Expt.estimes = estimes;
         Expt.Header = Header;
-        if nerr > 0
-        Expt.errs = errs;
-        else
-            Expt.errs = {};
-        end
     save(idxfile,'Expt','Expts');
     iExpts = Expts;
 end
@@ -2849,7 +2924,7 @@ WriteErrors(idxfile, Expt);
 function  StimCh = AddStimsFromFile(AddTxtFile, StimCh)
 fid = fopen(AddTxtFile,'r');
 if fid > 0
-    a = textscan(fid,'%f %f','delimiter','\n');
+    a = textscan(fid,'%f %f','delimiter','\n'); %ON, Off
     for j = 1:length(a{1})
         id = find(StimCh.times < a{1}(j));
         id = id(end);
@@ -2868,6 +2943,9 @@ if fid > 0
     tid = a{1};
     s = a{2};
     for j = 1:length(a{1})
+        if strncmp('badexpt',s{j},7) %error in file - ignore this expt
+            Trials.baddexpts(tid(j)) = 1;
+        else
         id = find(Trials.id  == a{1}(j));
         if length(id) ==1
             x = sscanf(s{j}(4:end),'%f');
@@ -2876,6 +2954,7 @@ if fid > 0
             elseif strncmp(s{j},'ce:',3)
                 Trials.cevals{id} = x;
             end
+        end
         end
     end
 end
@@ -2954,11 +3033,38 @@ if ~strcmp(c,'.txt')
 end
 SpkDefs;
 fid = fopen(AddTxtFile,'r');
+ts = now;
+
 if fid > 0
+    cprintf('blue','Adding Text from %s\n',AddTxtFile)
     a = textscan(fid,'%d %s','delimiter','\n');
-    fclose(fid);
+    if isempty(a{1})
+        if isempty(aText.text)
+            return;
+        end
+        b = textscan(fid,'%2s%d %s','delimiter','\n');
+        frewind(fid);
+        idid = find(strncmp('id',aText.text,2));
+        for j = 1:length(idid)
+            tid(j) = sscanf(aText.text{idid(j)},'id%d');
+        end
+        ti = b{2};
+        for j = 1:length(ti)
+            id = find(tid == ti(j));
+            if ~isempty(id)
+                t(j) = aText.times(idid(id(end)));
+            else
+                t(j) = NaN;
+            end
+        end
+        s = b{3};        
+    else
     t = a{1};
     s = a{2};
+    end
+    fclose(fid);
+    
+    
     did = find(strncmp(s,'delete',6));
     if ~isempty(did) && ~isempty(aText.times)
         for j = 1:length(did)
@@ -2978,7 +3084,8 @@ if fid > 0
         else
             txt = s{j};
         end
-        cprintf('blue','%d Adding Text %s\n',t(j),s{j})
+        fprintf('%d Adding Text %s\n',t(j),s{j})
+%        cprintf('blue','%d Adding Text %s\n',t(j),s{j})
         if ~isempty(aText.times)
         if t(j) < 0  && t(j) > -1000%special case for fixing lines
             if strncmp(s{j},'cm=rf',5)
@@ -2995,7 +3102,7 @@ if fid > 0
             aText.text = {txt aText.text{:}};
             aText.times = [0; aText.times];
             aText.codes = [0 0 0 0; aText.codes];
-        elseif strcmp(s(j),'delete')
+        elseif sum(strcmp(s(j),{'delete' 'badexpt'})) %special lines not going into text
             txt = '';
         else
             id = find(aText.times < t(j));
@@ -3013,6 +3120,8 @@ if fid > 0
         end
     end
 end
+fprintf('Took %.2f\n',mytoc(ts));
+
 
 
 function Expts = AddComments(Expts, Expt)
@@ -3047,6 +3156,9 @@ end
         cid = strmatch('cm=VisualArea',Expt.Comments.text);
         for k = 1:length(cid)
             Expts{j}.Header.Area{k} = Expt.Comments.text{cid(k)}(15:end);
+        end
+        if isfield(Expt.Comments,'Peninfo')
+            Expts{j}.Comments.Peninfo = Expt.Comments.Peninfo;
         end
     end
 end
@@ -3121,6 +3233,13 @@ frameperiod = Header.frameperiod;
 else
 frameperiod = 167;
 end
+
+if isfield(Header,'Name') && ~isempty(regexp(Header.Name,'[0-9]\.[0-9]*\.mat'))
+    Header.bysuffix = 1;
+else
+    Header.bysuffix = 0;
+end
+
 findtrial = 0;
 if state.alltrials
     usebadtrials = 1;
@@ -3193,6 +3312,7 @@ ids = [ids find(strcmp('Flag',fn))];
 ids = [ids find(strcmp('bsstimes',fn))];
 ids = [ids find(strcmp('esstimes',fn))];
 ids = [ids find(strcmp('ex3val',fn))];
+ids = [ids find(strcmp('bsdelay',fn))];
 %ids = [ids strmatch('imver',fn)];
 %ids = [ids strmatch('imse',fn)];
 state.tt = TimeMark(state.tt,'Set Fields');
@@ -3278,7 +3398,7 @@ for nx = 1:length(AllExpts)
     nu = 0; %number of ustim pulses
     if nt <= 3 && AllExpts(nx).result ~= CANCELEXPT && state.showerrs
         err = sprintf('%s Expt %d only %d good trials',Header.Name,nx,nt);
-        Idx = AddError(err, Idx, 1);
+        Idx = AddError(err, Idx, 0);
     end
     if ~isfield(AllExpts,'result')
         AllExpts(1).result = 1;
@@ -3328,6 +3448,7 @@ for nx = 1:length(AllExpts)
  %      
         fastseq = 0;
         for nf = 1:length(fn)
+            fsz= size(AllTrials.(fn{nf}));
             if iscell(AllTrials.(fn{nf}))
                 if strcmp(fn{nf},'uStimt')
                 else
@@ -3335,12 +3456,24 @@ for nx = 1:length(AllExpts)
                 Expt.Stimvals.(fn{nf}) = AllTrials.(fn{nf}){a(1)};
                 end
             else
-                nv = unique([AllTrials.(fn{nf})(igood)]);
+                if fsz(1) > 1 && fsz(2) > 1
+%for now only check unique of element 1. If 1s all same, and 2s all same, but 1 ~= 2, 
+%don't need it
+                    nv = unique([AllTrials.(fn{nf})(igood)]);
+                else
+                    nv = unique([AllTrials.(fn{nf})(igood)]);
+                end
             end
             
             if isnumeric(nv) & sum(~isnan(nv))> 1
-                for j = 1:nt
-                    Trials(j).(fn{nf}) = AllTrials.(fn{nf})(igood(j));
+                if fsz(1) > 1 && fsz(2) > 1
+                    for j = 1:nt
+                        Trials(j).(fn{nf}) = AllTrials.(fn{nf})(igood(j),:);
+                    end
+                else
+                    for j = 1:nt
+                        Trials(j).(fn{nf}) = AllTrials.(fn{nf})(igood(j));
+                    end
                 end
                 if strcmp(fn{nf},'Nf')
                     if sum(nv) == max(nv) % only 1 value + 0;
@@ -3407,7 +3540,7 @@ for nx = 1:length(AllExpts)
         if strcmp(Expt.Stimvals.e2,'ce') && max(Expt.e2vals) > 1
             bid = find(Expt.e2vals > 1);
             err = sprintf('Fixing ce values (%s->1)',sprintf('%.1f ',Expt.e2vals(bid)));
-            Idx = AddError(err, Idx, 0);
+            Idx = AddError(Idx, err);
             Expt.e2vals(bid) = 1;
         end
 
@@ -3425,6 +3558,7 @@ for nx = 1:length(AllExpts)
     timesexpt = 0;
     nu = 0; %count trials with uStimt;
     for k = 1:nt
+        Idx.t = AllTrials.Start(igood(k));
         if ~isempty(AllTrials.Cluster{igood(k)})
         sid = find(ismember(AllTrials.Cluster{igood(k)}, thecluster));
         Trials(k).Spikes = round(AllTrials.Spikes{(igood(k))}(sid));
@@ -3450,7 +3584,12 @@ for nx = 1:length(AllExpts)
         if ~isempty(strfind(Trials(k).OptionCode,'+2a')) || ~isempty(strfind(Trials(k).OptionCode,'+afc'))
             psychtrial = psychtrial+1;
         end
-        if strfind(Trials(k).OptionCode,'+fS')
+        if isfield(AllTrials,'Dc')
+            Dcval = AllTrials.Dc(igood(k));
+        else
+            Dcval = 0;
+        end
+        if strfind(Trials(k).OptionCode,'+fS') & Dcval < 1
             seqtrial = seqtrial+1;
             fastseq = 1;
         else
@@ -3512,9 +3651,6 @@ for nx = 1:length(AllExpts)
             Trials(k).me = ones(size(evid)) * Trials(k).me(1);
             if sum(strcmp(et,'Dc'))
                 ev = Expt.e1vals(evid);
-                if frpt > 1
-                    ev = ev(1:frpt:end);
-                end
                 Trials(k).(et) = AllTrials.Dc(igood(k));
                 Trials(k).(Expt.Stimvals.e2)= ev;
                 Trials(k).(e2)(find(ev == ISIGNALFRAME)) = AllTrials.(e2)(igood(k)); %% blanks
@@ -3526,6 +3662,10 @@ for nx = 1:length(AllExpts)
                 Trials(k).(et) = ev;
              %   eb = Expt.e2vals(AllTrials.Stimseq{igood(k)}+1);
               %  Trials(k).(Expt.Stimvals.e2)= eb;
+            elseif sum(strcmp(et,{'ic' 'pR'})) && Dcval > 0 && Dcval < 1
+                ev = Expt.e1vals(evid);
+                Trials(k).ori = AllTrials.or(igood(k));
+                Trials(k).or = ev;
             else
                 ev = Expt.e1vals(evid);
                 Trials(k).(et) = ev;
@@ -3801,7 +3941,7 @@ for nx = 1:length(AllExpts)
     if min(durs) < 0
         id = find(durs < 0);
         err = sprintf('Expt %d at %.2f(id%d) has (%d) negative durations',nexpts,Expt.Trials(id(1)).Start(1),Expt.Trials(id(1)).id,length(id));
-        Idx = AddError(err, Idx, state.showerrs);
+        Idx = AddError(Idx, err);
         id = find(durs > 0);
         Expt.Trials = Trials(id);
     end
@@ -3923,7 +4063,11 @@ end
 ufl = strrep(name,'.mat','.ufl');
 rid = strmatch('cm=rf',Text.text);
 
+
 AddTxtFile = strrep(name,'.mat','Add.txt');
+if ~exist(AddTxtFile)
+    AddTxtFile= regexprep(name,'\.[0-9]*.mat','Add.txt');
+end
 fid = fopen(AddTxtFile,'r');
 if fid > 0
     a = textscan(fid,'%d %s','delimiter','\n');
@@ -3997,11 +4141,12 @@ else
 end
 
 function Idx = AddError(err, varargin)
-
+%Idx = AddError(Idx, varargin)
+% or Idx = AddError(err, Idx, show) old style
 if ischar(err) %% old style
     Idx = varargin{1};
     show = varargin{2};
-else
+else  
     Idx = err;
     err = sprintf(varargin{:});
     
@@ -4030,13 +4175,20 @@ else
     mycprintf('errors',[err '\n']);
 end
 
-function FindMissingTimes(Events, Text, bstimes, estimes)
+function FindMissingTimes(Events, Text, bstimes, estimes,bsid,fsid,ts,te)
 
 bid = strmatch('bss',Text.text);
 bsstimes = Text.times(bid);
+tid = find(bsstimes >  ts & bsstimes < te);
+eid = find(bstimes > ts & bstimes < te);
 x = bsstimes-bstimes(1:length(bsstimes));
+hold off;
 plot(bsstimes,x,'o');
-
+hold on;
+x = bsstimes(tid)-bstimes(eid(1:length(tid)));
+plot(bsstimes(tid),x,'ro');
+plot([ts ts],get(gca,'ylim'));
+plot([te te],get(gca,'ylim'));
 
 
 function name = BuildName(name)

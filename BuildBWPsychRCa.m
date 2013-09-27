@@ -129,6 +129,7 @@ while j <= length(varargin)
                 details.allkernels(nk,:,:) = Ks{j}.kernel;
                 details.allpsum(nk,:,:) = Ks{j}.psum;
                 details.allnsum(nk,:,:) = Ks{j}.nsum;
+                details.stimsum(nk,:,:) = fftshift(Ks{j}.truesum);
                 details.or(nk) = or(j);
                 details.bw(nk) = bw(j);
                 details.nf(nk,:) = Ks{j}.nframes;
@@ -619,6 +620,7 @@ if isempty(ftpwr)
         nfts = filterim([sf sf/2], [or sig], wi, 'seedoffset', seedoffset, 'pix2deg', px,'nseeds', 1000, 'getft','noplot');
         pfts = filterim([sf sf/2], [or+90 sig], wi, 'seedoffset', seedoffset, 'pix2deg', px,'nseeds', 1000, 'getft','noplot');
         sigkernel = fftshift(squeeze(mean(abs(pfts),1)-mean(abs(nfts),1)));
+        sigor = AddOriSum(sigkernel','noplot');
     end
     
     %restrict to trials with enough reps to be worth calculating images
@@ -884,6 +886,7 @@ end
 
 if mksigkernel & exist('sigkernel','var');
     details.sigkernel = sigkernel;
+    details.sigor = AddOriSum(signkernel','noplot');
 end
 if sprc < 2
     details.kb = CalcPKernel(Expt,pid(2:end), nid, pwr, tpwr(2:end));
@@ -1179,11 +1182,7 @@ function [details, b] = BuildStimKernel(Expt, bw, or)
     if isfield(b,'nframes')
         details.nframes = b.nframes;
         details.kernel = a;
-        details.psum = b.psum;
-        details.nsum = b.nsum;
-        details.n = b.nframes;
-        details.zid = b.zid;
-        detials.zid = b.zid;
+        details = CopyFields(details,b,{'psum' 'nsum' 'nframes' 'zid' 'truesum'});
         details.Trials(b.zid) = b.Trials(b.zid);
     else
         details = [];
@@ -1196,6 +1195,8 @@ if ischar(Expt)
     name = Expt;
     [a,Expt] = ReadSerialFile(name,'readexpt','exptype','ORBW');
     Expt.filename = name;
+elseif isfield(Expt,'Header') && isfield(Expt.Header,'loadname')
+    Expt.filename = Expt.Header.loadname;
 elseif isfield(Expt,'Header') && isfield(Expt.Header,'name')
     Expt.filename = Expt.Header.name;
 end

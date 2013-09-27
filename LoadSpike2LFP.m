@@ -1,4 +1,7 @@
 function [Expt, details] = LoadSpike2LFP(Expt, varargin)
+%[Expt, details] = LoadSpike2LFP(Expt, varargin)
+%Load LFP data from spike2 .lfp.mat file
+%Also calculates power spectrum
 
 reload = 0;
 loaded = 0;
@@ -35,10 +38,11 @@ end
 if isfield(Expt.Trials,'LFP') & ~reload & ~loaded
     return;
 end
-
+expname = GetEval(Expt,'name');
 if ~isfield(Expt.Header,'bysuffix')
     Expt.Header.bysuffix = 0;
 end
+
 if iscell(lfpfile) 
     if exist(lfpfile{1},'file')
     load(lfpfile{1});
@@ -56,7 +60,7 @@ if iscell(lfpfile)
         return;
     end
 elseif ~loaded
-    if Expt.Header.bysuffix
+    if Expt.Header.bysuffix  && isfield(Expt.Header,'fileprefix')
         for j = 1:length(Expt.Header.Combineids)
             lfpfile = [Expt.Header.fileprefix 'A.' num2str(Expt.Header.Combineids(j)) '.lfp.mat'];
             if exist(lfpfile)
@@ -70,14 +74,22 @@ elseif ~loaded
         LFP.Trials = cat(1,[LFPS.Trials]);
         LFP.Header.Names = Names;
     else
+        if Expt.Header.bysuffix
+            lfpfile = regexprep(expname,'([0-9])(\.[0-9]*)\.mat','$1A$2.lfp.mat');
+        end
         if isempty(lfpfile)
-            lfpfile = [drive strrep(Expt.Header.Name,'.mat','.lfp.mat')];
+            lfpfile = [drive strrep(expname,'.mat','.lfp.mat')];
+            if ~exist(lfpfile,'file')
+                lfpfile =  strrep(lfpfile,'.lfp.mat','A.lfp.mat');
+            end
+            
         end
         if ~exist(lfpfile,'file')
-            lfpfile = name2path(splitpath(Expt.Header.Name),'smr');
+            a = lfpfile;
+            lfpfile = name2path(splitpath(expname),'smr');
             lfpfile = strrep(lfpfile,'.mat','.lfp.mat');
             if ~exist(lfpfile,'file')
-                fprintf('No LFP datafile: %s\n',lfpfile);
+                fprintf('No LFP datafile: %s or %s\n',lfpfile,a);
                 return;
             end
         end
@@ -105,6 +117,11 @@ for j = 1:length(Expt.Trials)
             starts(j) = Expt.Trials(j).Start(1);
     end
     lfplen(j) = length(LFP.Trials(trial(j)).LFP);
+    if isfield(Expt.Trials,'Result')
+        goodtrial(j) = Expt.Trials(j).Result;
+    else
+        goodtrial(j) = 1;
+    end
 end
 details.ltrials = trial;
 lfpchans = size(LFP.Trials(1).LFP,2);
@@ -114,7 +131,7 @@ lfpchans = size(LFP.Trials(1).LFP,2);
 %If fixcit is set, throw away fixcrit % of short trials
 %Otherwise set them all to the shortest
 lfplens = lfplen;
-gid = find(lfplen > 0 & diffs < 700);
+gid = find(lfplen > 0 & diffs < 700 & goodtrial);
 if min(lfplens)+5 > prctile(lfplen(gid),50)
     lfplen = min(lfplen(gid));
 elseif fixcrit > 0
@@ -159,6 +176,16 @@ for j = 1:length(Expt.Trials)
                 Expt.Trials(j).LFP(:,c) = Expt.Trials(j).LFP(:,c)./ LFP.Header.amps(c);  
             end
         end
+    elseif goodtrial(j) == 0
+        lfpos(j) = (Expt.Trials(j).Start(1) - LFP.Trials(k).ftime)/(LFP.Header.CRsamplerate.*10000);
+        Expt.Trials(j).lfpo = round(lfpos(j)); 
+        Expt.Trials(j).lfptime = LFP.Trials(k).ftime;
+        Expt.Trials(j).LFP = LFP.Trials(k).LFP;
+        if autoscale 
+            for c = 1:size(Expt.Trials(j).LFP,2)
+                Expt.Trials(j).LFP(:,c) = Expt.Trials(j).LFP(:,c)./ LFP.Header.amps(c);  
+            end
+        end
     else
         Expt.Trials(j).LFP = zeros(size(powerspec));
         lfpos(j) = (LFP.Trials(k).Start - LFP.Trials(k).ftime)/(LFP.Header.CRsamplerate.*10000);
@@ -167,7 +194,7 @@ for j = 1:length(Expt.Trials)
     end
     lfpft = fft(Expt.Trials(j).LFP);
     Expt.Trials(j).FTlfp = lfpft;
-    if size(lfpft,2) == lfpchans
+    if size(lfpft,2) == lfpchans && goodtrial(j)
     powerspec = powerspec + abs(lfpft);
     end
 end

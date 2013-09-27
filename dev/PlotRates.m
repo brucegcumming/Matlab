@@ -379,7 +379,7 @@ elseif strncmpi(str,'Psych',4)
               if sethold == 0
               hold off;
               end
-              pres = ExptPsych(Expt);
+              pres = ExptPsych(Expt,'forcecolor',colors{1});
               showplot = 2;
           end
           if strcmp(Expt.Stimvals.e2,'Id') || strcmp(Expt.Stimvals.e2,'e0')
@@ -490,7 +490,7 @@ elseif strncmpi(str,'Psych',4)
               ures.psych = [];
 %              plot(sd2cv(dres.psychval) .*sgn,dres.presp./dres.psum,'o');
           else
-              if showplot
+              if showplot == 1
                   plot(dres.psychval,dres.presp./dres.psum,'o');
                   for j = 1:size(dres.x,1)
                       pp(j).x = dres.x(j);
@@ -1634,7 +1634,7 @@ if showplot
         end
     end
 end
-result.name = Expt.Header.Name;
+[result.name, result.expname] = GetEval(Expt, 'name');
 result.extras = extra;
 
 if triglfp

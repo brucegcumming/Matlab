@@ -80,6 +80,7 @@ if densityplot
         subplot(nr,nc,j);
         hold off;
         DensityPlot(X(:,plots(j,1)),X(:,plots(j,2)));
+        set(gca,'ydir','normal');
     end
 else
     for k = 1:nid

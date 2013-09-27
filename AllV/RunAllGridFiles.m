@@ -6,6 +6,9 @@ function res = RunAllGridFiles(name, varargin)
 %To apply quantification of quick saves, use
 %RunAllGridFiles(file,'quantify','savespikes')  
 %
+%To remake all files using saveed clusterse
+%RunAllGridFiles(file,'savespikes','reclassifyall')  
+%
 %RunAllGridFiles(file,'expts', exlist, 'probes', probelist, ...)  
 %    sets expts/probes to be done. (can set 
 
@@ -151,6 +154,7 @@ if iscellstr(name) && isdir(name{1}) %given a list of directories
             res.dres{j} = RunAllGridFiles(name{j},varargin{:});
         end
     end
+    CheckExceptions(res, 'RunAllGridFiles');
     return;
 end
 
@@ -225,19 +229,40 @@ if strcmp(checktype,'quantify')
     vfiles = {};
     for j = 1:length(d)
         name = [path '/' d(j).name];
-        load(name);
+        load(name,'Clusters');
+        dname = strrep(name,'ClusterTimes','ClusterTimesDetails');
+        load(dname,'ClusterDetails');
         ex = sscanf(d(j).name(5:end),'%d');
         for c = 1:length(Clusters)
             need = 0;
-            if (isfield(Clusters{c},'quick') && Clusters{c}.quick > 0) || Clusters{c}.manual == 2
+            if isempty(Clusters{c}) %Don't try anytyning
+                cprintf('errors','%s Probe %d Cluster is Empty\n',d(j).name,c);
+            elseif (isfield(Clusters{c},'quick') && Clusters{c}.quick > 0) || Clusters{c}.manual == 2
                 need = 1;
                 fprintf('%s need Probe %d C1\n',d(j).name,c);
             elseif length(Clusters{c}.next) > 0
                 for k = 1:length(Clusters{c}.next)
-                if isfield(Clusters{c}.next{k},'manual') && Clusters{c}.next{k}.manual == 2
-                    need = 1;
-                    fprintf('%s need Probe %d C%d\n',d(j).name,c,k+1);
+                    if isfield(Clusters{c}.next{k},'manual') && Clusters{c}.next{k}.manual == 2
+                        need = 1;
+                        fprintf('%s need Probe %d C%d\n',d(j).name,c,k+1);
+                    elseif isfield(Clusters{c}.next{k},'clusterprog') & strncmp(Clusters{c}.next{k}.clusterprog,'PlotClusters',9)
+                        need = 1;
+                        fprintf('%s need Probe %d C%d - last cut in PlotClusters\n',d(j).name,c,k+1);
+                    end
                 end
+            end
+            if c > length(ClusterDetails) || ~isfield(ClusterDetails{c},'clst')
+                need = 1;
+                fprintf('%s need Probe %d C%d - No ClusterDetails.clst\n',d(j).name,c,k+1);
+            elseif length(ClusterDetails{c}.clst) ~= length(ClusterDetails{c}.xy)
+                need = 1;
+                fprintf('%s need Probe %d C%d - clst/xy mismatch\n',d(j).name,c,k+1);
+            elseif isfield(ClusterDetails{c},'next')
+                for k = 1:length(ClusterDetails{c}.next)
+                    if isfield(ClusterDetails{c}.next{k},'xy') && length(ClusterDetails{c}.next{k}.xy) ~= length(ClusterDetails{c}.xy)
+                        fprintf('%s need Probe %d C%d - next xy mismatch\n',d(j).name,c,k+1);
+                        need = 1;
+                    end
                 end
             end
             if need
@@ -282,7 +307,7 @@ if strcmp(checktype,'quantify')
             try
               cls{e}{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
             catch ME
-                cls{e}{j} = ME;
+                cls{e}{j}.errstate = ME;
                 cprintf('errors','Error!!!! %s:%d %s\n',vfiles{j},cids(j),ME.message)
             end
         end
@@ -296,12 +321,22 @@ if strcmp(checktype,'quantify')
         end
     else
         for j = 1:needed
-            cls{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
+            try
+                cls{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
+            catch ME
+                cls{j}.errstate = ME;
+                cls{j}.filename = vfiles{j};
+                cls{j}.probe = cids(j);
+                cls{j}.exptid = exids(j);
+                myprintf(logfid,'Error with %s,E%dP%d\n',vfiles{j},cids(j),exids(j));
+            end
         end
     end
     res = cls;
+    CheckExceptions(res, 'RunAllGridFiles');
     return;
 end
+
 
 if ~isdir(res.prefix)
     cprintf('errors','%s is not a Directory\n',res.prefix);
@@ -421,10 +456,26 @@ end
  if logfid > 0
      fclose(logfid);
  end
- 
- 
- function res = DoFile(name, cfile, ctype, varargin)
-     res = [];
+CheckExceptions(res, 'RunAllGridFiles');
+
+
+function myprintf(stream, varargin)
+ if stream > 0
+     try 
+         fprintf(stream,varargin{:});
+     end
+ end
+
+function res = DoFile(name, cfile, ctype, varargin)
+debugging = 0;
+j = 1;
+while j <= length(varargin)
+    if strncmpi(varargin{j},'debug',5)
+        debugging = 1;
+    end
+    j = j+1;
+end
+    res = [];
      if ctype ==2
          if exist(cfile)
              load(cfile);
@@ -438,7 +489,8 @@ end
              load(cfile);
              res = ClassifyFromCluster(name,Clusters,'reapply',varargin{:});
          catch ME
-             res = ME;
+             res.errstate = ME;
+             res.filename = cfile;
              cprintf('errors','Error!!!! %s: %s\n',name,ME.message)
          end
      elseif ctype == 1 || ctype == 3
@@ -447,24 +499,31 @@ end
      elseif ~exist(cfile)
          fprintf('No Cluster File %s\n',cfile);
      else
+         if debugging
+             load(cfile);
+             res = AllVPcs(name, varargin{:},'noninteractive');
+         else
          try
              load(cfile);
              try
                  res = AllVPcs(name, varargin{:},'noninteractive');
              catch ME
                  cprintf('errors','!!!AllVPcs Error %s for file %s (line %d, m-file %s)\n',ME.message,name,ME.stack(1).line,ME.stack(1).name);
-                 res = ME;
+                 res.errstate = ME;
+                 res.filename = name;
              end
          catch ME
              cprintf('errors','!!!Error Reading %s\n',cfile);
-             res = ME;
+             res.errstate = ME;
+         end
          end
      end
      if isfield(res,'logfid') && res.logfid > 0
          try
              fclose(res.logfid);
              fprintf('Successfully closed %d\n',res.logfid);
-         catch
+         catch ME
+             res.errstate = ME;
              cprintf('errors','FID %d could not be closed\n',res.logfid);
          end
      else

@@ -856,7 +856,8 @@ elseif strncmpi(name,'setexp',6)
         end
         stimes(1) = DATA.Expts{ei}.Trials(end).Start(1);
         stimes(2) = DATA.Expts{ei}.Trials(end).End(end);
-        tspk = FindSpikes(DATA, stimes, DATA.probe,ispk);
+        %DATA.currentexpt = ei;
+        tspk = FindSpikes(DATA, stimes, DATA.probe,ei);
         DrawSpikeWaves(DATA, tspk, nclusters, 2);
     elseif isfield(DATA.Expts{ei},'Cluster')
         if isfigure(DATA.xyfig)
@@ -3150,7 +3151,7 @@ end
     SetFigure(DATA.tag.dataplot,DATA);
     if sum(strcmp('Dc',{Expt.Stimvals.et Expt.Stimvals.e2}))
         Expt.Header.rc = 2;
-    elseif Expt.Stimvals.Dc > 0 && Expt.Stimvals.Dc < 1
+    elseif isfield(Expt.Stimvals,'Dc') && Expt.Stimvals.Dc > 0 && Expt.Stimvals.Dc < 1
         Expt.Header.rc = 2;
     end
     if Expt.Header.rc == 1
@@ -3288,6 +3289,8 @@ end
     nexpts = 0;
     suffixlist = [];
     suffixid = [];
+    DATA.ArrayConfig = GetArrayConfig(name);
+
     ts = now;
     for j = 1:length(d)
         if (length(regexp(d(j).name,'Expt[0-9]*.mat')) | length(regexp(d(j).name,'\.[0-9]*\.mat'))) & ...
@@ -10365,6 +10368,8 @@ end
 if useguilist
     combinelist = get(DATA.elst,'value');
 end
+
+DATA.state.recount = 1;
 
     DATA.state.includeprobename = 1;
     oldlistbycell = DATA.listbycell;

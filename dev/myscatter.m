@@ -18,6 +18,7 @@ bidlist = [];
 plotargs = {};
 ptlabels = {};
 colors = [];
+colorids = [];
 h = [];
 if size(x,2) == 1
     x = x';
@@ -37,6 +38,9 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'labels',5)
         j = j+1;
         ptlabels = varargin{j};
+    elseif strncmpi(varargin{j},'colorids',8)
+        j = j+1;
+        colorids = varargin{j};
     elseif strncmpi(varargin{j},'colors',6)
         j = j+1;
         colors = varargin{j};
@@ -46,6 +50,9 @@ while j <= length(varargin)
     j = j+1;
 end
 
+if ~isempty(colorids) && isempty(colors)
+    colors = mycolors;
+end
 if isempty(idlist)
     idlist = 1:size(x,2);
 elseif size(idlist,2) == 1
@@ -59,7 +66,9 @@ for k = 1:size(x,1)
 for j = 1:size(x,2)
     np = np+1;
     h(np) =  plot(x(k,j),y(k,j),symbol,'buttondownfcn',{fcn, idlist(:,j), bidlist(k)},plotargs{:});
-    if ~isempty(colors)
+    if ~isempty(colorids)
+        set(h(np),'color',colors{colorids(k,j)});
+    elseif ~isempty(colors)
         set(h(np),'color',colors{k,j});
     end
     hold on;

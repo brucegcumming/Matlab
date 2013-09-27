@@ -25,11 +25,15 @@ elseif isfield(DATA,'AllClusters') && iscell(DATA.AllClusters)
     else
         nexp = DATA.currentexpt;
     end
-    if length(DATA.AllClusters) < nexp || length(DATA.AllClusters{nexp}) < probe
+    if length(DATA.AllClusters) < min(nexp) || length(DATA.AllClusters{nexp(1)}) < probe
         ispk = [];
     else
-    ispk = find(DATA.AllClusters{nexp}(probe).times > times(1) &...
-    DATA.AllClusters{nexp}(probe).times < times(2));
+        ispk = [];
+        for j = 1:length(nexp)
+            ispks{j} = find(DATA.AllClusters{nexp(j)}(probe).times > times(1) &...
+                DATA.AllClusters{nexp(j)}(probe).times < times(2));
+        end
+        ispk = cat(1,ispks{:});
     end
 elseif isfield(DATA,'AllClusters')
     ispk = find(DATA.AllClusters(probe).times > times(1) &...

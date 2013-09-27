@@ -179,12 +179,15 @@ filter = fftshift(filter);
     state.buildim = 1;
     state.replace = replace;
     if parallel
+        ftcells = {};
         parfor seed = (1:nseed)
             im = BuildIm(savedir,seed, state, filter, envelope);
             if ~isempty(im)
             nbuilt = nbuilt+1;
             end
+            fts(seed,:,:) = fft2(im-0.5);
         end
+        details.ft = squeeze(fts(end,:,:));
     else
         for seed = 1:nseed
             [im, ft] = BuildIm(savedir,seed, state, filter, envelope);
@@ -195,10 +198,10 @@ filter = fftshift(filter);
             end
             end
         end
+        details.image = im;
+        details.ft = ft;
     end
     
-details.image = im;
-details.ft = ft;
 
 if ~isempty(savedir) & nbuilt
     fid = fopen(sprintf('%s/paramlist',savedir),'w');

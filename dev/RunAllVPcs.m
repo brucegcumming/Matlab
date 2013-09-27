@@ -1,10 +1,17 @@
 function res = RunAllVPcs(name, varargin)
 %res = RunAllVPcs(dir, .....
-%Reads all FullV Matlab files in a directory and calls AllVPcs
+%Reads all FullV Matlab files in a directory and calls AllVPcs. Some arguemnts to
+%AllVPcs ('quantifyall', 'reclassifyall') perform operation on all channels. Others only operate on 
+%a probe named on the command line ('refcluster').  In the latter case, a list of probes must be given to RunAllVPcs
+%Examples: 
 %
 %res = RunAllVPcs(dirname,'quantifyall','savespikes')
 %Uses existing cluster boundary an recalculates statisitcs (finishining
-%"quick" saves)
+%"quick" saves). Checks all channels but only recalculates channels needing finishing. 
+%
+%res = RunAllVPcs(dirname,'probes',probelist,'refcut')  Applies RefClusters where clusters are not defind
+%res = RunAllVPcs(dirname,'probes',probelist,'refclusterforce')  Applies RefClusters regardless
+%when probes is used in this way, RunallVPcs calls AllVPcs separately for each probe
 %
 %RunAllVPcs(dirname,'expts',exlist, 'tchan',tlist, 'savespikes', 'refineall',Clusters)
 %Uses clusters defined in Clusters and reapplies these to probes named in
@@ -38,6 +45,7 @@ userefcluster = 0;
 condenselist = 0;
 runinteractive = 0;
 nskip = 0;
+probe = [];
 
 args = {};
 addargs = {};
@@ -283,7 +291,7 @@ end
  if logfid > 0
      fclose(logfid);
  end
-CheckErrors(res,'AllVPcs');
+CheckExceptions(res,'AllVPcs');
 
 function need = FineUnsafes(res, findunsafe)
     need = [];
@@ -310,6 +318,7 @@ makesmall = 1;
 quantify = 0;
 checkspikes = 0;
 userefcluster = 0;
+probes = [];
 
 args = {};
 while j <= length(varargin)
@@ -322,6 +331,9 @@ while j <= length(varargin)
         end
     elseif strncmpi(varargin{j},'nocut',5)
         nocut = 1;
+    elseif strncmpi(varargin{j},'probes',6)
+        j = j+1;
+        probes = varargin{j};
     elseif strncmpi(varargin{j},'quantify',5)
         quantify = 1;
         args = {args{:} varargin{j}};
@@ -406,6 +418,14 @@ if checkspikes
     return;
 end
 
+
+
+if ~isempty(probes)
+    for j = 1:length(probes)
+        res.cls{j} = AllVPcs(outname,'tchan',probes(j), args{:});
+    end
+    return;
+end
 
 ts = now;
 try

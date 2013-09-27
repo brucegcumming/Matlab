@@ -18,7 +18,17 @@ while j <= length(varargin)
     j = j+1;
 end
 
-if ~exist(name,'file')
+
+if iscell(name)
+    for j = 1:length(name)
+        name{j} = LoadExpt(name{j},varargin{:});
+    end
+    Expt = name;
+    return;
+elseif isfield(name,'Header')
+    Expt = name;
+    name = Expt.Header.loadname;
+elseif ~exist(name,'file')
     Expt = [];
     if(name(1) == '/')
         return;

@@ -87,7 +87,7 @@ elseif strmatch('loadone',list)
 elseif strmatch(list,'load')
   LoadAllData(OTTF);
 elseif strmatch(list,'Mark')
-    OTTF.data.marked(OTTF.id) = 1;
+    OTTF.Data.marked(OTTF.id) = 1;
     set(findobj('Tag',TOPTAG),'UserData',OTTF);
  elseif strmatch(list,'NewPrefix')
      OTTF.prefix = get(findobj('Tag','Prefix'),'String');
@@ -96,15 +96,15 @@ elseif strmatch(list,'Mark')
      end
     set(findobj('Tag',TOPTAG),'UserData',OTTF);     
 elseif strmatch(list,'UnMarkAll')
-    OTTF.data.marked(1:end) = 0;
+    OTTF.Data.marked(1:end) = 0;
     set(findobj('Tag',TOPTAG),'UserData',OTTF);
     RePlot(OTTF);
 elseif strmatch(list,'UnMark')
-    OTTF.data.marked(OTTF.id) = 0;
+    OTTF.Data.marked(OTTF.id) = 0;
     set(findobj('Tag',TOPTAG),'UserData',OTTF);
     RePlot(OTTF);
 elseif strmatch(list,'PrintMarkList')
-    idx = find(OTTF.data.marked > 0);
+    idx = find(OTTF.Data.marked > 0);
     if isempty(idx) && isfield(OTTF.plot,'selected')
         idx = OTTF.plot.selected;
     end
@@ -390,7 +390,7 @@ elseif strmatch(list,'popplot')
 elseif strmatch(list,'nextmarked')
     it = findobj(gcf, 'Tag',OTTF.listtag);
     n = get(it, 'value');
-    idx = find(OTTF.data.marked == 1);
+    idx = find(OTTF.Data.marked == 1);
     id = min(find(idx > n));
     if ~isempty(id)
         set(it, 'value',idx(id));
@@ -514,6 +514,9 @@ function OTTF = LoadState(OTTF)
     oldDATA = OTTF;
     
     tic; load(OTTF.statefile); toc
+    if isfield(OTTF,'data') && isfield(OTTF.data,'marked')
+        OTTF.Data.marked = OTTF.data.marked;
+    end
     f = fields(oldplot);
     for j = 1:length(f)
         if ~isfield(OTTF.plot,f{j})
@@ -543,6 +546,16 @@ function OTTF = LoadState(OTTF)
     end
     if ~isempty(OTTF.xfunc)
         OTTF = feval(OTTF.xfunc, 'checkload', OTTF);
+    end
+    if ispc
+        drive = pwd;
+        drive = drive(1:2);
+    else
+        drive = '';
+    end
+    for j = 1:length(OTTF.fstrings)
+        OTTF.fstrings{j} = regexprep(OTTF.fstrings{j},'^[A-Z]:','');
+        OTTF.fstrings{j} = [drive OTTF.fstrings{j}];
     end
 
 function name = SetStateName(OTTF)
@@ -1120,14 +1133,18 @@ OTTF.gui.wsiz = wsiz;
 
 if ~isempty(bgcfileprefix) & ~strncmp(bgcfileprefix,OTTF.fstrings{1},length(bgcfileprefix))
     OTTF.prefix = bgcfileprefix;
+elseif ispc && OTTF.fstrings{1}(1) == '/'
+    D = pwd;
+    OTTF.prefix = D(1:2);
 else
     OTTF.prefix = '';  
 end
 %if use /bgc/bgc as path, should always work.
 if strfind(OTTF.fstrings{1},'/bgc/bgc')
 OTTF.prefix = '';
-else
-OTTF.prefix = '';
+elseif ispc && OTTF.fstrings{1}(1) == '/'
+    D = pwd;
+    OTTF.prefix = D(1:2);
 end
 if iscellstr(list)
     OTTF.list = 'struct';
@@ -1197,7 +1214,7 @@ if ~isempty(OTTF.prefix)
 end
 
 for j = 1:length(OTTF.fstrings)
-    OTTF.data.marked(j) = 0;
+    OTTF.Data.marked(j) = 0;
 end
 
 

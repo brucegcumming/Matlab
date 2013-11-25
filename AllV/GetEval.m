@@ -52,7 +52,9 @@ elseif strcmpi(type,'name')
     if isfield(Expt.Header,'loadname')
         tf = Expt.Header.loadname;
     elseif isfield(Expt.Header,'name')
-        tf = Expt.Header.loadname;
+        tf = Expt.Header.name;
+    elseif isfield(Expt.Header,'Name')
+        tf = Expt.Header.Name;
     end
     return;
 end

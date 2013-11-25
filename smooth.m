@@ -10,6 +10,11 @@ end
 sdim = 1;
 kernel = [];
 j = 1;
+if strncmpi(w,'kernel',4)
+    w = 1;
+    kernel = varargin{1};
+    j = 2;
+end
 
 while j < nargin-1
     if strncmpi(varargin{j},'gauss',4)

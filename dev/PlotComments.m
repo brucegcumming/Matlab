@@ -12,11 +12,13 @@ D.closeonadd = 0;
 D.includeexptlist = 1;
 D.interactive = 1;
 D.show.user = 0;
-D.show.program  =0;
+D.show.program  = 0;
 D.show.time = 0;
 D.show.exptprobe = 0;
+D.show.depth = 0;
 DATA = [];
 addline = [];
+filename = [];
 
 if ischar(varargin{1})
     if isdir(varargin{1})
@@ -24,7 +26,8 @@ if ischar(varargin{1})
     else
         [path, filename] = fileparts(varargin{1});
     end
-    [D.ExptComments, D.ExptList] = BuildExptComments(varargin{1});
+    D.filename = dir2name(varargin{1},'filename');
+    [D.ExptComments, D.ExptList] = BuildExptComments(varargin{:});
     cname = [varargin{1} '/Comments.mat'];
     D.CommentFile = cname;
     if exist(cname)
@@ -77,7 +80,7 @@ if ~isempty(addline) %just add a comment without GUI
 end
     if parent > 0
         if D.interactive
-        F = GetFigure('Comments',parent);
+            [F, isnew] = GetFigure('Comments',parent);
         end
         DATA = get(parent,'UserData');
 %        D.closeonadd = 0;
@@ -92,41 +95,59 @@ end
             D.program = DATA.progname;
         end
     else
-        F = GetFigure('Comments');
-    end
-    if D.interactive
-        set(F,'DefaultUIControlFontSize',fontsize);
-
-        setappdata(F,'CommentData',D);
-        lst = uicontrol(F, 'Style','listbox','String', 'No Comments',...
-            'Callback', {@HitCommentList},...
-            'Tag', 'CommentDisplay',...
-            'KeyPressFcn', @KeyPressed,...
-            'fontsize',fontsize,...
-            'units','norm', 'Position',[0 0.1 1 0.9]);  
-        a = uicontrol(F, 'Style','edit','String', '', ...
-            'tag','NewComment',...
-            'fontsize',fontsize,...
-            'units','norm', 'Position',[0 0 0.85 0.1]);  
-        if D.closeonadd == 0
-            set(a,'position',[0 0 0.7 0.1]);
-            uicontrol(F, 'Style','Pushbutton','String', 'Add',...
-                'Callback', {@AddCommentList, 'refresh'},...
+        [F, isnew] = GetFigure('Comments');
+        D.program = 'PlotComments';
+    end    
+    if D.interactive 
+        if isnew
+            if ~isempty(filename)
+                D.filename = filename;
+            end
+            cmenu = uicontextmenu;
+            uimenu(cmenu,'Label','Edit','Callback',@EditComment);
+            set(F,'DefaultUIControlFontSize',fontsize,'UIcontextmenu',cmenu);
+            setappdata(F,'CommentData',D);
+            lst = uicontrol(F, 'Style','listbox','String', 'No Comments',...
+                'Callback', {@HitCommentList},...
+                'Tag', 'CommentDisplay',...
+                'KeyPressFcn', @KeyPressed,...
                 'fontsize',fontsize,...
-                'units','norm', 'Position',[0.7 0 0.15 0.1]);
+                'UIcontextmenu',cmenu,...
+                'units','norm', 'Position',[0 0.1 1 0.9]);
+            a = uicontrol(F, 'Style','edit','String', '', ...
+                'tag','NewComment',...
+                'fontsize',fontsize,...
+                'units','norm', 'Position',[0 0 0.85 0.1],'callback',@CommentText);
+            if D.closeonadd == 0
+                set(a,'position',[0 0 0.7 0.1]);
+                uicontrol(F, 'Style','Pushbutton','String', 'Add',...
+                    'Callback', {@AddCommentList, 'refresh'},...
+                    'fontsize',fontsize,...
+                    'units','norm', 'Position',[0.7 0 0.15 0.1]);
+            end
+            uicontrol(F, 'Style','Pushbutton','String', 'Done',...
+                'Callback', {@AddCommentList, 'close'},...
+                'fontsize',fontsize,...
+                'units','norm', 'Position',[0.85 0 0.15 0.1]);
+            hm = uimenu(F,'Label','Show');
+            uimenu(hm,'Label','User','tag','user','Callback',@SetOptions);
+            uimenu(hm,'Label','Time','tag','time','Callback',@SetOptions);
+            uimenu(hm,'Label','Expt/Probe','tag','exptprobe','Callback',@SetOptions);
+            uimenu(hm,'Label','Electrode Depth','tag','depth','Callback',@SetOptions);
+            uimenu(hm,'Label','Program','tag','program','Callback',@SetOptions);
         end
-        uicontrol(F, 'Style','Pushbutton','String', 'Done',...
-            'Callback', {@AddCommentList, 'close'},...
-            'fontsize',fontsize,...
-            'units','norm', 'Position',[0.85 0 0.15 0.1]);  
-        hm = uimenu(F,'Label','Show');
-        uimenu(hm,'Label','User','tag','user','Callback',@SetOptions);
-        uimenu(hm,'Label','Time','tag','time','Callback',@SetOptions);
-        uimenu(hm,'Label','Expt/Probe','tag','exptprobe','Callback',@SetOptions);
-        uimenu(hm,'Label','Program','tag','program','Callback',@SetOptions);
+            if isfield(D,'filename')
+                set(F,'Name',dir2name(D.filename,'filename'));
+            end
         DisplayComments(F);
     end
-    
+ 
+function CommentText(a,b)
+   f = GetFigure(a);
+   if get(f,'currentcharacter') %Hit return
+       AddCommentList(a,b,'refresh');
+   end
+   
 function DisplayComments(F, varargin)
 D = getappdata(F,'CommentData');
 setpos = 0;
@@ -142,16 +163,31 @@ end
     str = {};
     if D.includeexptlist
         for j = 1:length(D.ExptList)
-            str{j} = sprintf('E%d %s: %d trials',j,D.ExptList(j).name,D.ExptList(j).ntrials);
+            epstr = [];
+            dstr = [' at ' datestr(D.ExptList(j).start,'HH:MM')];
+            if D.show.depth && isfield(D.ExptList,'depth')
+                epstr = [epstr ' ' sprintf('ed=%.3f',mean(D.ExptList(j).depth))];
+            end
+            str{j} = sprintf('E%d %s: %d trials%s %s',j,D.ExptList(j).name,D.ExptList(j).ntrials,dstr,epstr);
+            ts(j) = D.ExptList(j).start;
             strid(j) = 0;
         end
     end
     nc = length(str);
     %Cell array or struct? WEhn called on a grid dir, seems to be a strcut
     for j = 1:length(D.ExptComments)
-        str{nc+j} = D.ExptComments(j).text;
+        epstr = [];
+        if D.show.depth && isfield(D.ExptList,'depth')
+            epstr = [epstr ' ' sprintf('ed=%.3f',mean(D.ExptComments(j).depth))];
+        end
+        dstr = [' at ' datestr(D.ExptComments(j).time,'HH:MM')];
+        str{nc+j} = [D.ExptComments(j).text dstr epstr];
+        ts(nc+j) = D.ExptComments(j).time;
         strid(nc+j) = 1000+j;
     end
+    [a,b] = sort(ts);
+    str = str(b);
+    strid = strid(b);
     nc = length(str);
     if isfield(D,'Comments')
     for j = 1:length(D.Comments)
@@ -166,8 +202,11 @@ end
         if D.show.time
             epstr = [datestr(D.Comments(j).time) ' ' epstr];
         end
-        if D.show.program
+        if D.show.program && isfield(D.Comments,'program')
             epstr = [D.Comments(j).program ' ' epstr];
+        end
+        if D.show.depth && isfield(D.Comments,'depth')
+            epstr = [sprintf('%.3f') D.Comments(j).depth ' ' epstr];
         end
         str{j+nc} = [ epstr D.Comments(j).comment];
         strid(j+nc) = j;
@@ -259,8 +298,10 @@ if iscell(txt) %return in text win makes string a cell with blank
 else
     Comments(n).comment = txt;
 end
-if isfield(DATA,'program')
-Comments(n).program = DATA.program;
+if isfield(D,'program')
+    Comments(n).program = D.program;
+elseif isfield(DATA,'program')
+    Comments(n).program = DATA.program;
 end
 C = D;
 C.Comments = Comments;
@@ -270,6 +311,17 @@ if strmatch(ks.Key,'delete')
     DeleteComment(src);
 end
     
+function EditComment(a,b)
+F = get(a,'parent');
+a = findobj(F,'tag','CommentDisplay');
+line = get(a,'value');
+strid = get(a,'userdata');
+D = getappdata(F,'CommentData');
+load(D.CommentFile);
+a = findobj(F,'tag','NewComment');
+set(a,'string',line(strid))
+
+
 function DeleteComment(a,b)
 %Deletes comment currently selected in text list
 F = get(a,'parent');
@@ -294,7 +346,12 @@ line = get(a,'value');
 strid = get(a,'userdata');
 F = get(a,'parent');
 D = getappdata(F,'CommentData');
+C = [];
 if strid(line) >0 && strid(line) < 1000
 C = D.Comments(strid(line));
-fprintf('%s at %s: %s\n',C.user, datestr(C.time), C.comment);
+fprintf('%s: %s at %s',C.comment, C.user, datestr(C.time));
 end
+if isfield(C,'program')
+    fprintf(' from %s',C.program);
+end
+fprintf('\n');

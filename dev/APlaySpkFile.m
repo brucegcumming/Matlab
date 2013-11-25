@@ -67,7 +67,7 @@ mkidx =0;  %%need this up here so taht relist works
 
 
 if isdir(name)
-    [Expt, Expts] = ReadExptDir(name, varargin{:});
+    [Expts, Expt] = ReadExptDir(name, varargin{:});
     return; 
 end
 
@@ -98,7 +98,7 @@ while j <= length(varargin)
     elseif strncmpi(vg,'noframes',6)
         state.needframes = 0;
     elseif strncmpi(vg,'profile',6)
-        state.profiling = 1;
+        state.profiling = 2;
     elseif sum(strncmpi(vg,{'quicksuffix' 'quickload'},9))
        ignoreSpikeO = 2;
        quickload = 1;
@@ -624,6 +624,10 @@ if ischar(name)
                             a.Clusters{k}.times = SpkTimes(1).Clusters{k}.times;
                             a.Clusters{k}.clst = SpkTimes(1).Clusters{k}.clst;
                         end
+                        if diff(size(a.Clusters{k}.times)) < 0 %make sure these are column vectors
+                            cprintf('red','%s P%d has t as row vector\n',cname,k)
+                            a.Clusters{k}.times = a.Clusters{k}.times';
+                        end
                     end
                     SpkTimes(nspkt).Clusters = a.Clusters;
                     if isfield(a,'FullVData')
@@ -1013,7 +1017,15 @@ end
 Expt.Header.DataType = Expt.DataType;
 
 if ~mkidx
-    load(idxfile);
+    t = mygetCurrentTask();
+    if t.ID > 0
+        fprintf('WOrker %d loading %s\n',t.ID,idxfile);
+        load(idxfile);
+        fprintf('Worker %d loaded %s\n',t.ID,idxfile);
+    else
+        load(idxfile);
+    end
+  
     if ~isfield(Expt,'errs')
         Expt.errs = {};
     end
@@ -1030,10 +1042,15 @@ if ~mkidx
     aText.text = {};
     aText.times = [];
     aText.codes = [];
-    [aText, Ch30] = AddText(regexprep(name,'\.[0-9]*.mat','Add.txt'), aText, Ch30);
-    [aText, Ch30] = AddText(strrep(name,'.mat','Add.txt'), aText, Ch30);
-    if isfield(Expt,'Comments') & isfield(Expt.Comments,'Peninfo');
-        txt = GetPenInfo(Ch30,'name',name);
+    [aText, Ch30, na] = AddText(regexprep(name,'\.[0-9]*.mat','Add.txt'), aText, Ch30);
+    [aText, Ch30, nb] = AddText(strrep(name,'.mat','Add.txt'), aText, Ch30);
+%only re-read peninfo if there are added lines
+    if isfield(Expt,'Comments') & isfield(Expt.Comments,'Peninfo') && (na+nb) > 0
+        if isempty(aText)
+            txt = GetPenInfo(Ch30,'name',name);
+        else
+            txt = GetPenInfo(aText,'name',name);
+        end
         txt = strrep(txt,'Contact CNT','ContactCNT');
         Expt.Comments.Peninfo.trode = txt;
         id = strfind(txt,'Contact');
@@ -1144,6 +1161,7 @@ if 0 & idxfile & exist(idxfile,'file')
     load(idxfile);
     return;
 end
+
     if ~isfield(Expt,'errs')
         Expt.errs = errs;
         Expt.newerrs = length(errs);
@@ -1403,6 +1421,20 @@ else
     Result.badisi = [];
 end
 
+xname = strrep(name,'.mat','Add.txt');
+fid = fopen(xname,'r');
+if fid > 0
+    a = textscan(fid,'%f %s','delimiter','\n');
+    fclose(fid);
+    eid = strcmp('EndExpt',a{2});
+    for j = 1:length(eid)
+        id = find(Events.times < a{1}(eid(j))); %should never be empty
+        id = id(end);
+        Events.codes = [Events.codes(1:id,:); ENDEXPT 0 0 0; Events.codes(id+1:end,:)];
+        Events.times = [Events.times(1:id); a{1}(j); Events.times(id+1:end)];
+        Events.store = [Events.store(1:id); Events.store(id); Events.store(id+1:end)];
+    end
+end
 
 readmethod = 0;
 settrials = 0;
@@ -1462,7 +1494,7 @@ ExptStart = Events.times(exstartid);
 exendid = exendid(exendid > exstartid(1));
 ExptEnd = Events.times(exendid);
 if isempty(ExptEnd) %% sometimes .mat file is missing EndExpt Marker. But best to fix .smr
-    Expt = AddError(Expt, 'No EndExpt Marker', Expt);
+    Expt = AddError(Expt, 'No EndExpt Marker');
     ExptEnd = Events.times(end);
     exendid = length(Events.times)+1;
     Events.codes(exendid,1) = ENDEXPT;
@@ -1572,10 +1604,30 @@ bfevid = find(Events.codes(:,1) == BADFIX);
 endtrid = find(Events.codes(:,1) == ENDTRIAL);
 sacid = strmatch('Sa:',Text.text); %lines sent by binoc if ending trial
 endstimid = strmatch('EndStim',Text.text);
+t = mygetCurrentTask();
+if t.ID == 0
+    guiok = 1;
+else
+    guiok = 0;
+end
+
+
+
+
+
+Trials.Start = zeros(size(fsid))';
+Trials.End = zeros(size(fsid))';
+Trials.FalseStart = zeros(size(fsid))';
+Trials.TrueEnd = zeros(size(fsid))' .* NaN;
+Trials.delay = Trials.TrueEnd;
+ts = now;
+
 if length(fsid) == length(bsid)
    Result.bsdelay = fstimes - bstimes(bsid);
    readmethod = 1;
-   wh = waitbar(0,'Building Trial Time List');
+   if guiok
+       wh = waitbar(0,'Building Trial Time List');
+   end
 %Trials.EndTxt idetnifies the text event that matched the end of trial n   
   for j = 1:length(fsid)
       Trials.Start(j) = bstimes(bsid(j));
@@ -1637,49 +1689,62 @@ if length(fsid) == length(bsid)
           x = Trials.EndTxt(j) - Trials.EndTxt(j-1);
           fprintf('End Trial text timing error at %.0f\n',Trials.EndTxt(j));
       end
-      if ~isempty(frametimes) % have VTR channel
-                id = find(frametimes > Trials.Start(j) & frametimes < Trials.Start(j)+500);
-                if ~isempty(id)
-                    Trials.delay(j) = frametimes(id(1)) - Trials.Start(j);
-                    Trials.Start(j) = frametimes(id(1));
-                    Trials.FalseStart(j) = 0;
-                    ff = 1;
-                else
-                    Trials.FalseStart(j) = 1;
-                    Trials.delay(j) = NaN;
-                    ff = 1;
-                end
 
-          
-          id = find(frametimes(ff:end) > Trials.End(j))+ff-1;
+      if j < length(fstimes)
+          nextfs = fstimes(j+1);
+      else
+          nextfs = estimes(end)+2;
+      end
+      id = find(rwtimes > Trials.Start(j) & rwtimes < nextfs);
+      if ~isempty(id)
+          Trials.rwtimes{j} = rwtimes(id);
+      else
+          if Trials.estimes(j)-Trials.bstimes(j) > 20000 & Trials.Result(j) > 0
+              Trials.rwtimes{j} = 0;
+          else
+              Trials.rwtimes{j} = 0;
+          end
+      end
+      if guiok && mod(j,1000) == 0 
+          waitbar(j/length(fstimes));
+      end
+  end
+  if ~isempty(frametimes) % have VTR channel
+      
+      ff = 1;
+      nf = length(frametimes);
+      maxl(2:length(Trials.Start)) = 100+ceil(diff(Trials.Start)./100);
+      maxl(1) = ceil(Trials.Start(1)./100);
+      for j = 1:length(Trials.Start)
+          if ff+maxl(j) > nf
+              last = nf;
+          else
+              last = ff+maxl(j);
+          end
+          id = find(frametimes(ff:last) > Trials.Start(j),1)+ff-1;
+          if ~isempty(id)
+              Trials.delay(j) = frametimes(id(1)) - Trials.Start(j);
+              Trials.Start(j) = frametimes(id(1));
+              Trials.FalseStart(j) = 0;
+              ff = id(1);
+              last = min([ff+1000 nf]);
+          else
+              Trials.FalseStart(j) = 1;
+              Trials.delay(j) = NaN;
+          end
+          id = find(frametimes(ff:last)> Trials.End(j),1)+ff-1;
           if ~isempty(id) & frametimes(id(1))-Trials.End(j) < 500
               Trials.endelay(j) = Trials.End(j) - frametimes(id(1));
               Trials.End(j) = frametimes(id(1));
               Trials.TrueEnd(j) = frametimes(id(1));
           else
           end
-          if j < length(fstimes)
-              nextfs = fstimes(j+1);
-          else
-              nextfs = estimes(end)+2;
-          end
-          id = find(rwtimes > Trials.Start(j) & rwtimes < nextfs);
-          if ~isempty(id)
-              Trials.rwtimes{j} = rwtimes(id);
-          else
-              if Trials.estimes(j)-Trials.bstimes(j) > 20000 & Trials.Result(j) > 0
-              Trials.rwtimes{j} = 0;
-              else
-              Trials.rwtimes{j} = 0;
-              end
-          end
-      end
-      if mod(j,100) == 0
-      waitbar(j/length(fstimes));
       end
   end
-  delete(waitbar(1));
-  drawnow;
+  if guiok
+      delete(waitbar(1));
+      drawnow;
+  end
   %badfix is always (?? what about Sa?) detected by spike2, so the stimoff
   %marker will always be after this.
   bid = find(Events.codes(:,1) == 11); %bad fix
@@ -1720,6 +1785,9 @@ else
     readmethod = -1;
 end
 end
+
+tt = mytoc(ts);
+
 
 
 
@@ -1961,8 +2029,11 @@ if length(Expts) > nx  && settrials == 0 %some Expts set in first pass never fou
     fprintf('Only found %d of %d good Expts\n',nx,length(Expts));
 end
 ntrials = nt;
-fprintf('Setting Trials Took %.2f\n',toc);
+fprintf('Setting Trials Took %.2f\n',mytoc(ts));
 tic;
+if state.profiling == 2
+    return;
+end
 
 trial = 1;
 k = 1;
@@ -2071,12 +2142,20 @@ lastfix.fx = 0;
 lastfix.fy = 0;
 Stimulus.Flag = '';
 fprintf('Text->stims .....',toc);
-waitbar(0,sprintf('parsing %d txt lines',length(aText.text)));
+if guiok
+    waitbar(0,sprintf('parsing %d txt lines',length(aText.text)));
+end
+if state.profiling == 1
+    profile on;
+end
 
 inexpt = 0;
 Stimulus.OptionCode = '+se';
 nfpj=0;
 bsctr = 0;
+waitloop = round(length(aText.text)/20); %update waitbar 20 times
+E.explabel = '';
+
 for j = 1:length(aText.text)
     aText.text{j} =  deblank(aText.text{j});
     txt = aText.text{j};
@@ -2095,7 +2174,7 @@ for j = 1:length(aText.text)
             for f = {'puA' 'puF' 'USd' 'USp' 'USf' 'nph' 'ijump' 'mixac' 'baddir' ...
                     'e1max' 'backMov' 'FakeSig' 'pBlack' 'aOp' 'aPp' 'seof' 'serange' ...
                     'nimplaces' 'usenewdirs' 'choicedur' 'cha' 'imi' 'choicedur' 'ePr' ...
-                    'coarsemm' 'psyv' }
+                    'coarsemm' 'psyv'}
                 if sum(strncmp(txt,f,length(f{1})))
                     ss = txt(1:length(f{1}));
                     slen = length(f{1});
@@ -2134,13 +2213,14 @@ for j = 1:length(aText.text)
             bsctr = bsctr+1;
         elseif aText.codes(j,1) == 3 %end stim
             instim = 2;
-        elseif aText.codes(j,1) == STARTEXPT %end stim
+        elseif aText.codes(j,1) == STARTEXPT
             inexpt = 1;
             if readmethod == 1
                 id = find([Expts.end] < aText.times(j));
                 ix = length(id)+1;
             end
         elseif aText.codes(j,1) == ENDEXPT %end stim
+            Stimulus.explabel = '';
             if inexpt
                 ix = ix+1;
             end
@@ -2148,7 +2228,8 @@ for j = 1:length(aText.text)
         elseif regexp(txt,'sb[+,-,0]') %ignore these lines
         elseif strncmp(txt,'{}',2) %bug!!
         txt = aText.text{j};
-            
+        elseif strncmp(txt,'explabel',7) %
+            Stimulus.explabel = txt(10:end);            
         elseif strncmp(txt,'EndStim',7) %finished reading all text related to last stim
             gotend = 1;
         elseif strncmp(txt,'manexpt=',8)
@@ -2161,7 +2242,18 @@ for j = 1:length(aText.text)
             end
             Stimulus.exvals = a;
         elseif strncmp(txt,'exvals',6)
-            a = sscanf(txt,'exvals %f %f %f %d');
+            if isspace(txt(7))
+                a = sscanf(txt,'exvals %f %f %f %d');
+                if length(a) == 4
+                    Stimulus.stimid = a(4);
+                end
+            elseif txt(7) == '='
+                a = sscanf(txt,'exvals=%f %f %f %d');
+                Stimulus.exvals = a;
+            else
+                a = sscanf(txt,'exvals%f %f %f %d');
+                Stimulus.exvals = a;
+            end
             if isfield(Stimulus,'et')
                 Stimulus.(Stimulus.et) = a(1);
             end
@@ -2526,6 +2618,8 @@ for j = 1:length(aText.text)
             Stimulus.rwdir = correctdir;
 %            Stimulus.FlipDir = 1;
         end
+%                fprintf('t%.1f end %.1f c%d,%d trials %d\n',t,endtimes(trial),aText.codes(j,1),aText.codes(j,4),trial)
+
         if trial == 3057
             instim = instim;
         end
@@ -2571,7 +2665,7 @@ for j = 1:length(aText.text)
             end
             end
             instim = 2;
-        else %shouldb't happen
+        else %? shouldb't happen. Comes here for all codes out
             trial = trial;
        end
     end
@@ -2626,14 +2720,20 @@ for j = 1:length(aText.text)
     elseif t > Trials.Start(trial) && instim == 0 && aText.codes(j,4) ~= 2
         instim = 1;
     end
-    if mod(j,1000) == 0
+    if guiok && mod(j,waitloop) == 0
         waitbar(j/length(aText.text));
     end
 end
+if guiok
 delete(waitbar(1));
 drawnow;
+end
+if state.profiling == 1
+    profile viewer;
+end
 
 if isfield(Trials,'ve') && iscellstr(Trials.ve)
+    Expt.version = Trials.ve{end};
     for j = 1:length(Trials.ve)
         if strncmp(Trials.ve{j},'binoclean',8)
             x = sscanf(Trials.ve{j}(11:end),'%f');
@@ -3018,7 +3118,7 @@ if isfield(Idx,'errs') & length(Idx.errs)
     fclose(fid);
 end
 
-function [aText, Text] = AddText(AddTxtFile, aText, Text)
+function [aText, Text, newlines] = AddText(AddTxtFile, aText, Text)
 %Add text reads lines of the form
 %t txt
 %where t is in seconds, not timestamps
@@ -3027,6 +3127,7 @@ function [aText, Text] = AddText(AddTxtFile, aText, Text)
 %can also add Stimulus Values by id with
 %idxxxx str
 
+newlines = 0;
 [a,b,c] = fileparts(AddTxtFile);
 if ~strcmp(c,'.txt')
     return;
@@ -3064,7 +3165,6 @@ if fid > 0
     end
     fclose(fid);
     
-    newlines = 0;
     did = find(strncmp(s,'delete',6));
     if ~isempty(did) && ~isempty(aText.times)
         for j = 1:length(did)
@@ -3084,8 +3184,9 @@ if fid > 0
         else
             txt = s{j};
         end
-        fprintf('%d Adding Text %s\n',t(j),s{j})
-%        cprintf('blue','%d Adding Text %s\n',t(j),s{j})
+        if j < 500
+            cprintf('blue','%d Adding Text %s\n',t(j),s{j})
+        end
         if ~isempty(aText.times)
         if t(j) < 0  && t(j) > -1000%special case for fixing lines
             if strncmp(s{j},'cm=rf',5)
@@ -3106,7 +3207,7 @@ if fid > 0
             txt = '';
         else
             aText.text{end+1} = txt;
-            aText.times(end+1)=t;
+            aText.times(end+1)=t(j);
             aText.codes(end+1,:)=0;
             if strcmp(txt,'EndExpt')
                 aText.codes(end,1) = ENDEXPT;
@@ -3118,14 +3219,14 @@ if fid > 0
             Text.text(end+1,1:length(txt)) = txt;
         end
     end
+    if newlines
+        [t, tid] = sort(aText.times);
+        aText.text = aText.text(tid);
+        aText.times = aText.times(tid);
+        aText.codes = aText.codes(tid,:);
+    end
+    fprintf('Took %.2f\n',mytoc(ts));
 end
-if newlines
-    [t, tid] = sort(aText.times);
-    aText.text = aText.text(tid);
-    aText.times = aText.times(tid);
-    aText.codes = aText.codes(tid,:);
-end
-fprintf('Took %.2f\n',mytoc(ts));
 
 
 
@@ -3172,6 +3273,7 @@ end
 
 function Trials = SetTrial(Stimulus, Trials, trial, ntrials)
 
+
 fn = fieldnames(Stimulus);
 if isfield(Stimulus,'Ro') && isfield(Stimulus,'dx')
     ca = cos(Stimulus.Ro * pi/180);
@@ -3182,28 +3284,30 @@ if isfield(Stimulus,'Ro') && isfield(Stimulus,'dx')
     Stimulus.dO = Stimulus.dx .* sa - Stimulus.dy .* ca;
     Stimulus.dP = Stimulus.dy .* sa + Stimulus.dx .* ca;
 end
+
 for k = 1:length(fn)
     F = fn{k};
-    if ~isfield(Trials,F)
-%        Trials.F(1:ntrials) = NaN; % pre-allocate memory
-    end
     if strcmp(F,'St')
         Trials.St(trial) = Stimulus.(F);
     elseif strncmp(F,'trode',5)
     elseif ischar(Stimulus.(F)) 
         if ~isfield(Trials,F) || ischar(Trials.(F)) || iscell(Trials.(F))
-        if length(Stimulus.(F)) > 0
+        if ~isempty(Stimulus.(F))
             Trials.(F){trial} = Stimulus.(F);
         end
         else
             fprintf('%s is Char in Stimulus, not in Trials\n',fn{k});
         end
-    elseif sum(strcmp(F,{'Seedseq' 'Stimseq' 'Phaseseq' 'cLseq' 'cRseq' 'xoseq' 'yoseq' 'rptframes' 'rwtimes'}))    
+    elseif sum(strcmp(F,{'Seedseq' 'Stimseq' 'Phaseseq' 'cLseq' 'cRseq' 'xoseq' 'yoseq' 'rptframes' 'rwtimes' 'nsf' 'ntf'}))    
            Trials.(fn{k}){trial} = Stimulus.(fn{k});
     else
+        if ~isfield(Trials,F)
+            Trials.(F)(1:ntrials,1) = NaN; % pre-allocate memory
+        end
         if isempty(Stimulus.(F))
-            Trials.(F)(trial) = NaN;
+            Trials.(F)(trial,1) = NaN;
         else
+%            Trials.(F)(trial,1:length(Stimulus.(F))) = Stimulus.(F);
             Trials.(F)(trial,1:length(Stimulus.(F))) = Stimulus.(F);
         end
     end
@@ -3222,6 +3326,24 @@ if isfield(Trials,'RespDir') & length(Trials.RespDir) < length(Trials.Start)
     Trials.RespDir(length(Trials.Start)) = 0;
 %    Trials.FlipDir(length(Trials.Start)) = 1;
 end
+
+
+function Header = SetHeader(Header, AllTrials, igood, f)
+%Set Header field using value of a cell string in selected trials
+%Allows for empty Cells, which unique does not
+
+    if isfield(AllTrials,f)
+        if iscell(AllTrials.(f))
+            [a, b] = Counts(AllTrials.(f)(igood(igood < length(AllTrials.(f)))));
+            if ~isempty(b) && ~isempty(a)
+                Header.(f) = b{1};
+            elseif isfield(Header,f)
+                Header = rmfield(Header,f);
+            end
+        else
+            Header.(f) = unique(AllTrials.(f)(igood));
+        end
+    end
 
 function [Expts, Idx, state] = SortExpts(AllExpts, AllTrials, Header, thecluster, Idx,state,  varargin)
 SpkDefs;
@@ -3243,6 +3365,15 @@ if isfield(Header,'Name') && ~isempty(regexp(Header.Name,'[0-9]\.[0-9]*\.mat'))
     Header.bysuffix = 1;
 else
     Header.bysuffix = 0;
+end
+
+
+id = find(diff(AllTrials.id) < 0);
+for j = 1:length(id)
+    offset = AllTrials.id(id(j))-AllTrials.id(id(j)+1);
+    AllTrials.id(id(j)+1:end) = AllTrials.id(id(j)+1:end)+offset;
+    AllTrials.idoffset(id(j)+1:length(AllTrials.id)) = offset;
+    Idx = AddError(Idx, 'Adding Id Offset %d at ID %d',offset,id(j)+1);
 end
 
 findtrial = 0;
@@ -3319,6 +3450,8 @@ ids = [ids find(strcmp('bsstimes',fn))];
 ids = [ids find(strcmp('esstimes',fn))];
 ids = [ids find(strcmp('ex3val',fn))];
 ids = [ids find(strcmp('bsdelay',fn))];
+ids = [ids find(strcmp('explabel',fn))];
+ids = [ids find(strcmp('exptvars',fn))];
 %ids = [ids strmatch('imver',fn)];
 %ids = [ids strmatch('imse',fn)];
 state.tt = TimeMark(state.tt,'Set Fields');
@@ -3326,7 +3459,14 @@ state.tt = TimeMark(state.tt,'Set Fields');
 
 %do not include PhaseSeq here - has special cases
 seqstrs = {'dxvals' 'cevals'};
-cellfields = {'rwtimes'};
+cf = {'rwtimes' 'nsf' 'ntf'};
+    cellfields = {};
+for j = 1:length(cf)
+    f = cf{j};
+    if isfield(AllTrials,f) && iscell(AllTrials.(f))  %need to make this general
+        cellfields = {cellfields{:} f};
+    end
+end
 seqvars = {};
 for j = 1:length(seqstrs)
     id = find(strcmp(seqstrs{j},fn));
@@ -3460,8 +3600,15 @@ for nx = 1:length(AllExpts)
             if iscell(AllTrials.(fn{nf}))
                 if strcmp(fn{nf},'uStimt')
                 else
-                nv = unique({AllTrials.(fn{nf}){igood}});
-                Expt.Stimvals.(fn{nf}) = AllTrials.(fn{nf}){a(1)};
+                    if iscellstr(AllTrials.(fn{nf}))
+                        nv = unique({AllTrials.(fn{nf}){igood}});
+                    else
+                        [x, nv] = Counts(AllTrials.(fn{nf})(igood));
+                        if length(x) ==1  || length(nv) == 1
+                            nv = 1;
+                        end
+                    end
+                    Expt.Stimvals.(fn{nf}) = AllTrials.(fn{nf}){a(1)};
                 end
             else
                 if fsz(1) > 1 && fsz(2) > 1
@@ -3491,7 +3638,11 @@ for nx = 1:length(AllExpts)
                 end
                 Expt.Stimvals.(fn{nf}) = prctile([AllTrials.(fn{nf})(igood)],50);
             elseif isnumeric(nv)
-                Expt.Stimvals.(fn{nf}) = nv;
+                if sum(~isnan(nv)) > 0
+                    Expt.Stimvals.(fn{nf}) = nv(~isnan(nv));
+                else
+                    Expt.Stimvals.(fn{nf}) = NaN;
+                end
             end
         end
         if isfield(AllTrials,'dfx') && size(AllTrials.dfx,2) > 1
@@ -3509,6 +3660,10 @@ for nx = 1:length(AllExpts)
     duration = mean([Trials.End] - [Trials.Start]);
     et = Expt.Stimvals.et;
     e2 = Expt.Stimvals.e2;
+    Header = SetHeader(Header, AllTrials, igood, 'explabel');
+    Header = SetHeader(Header, AllTrials, igood, 'exptvars');
+    Header = SetHeader(Header, AllTrials, igood, 'idoffset');
+
     if ~isfield(Expt.Stimvals,'e3')
         Expt.Stimvals.e3 = 'e0';
     end
@@ -3643,7 +3798,7 @@ for nx = 1:length(AllExpts)
         for nf = 1:length(cellfields) %fileds that are cell arrays
             f = cellfields{nf};
             if isfield(AllTrials,f) && length(AllTrials.(f)) >= k
-                Trials(k).(f) = AllTrials.(f){k};
+                Trials(k).(f) = AllTrials.(f){igood(k)};
             end
         end
         for f = 1:length(needfields)
@@ -3807,6 +3962,10 @@ for nx = 1:length(AllExpts)
         end
     end
     if isfield(Trials,'CorLoop')
+        id = find([Trials.CorLoop] ~= 0);
+        if ~isempty(id)
+            Header.excluded.CorLoop = [Trials(id).id];
+        end
         id = find([Trials.CorLoop] == 0);
         if length(id)
             Trials = Trials(id);
@@ -3832,8 +3991,11 @@ for nx = 1:length(AllExpts)
     end
     if fastseq && state.alltrials == 0
        id = find(nframes > 1);
-       Trials = Trials(id);
        bid = find(nframes  ==1);
+       if ~isempty(bid)
+                  Header.excluded.noRC = [Trials(bid).id];
+       end
+       Trials = Trials(id);
        if length(bid) > 2
            Idx = AddError(Idx, 'Ex %d Removing %d Trials becuase no RC sequence\n',nexpts,length(bid));
        end
@@ -3845,8 +4007,10 @@ for nx = 1:length(AllExpts)
             Trials = rmfield(Trials,'uStim');
     end
 
+    Header.idrange = minmax([AllTrials.id(igood)]);
     if isfield(Trials,'inexpt') && sum([Trials.inexpt] ==0 > 0)
        bid = find([Trials.inexpt] == 0);
+       Header.excluded.noexpt = [Trials(bid).id];
        id = find([Trials.inexpt] > 0);
        ids = unique([Trials(bid).id]);
        if ~isempty(bid)
@@ -3866,6 +4030,9 @@ for nx = 1:length(AllExpts)
     end
     if length(id) > length(Trials)/2
         nid = find(isnan([Trials.delay]));
+        if ~isempty(nid)
+            Header.excluded.delay = [Trials(nid).id];
+        end
         Expt.Trials = Trials(id);
         durs = durs(id);
         if length(nid)

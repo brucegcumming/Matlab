@@ -1,6 +1,10 @@
 function DATA = CombinerInit(DATA, name, TOPTAG, layout)
 
+
 DATA.layout.top = [];
+if ~isfield(DATA,'nevdir')
+    DATA.nevdir = [];
+end
     DATA.layout.spkv = [];
     DATA.layout.spkxy = [];
     DATA.layout.lfp = [];

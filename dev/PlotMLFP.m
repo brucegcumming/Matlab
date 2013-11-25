@@ -1,20 +1,46 @@
-function lfpm = PlotMLFP(Expt, varargin)
-%fpm = PlotMLFP(Expt, ..)
+function [lfpm, result] = PlotMLFP(Expt, varargin)
+%[fpm, details] = PlotMLFP(Expt, ..)
 %Plot LFP Data for Arrays
 %Default is a line plot, one for each probe
 %
 %fpm = PlotMLFP(Expt, 'stack')
 %fpm = PlotMLFP(Expt, 'image')
 %fpm = PlotMLFP(Expt, 'split')
+%fpm = PlotMLFP(Expt, 'expts', {'jv' 'sf' 'st' 'tf' 'nsfs'},'lines','ftpwr');
+% builds pwr spectrum for each combination of expt vars. 
+%
+% see also PlotLFPpwr
+
 plottype = 1;
-nfreq = 50;
+nfreq = 500;
 checkdim = 0;
 minlen = 0;
 chscale = 0;
 needft = 0;
 stackoff = 0.05;
+plotlines = 0;
 timerange = [];
 freqs = 1:nfreq;
+yvals = [];
+xvals = [];
+et = [];
+eb = [];
+ec = [];
+ed = [];
+result = [];
+
+if isfield(Expt.Header,'exptvars')
+    extypes = split(Expt.Header.exptvars,',');
+    et = extypes{1};
+    if length(extypes) > 1
+        eb = extypes{2};
+    end
+else
+    extypes = {};
+end
+probes = [];
+styles = {'-' '--' '-.' ':' '-' '--' '-.' ':' '-' '--' '-.' ':' '-' '--' '-.' ':'};
+styles = [styles(:); styles(:)];
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'image',4)
@@ -27,14 +53,39 @@ while j <= length(varargin)
         end
     elseif strncmpi(varargin{j},'csd',3)
         plottype = 7;
+    elseif strncmpi(varargin{j},'expt1',5)
+        j = j+1;
+        et = varargin{j};        
+    elseif strncmpi(varargin{j},'expts',5)
+        j = j+1;
+        extypes = varargin{j};
+        et = extypes{1};
+    elseif strncmpi(varargin{j},'expt2',5)
+        j = j+1;
+        extypes{1} = varargin{j};        
+    elseif strncmpi(varargin{j},'expt3',5)
+        j = j+1;
+        extypes{2} = varargin{j};        
+    elseif strncmpi(varargin{j},'expt4',5)
+        j = j+1;
+        extypes{3} = varargin{j};        
+    elseif strncmpi(varargin{j},'select',5)
+        j = j+1;
+        id = eval(['find([Expt.Trials.' varargin{j} ');']);
+        Expt.Trials = Expt.Trials(id);
     elseif strncmpi(varargin{j},'scale',4)
         chscale = 20;
         if length(varargin) > j & isnumeric(varargin{j+1})
             j = j+1;
             chscale = varargin{j};
         end
+    elseif strncmpi(varargin{j},'lines',4)
+        plotlines = 1;
     elseif strncmpi(varargin{j},'split',4)
         plottype = 8;
+    elseif strncmpi(varargin{j},'probes',4)
+        j = j+1;
+        probes = varargin{j};
     elseif strncmpi(varargin{j},'stack',4)
         plottype = 5;
         if length(varargin) > j && isnumeric(varargin{j+1})
@@ -43,6 +94,7 @@ while j <= length(varargin)
         end
     elseif strncmpi(varargin{j},'ftpwr',4)
         plottype = 9;
+        needft = 1;
         if length(varargin) > j && isnumeric(varargin{j+1})
             j = j+1; 
             freqs = varargin{j};
@@ -69,6 +121,12 @@ while j <= length(varargin)
             j = j+1; 
             nfreq = varargin{j};
                 end
+    elseif strncmpi(varargin{j},'xvals',5)
+            j = j+1; 
+            xvals = varargin{j};
+    elseif strncmpi(varargin{j},'yvals',5)
+            j = j+1; 
+            yvals = varargin{j};
     end
     j = j+1;
 end
@@ -77,21 +135,60 @@ if Expt.Header.rc
     return;
 end
 
-et = GetEval(Expt,'et');
-eb = GetEval(Expt,'e2');
+if isempty(et)
+    et = GetEval(Expt,'et');
+end
+if isempty(eb)
+    eb = GetEval(Expt,'e2');
+end
+
 
 if ~isfield(Expt.Trials,et)
     [Expt.Trials.(et)] = deal(0);
 end
 
+if isempty(yvals)
+    if ~strcmp(eb,'e0') && isfield(Expt.Trials,eb)
+        yiv = [Expt.Trials.(eb)];
+    else
+        yiv = ones(size(Expt.Trials));
+    end
+    yvals = unique(yiv);
+end
+
+if isempty(extypes)
+    extypes{1} = et;
+    if isfield(Expt.Trials,eb)
+        extypes{2} = eb;
+    else
+        extypes{2} = 'st';
+    end
+end
+
+for j = 1:length(extypes)
+    if ~isfield(Expt.Trials,extypes{j})
+        fprintf('Not Field %s in Trials\n',extypes{j});
+        return;
+    end
+    vals{j} = [Expt.Trials.(extypes{j})];
+    uvals{j} = unique(vals{j});
+    env(j) = length(uvals{j});
+end
+    
+
 if ~isnan(et)
-xiv = [Expt.Trials.(et)];
-xvals = unique(xiv);
+    xiv = [Expt.Trials.(et)];
+    allx = unique(xiv);
 else
-[Expt.Trials.dummy] = deal(1);
-xvals = 1;
-et = 'dummy';
-xiv = [Expt.Trials.dummy];
+    [Expt.Trials.dummy] = deal(1);
+    et = 'dummy';
+    xiv = [Expt.Trials.dummy];
+end
+
+if isempty(xvals)
+    xvals = unique(xiv);
+else
+    xvals = allx(xvals);
 end
 
 if checkdim
@@ -105,7 +202,7 @@ if checkdim
         len = min(lens);
         good = 1:length(Expt.Trials);
     else
-        if ismember(plottype,[3 4 6])
+        if ismember(plottype,[3 4 6 9])
             needft = 1;
         end
         good = find(lens > minlen & nchs == nch);
@@ -148,18 +245,55 @@ end
 LFP = cat(3,Expt.Trials.LFP);
 if isfield(Expt.Trials,'FTlfp') & needft
 PWR = cat(3,Expt.Trials.FTlfp);
+elseif needft
+    for j = 1:length(Expt.Trials)
+        Expt.Trials(j).FTlfp = abs(fft(Expt.Trials(j).LFP));
+        PWR = cat(3,Expt.Trials.FTlfp);
+    end
 else
     PWR = LFP;
 end
 
-for j = 1:length(xvals)
-    idx = find(xiv == xvals(j));
-    for k = 1:size(LFP,2);
-        lfpm(j,k,:) = squeeze(mean(LFP(:,k,idx),3));
-        lfpft(j,k,:) = squeeze(mean(abs(PWR(:,k,idx)),3));
+
+for j = 1:length(extypes)
+    cx{j} = 1;
+end
+
+allids = {};
+for ii = 1:prod(env)
+    [cx{:}] = ind2sub(env,ii);
+    for j = 1:length(xvals)
+        idx = find(xiv == xvals(j));
+        for k = 1:length(cx)
+            id = find(vals{k} == uvals{k}(cx{k}));
+            idx = intersect(idx,id);
+        end
+        n = sum(ismember(idx,cat(2,allids{:})));
+        if n == 0
+            if isempty(idx)
+                idx = [];
+            end
+            allids{ii,j} = idx;
+        elseif n < length(idx)
+            idx = [];
+        else
+            idx = [];
+        end
+        alln(ii,j) = length(idx);
+        if ~isempty(idx)
+            %    for k = 1:size(LFP,2);
+            lfpm(ii,j,:,:) = squeeze(mean(LFP(:,:,idx),3))';
+            lfpft(ii, j,:,:) = squeeze(mean(abs(PWR(:,:,idx)),3))';
+            %    end
+        end
     end
 end
 
+result.ids = allids;
+
+if isempty(probes)
+    probes = 1:size(lfpm,3);
+end
 
 colors = mycolors;
 if plottype == 1
@@ -231,7 +365,11 @@ elseif plottype == 6  % stacked FT
     hold off;
     for j = 1:size(LFP,2)
         for k = 1:length(xvals)
-            plot(ftfrq(freqs),squeeze(lfpft(k,j,freqs))+j.*0.0,'color',colors{j});
+            if length(xvals) == 1
+                plot(ftfrq(freqs),squeeze(lfpft(k,j,freqs))+j.*0.0,'color',colors{j});
+            else
+                plot(ftfrq(freqs),squeeze(lfpft(k,j,freqs))+j.*0.0,'color',colors{j});
+            end
             hold on;
         end
 
@@ -242,12 +380,44 @@ elseif plottype == 7  %CSD
     imagesc(csd');
 
 
-elseif plottype ==  9 % plot power vs expt variae
+elseif plottype ==  9 % plot power vs expt var
     subplot(1,1,1);
     hold off;
-        for k = 1:length(xvals)
-            resps(:,k) = squeeze(mean(lfpft(k,:,freqs),3));
+    if plotlines
+        colors = mycolors;
+        hold off;
+        nl = 0;
+        for j = 1:size(lfpft,1)
+            sc = styles{1+mod(j-1,4)};
+            for k = 1:size(lfpft,2)
+                [cx{:}] = ind2sub(env,j);
+                if alln(j,k) > 0
+                    nl = nl+1;
+                    labels{nl} = sprintf('%s=%.2f',et,xvals(k));
+                    for m = 2:length(cx)
+                        result.(extypes{m})(nl) = uvals{m}(cx{m});
+                        labels{nl} = [labels{nl} sprintf(',%s=%.2f',extypes{m},uvals{m}(cx{m}))];
+                    end
+                    labels{nl} = [labels{nl} sprintf(',n=%d',alln(j,k))];
+                    result.resps(:,:,nl) = squeeze(mean(lfpft(j,k,probes,freqs),3));
+                    result.n(nl) = alln(j,k);
+                    result.sid(nl) = j;
+                    if length(xvals) == 1
+                        plot(squeeze(mean(lfpft(j,k,probes,freqs),3)),'-','color',colors{j});
+                    else
+                        plot(squeeze(mean(lfpft(j,k,probes,freqs),3)),'color',colors{k},'linestyle',sc);
+                    end
+                    hold on;
+                end
+            end
         end
-        imagesc(resps);
-
+        legend(labels);
+        set(gca,'yscale','log');
+        axis('tight');
+    else
+        imagesc(squeeze(resps(:,:,1)));
+    end
+    lfpm = lfpft;
+    result.alln = alln;
+    result.labels = labels;
 end

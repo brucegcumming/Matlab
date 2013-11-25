@@ -5,7 +5,7 @@ function SetMenuCheck(F, tag, value, varargin)
 % menu, if value > 0
 %Set Check marks on menus
 %if F is a handle to a menu object, means this has just been selected
-% SetMenucheck(a, [], 'exclusive') turns off checks for other members of menu
+% SetMenucheck(a, 'exclusive') turns off checks for other members of menu
 %so turn this on
 %Otherwised
 exclusive = 0;

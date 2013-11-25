@@ -37,9 +37,9 @@ elseif isstruct(E)  % a details struct with a list of dirs containing expts.
     names = CheckForExpts(E, varargin{:}); %first arg should be suffix to check
 elseif isdir(E)
     if depth > 0
-    [names, details] = ListExptDirs(E, depth, varargin);
+        [names, details] = ListExptDirs(E, depth, varargin);
     else
-    [names, details] = ListExptDir(E, varargin);
+        [names, details] = ListExptDir(E, varargin);
     end
 elseif ischar(E)
     [names, details] = ListExptDirs(E, depth, varargin);
@@ -177,12 +177,30 @@ end
 function [names, details] = ListExptDir(E, varargin)
 
 relist = 0;
+listfullv = 0;
 j = 1;
 while j <=length(varargin)
-    if strncmpi(varargin{j},'relist',5)
+    if strncmpi(varargin{j},'fullv',5)
+        listfullv = 1;
+    elseif strncmpi(varargin{j},'relist',5)
         relist = 1;
     end
     j = j+1;
+end
+
+if listfullv
+    expts = [];
+    d = dir([E '/Expt*FullV.mat']);
+    for j = 1:length(d)
+        expts(j) = GetExptNumber(d(j).name);
+        probes(j) = GetProbeFromName(d(j).name);
+        sizes(j) = d(j).bytes;
+    end
+    names = unique(expts);
+    details.expts = expts;
+    details.probes = probes;
+    details.sizes = sizes;
+    return;
 end
 
 outname = [E '/AllExptList.mat'];

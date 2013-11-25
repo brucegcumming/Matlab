@@ -66,7 +66,11 @@ if loadallspikes
     if exist(xname)
     X = load(xname);
     Spikes.xmaxv = X.Spikes.maxv;
-    Spikes.xvalues = X.Spikes.values;
+    if ndims(X.Spikes.values) == 2
+        Spikes.xvalues(1,:,:) = X.Spikes.values;
+    else
+        Spikes.xvalues = X.Spikes.values;
+    end
     Spikes.xchans = X.Spikes.chspk;
     end
 end

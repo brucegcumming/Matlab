@@ -1,4 +1,4 @@
-function idx = BuildGridIndex(name, Expts, varargin)
+function idx =BuildGridIndex(name, Expts, varargin)
 %idx = BuildGridIndex(name, Expts, ...)
 %Build an index of which neV files match Expt .mat files
 %name is a filename or direcotry where the .mat file lives (used to
@@ -18,6 +18,7 @@ function idx = BuildGridIndex(name, Expts, varargin)
     idx = [];
    datdir = 'F:/Utah/jbe/';
    reindex = 0;
+   nevdir = [];
    plotexpts = [];
    checktag = 'TrialCheck';
    preperiod = 5000;
@@ -31,7 +32,12 @@ function idx = BuildGridIndex(name, Expts, varargin)
    forcematches = {};
    forceexpts = [];
    forcebsoff = [];
+   showerr = 1;
    aargs = {};
+   usealltrials = 0;
+if nargin == 1
+    Expts = [];
+end
    
 j = 1;
 while j <= length(varargin)
@@ -49,23 +55,30 @@ while j <= length(varargin)
         forceexpts = [forceexpts varargin{j}];
         j = j+1;
         forcebsoff = [forcebsoff varargin{j}];
+    elseif strncmpi(varargin{j},'nevdir',5)
+        j = j+1;
+        nevdir = varargin{j};
     elseif strncmpi(varargin{j},'plotfiles',5)
         plottype = 1;
     elseif strncmpi(varargin{j},'plotexpts',5)
         j = j+1;
         plotexpts = varargin{j};
+    elseif strncmpi(varargin{j},'noerrs',5)
+        showerr = 0;
     elseif strncmpi(varargin{j},'plotidx',5)
         plottype = 3;
     elseif strncmpi(varargin{j},'reindex',5)
         reindex = 1;
     elseif strncmpi(varargin{j},'usealltr',8) %remake the new way (V.2)
         aargs= {aargs{:} varargin{j}};
+        usealltrials =1;
     elseif strncmpi(varargin{j},'update',5) %remake the new way (V.2)
         reindex = 2;        
     end
     j = j+1;
 end
-   
+
+
 if isstruct(name)
     PlotIdx(name);
     return;
@@ -73,7 +86,11 @@ elseif isdir(name)
        datdir = name;
    else
        datdir = fileparts(name);
-   end
+end
+if isempty(nevdir)
+    nevdir = datdir;
+end
+
    plotsummary = 2;
 
    if isempty(strfind(path,'BlackRock'))
@@ -102,6 +119,7 @@ elseif isdir(name)
        a = load(idxfile);
        idx = a.idx;
        idx.datdir = datdir;
+       idx.nevdir = nevdir;
        nidx = length(idx.names);
        if plottype == 1
            PlotExptFiles(idx, Expts, Trials);
@@ -116,9 +134,14 @@ elseif isdir(name)
    end
    if isempty(Expts)
        if isdir(name) %online files
-           idx = BuildMatFiles(datdir);
-           save(idxfile,'idx');
-           return;
+           [Expts, Trials] = ReadExptDir(name, 'online', 'noerrs');
+           if iscell(Trials)
+               for nex = 1:length(Expts)
+                   Expts{nex}.bstimes = Trials{nex}.Trials.bstimes';
+                   Expts{nex}.gridstoreon = Trials{nex}.Trials.bstimes(1);
+               end
+           end
+           idx = BuildMatFiles(nevdir);
        else
            Expts = GetExpts(name, aargs{:});
        end
@@ -139,7 +162,7 @@ elseif isdir(name)
        starts(j) = Expts{j}.Header.CreationDate + Expts{j}.Header.Start./(10000 * 60 *60 *24);
        ebstimes{j} = Expts{j}.bstimes;
        id = find(Expts{j}.DigMark.codes ==1);
-       if isempty(Expts{j}.gridstoreon)
+       if ~isfield(Expts{j},'gridstoreon') || isempty(Expts{j}.gridstoreon)
            Expts{j}.gridstoreon = Expts{j}.bstimes(1);;
        end
        if isempty(id)
@@ -174,7 +197,7 @@ elseif isdir(name)
        end
        nson = length(sampleon);
        sampleons = [sampleons sampleon(1)];
-
+       exptids(j) = Expts{j}.Header.idrange(end);
        id = find(Expts{j}.DigMark.codes ==2);
        
  %Nov 2012 Onwards, use Trial Isis to do matching, so start/end times are less critical
@@ -212,7 +235,7 @@ elseif isdir(name)
    
 %First Build a list of Nev files and their times
 %This works for multiple files per expt. 
-   d = dir([datdir]);
+   d = dir([nevdir]);
    filenames = {d.name};
    %d = dir([datdir '/*.nev']);
    newf = 0;
@@ -220,7 +243,7 @@ elseif isdir(name)
    usenev = 1;
    for j = 1:length(d)
        if ~isempty(strfind(d(j).name,'.nev')) && usenev %this has starttime and Dig Events
-           nevfile = [datdir '/' d(j).name];
+           nevfile = [nevdir '/' d(j).name];
            matfile = strrep(d(j).name,'.nev','.mat');
            mid = strmatch(matfile,filenames);
            if length(mid)
@@ -325,8 +348,8 @@ elseif isdir(name)
                        amindt(e,nnev) = NaN;
                    elseif length(bstimes) > 1 %if more trials in nev that expt, can't be  a match.  
 %But if some trials have been deleted from Expt (e.g. because of missing RC sequnece, can get this
-%So add calculation.  But shouldn't need this, so for now, setill set mindt to Nan
-                       xid = 1:length(ebstimes(3));
+%So add calculation.  But shouldn't need this, so for now, set mindt to Nan
+                       xid = 1:length(ebstimes(e));
                        xsc = [];
                        for dt = 0:length(bstimes)-length(ebstimes{e});
                            xsc(dt+1) = std(diff(ebstimes{e}-dx(xid+dt)));
@@ -436,6 +459,7 @@ elseif isdir(name)
    idx.exbstimes = ebstimes;
    idx.version = VERSION;
    idx.builddate = now;
+   idx.usealltrials = usealltrials;
    
    if isempty(idx)
        fprintf('Missing NeV Data Filesin %s\n',name);
@@ -443,9 +467,12 @@ elseif isdir(name)
    end
    
    missing = setdiff(1:length(Expts),idx.expt);
-   if length(missing)
+   if length(missing) 
        idx.missing = missing;
-       warndlg(sprintf('Missing Expts %s',sprintf('%d ',missing)),'Expts Missing');
+       idx = AddError(idx, sprintf('Missing NEV for Expts %s',sprintf('%d ',missing)));
+       if showerr
+           warndlg(idx.errs{end},'Expts Missing');
+       end
    end
    eid = find(idx.expt > 0);
    badsd = find(idx.bsstd(eid) > 100);
@@ -458,16 +485,17 @@ elseif isdir(name)
        end
    end
    
+idx.datdir = datdir;
+idx.nevdir = nevdir;
+idx.exptstarts = sampleons;
+idx.exptends = sampleoffs;
+idx.exptids = exptids;
    if compareidxs || reindex == 2
        cmpdiffs = CompareGridIdx(idx, oldidx.idx);
        idx.exptdiffs = length(cmpdiffs);
    elseif newf > 0 
        save(idxfile,'idx');
    end
-idx.datdir = datdir;
-idx.exptstarts = sampleons;
-idx.exptends = sampleoffs;
-
 if length(plotexpts)
     GetFigure(checktag);
     hold off;
@@ -628,7 +656,7 @@ for j = 1:length(d)
     end
 end
 idx.datdir = datdir;
-
+idx.nevdir = nevdir;
 
 function PlotIdx(idx)
 

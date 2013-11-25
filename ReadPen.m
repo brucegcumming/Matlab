@@ -1,8 +1,12 @@
 function pen = ReadPen(file, varargin)
 
+pen = [];
+if ~exist(file)
+    mycprintf('blue','%s Does not exist\n',file);
+    return;
+end
 fin = fopen(file,'r');
 if fin < 0
-    pen = [];
     fprintf('Can''t Read %s\n',file);
     return;
 end
@@ -31,9 +35,13 @@ end
 toff = 0;
 MapDefs;
 pen.comments = {};
+pen.arealines = [];
 pen.missed = 0;
 nlines = 0;
 nexpts = [];
+%toff not tracked properly yet.  Try just using datenum at open + time
+%? may need to check for reopen of log without change in t...
+
 while ~feof(fin)
     inlin = fgets(fin);
     nlines = nlines+1;
@@ -111,6 +119,7 @@ while ~feof(fin)
         pen.comments{ncomm} = inlin;
         pen.cmtype(ncomm) = 6;
         pen.cmtime(ncomm) = length(times);
+        pen.arealines(end+1) = ncomm;
     elseif strfind(inlin,'Impedance')
         ncomm = ncomm+1;
         pen.comments{ncomm} = inlin;
@@ -156,6 +165,26 @@ while ~feof(fin)
         end
      
     elseif strfind(inlin,'File')
+    end
+    if isfield(pen,'datenum')
+        pen.date(length(times)) = pen.datenum+(times(end)-toff)./(24);
+    end
+end
+
+%since times are taken from depth changes etc, not every line
+%time of file should match time of comment
+if ~isempty(pen.arealines)
+    al = pen.cmtime(pen.arealines);
+    for j = 1:length(cellid)
+        pen.visualarea{j} = 'Vd';
+        id = find(al <= cellid(j));
+        if ~isempty(id)
+            s = pen.comments{pen.arealines(id(end))};
+            xid = strfind(s,'VisualArea');
+            if ~isempty(xid);
+                pen.visualarea{j} = regexprep(s(xid+11:end),' .*','');
+            end
+        end
     end
 end
 pen.times = times;

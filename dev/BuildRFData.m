@@ -9,6 +9,7 @@ function rfs = BuildRFData(dirname, varargin)
 recurse = 0;
 saverfs = 0;
 rebuild = 0;
+verbose = 0;
 rfs = [];
 j = 1;
 while j <= length(varargin)
@@ -18,6 +19,8 @@ while j <= length(varargin)
         rebuild = 1;
     elseif strncmpi(varargin{j},'save',4)
         saverfs = 1;
+    elseif strncmpi(varargin{j},'verbose',4)
+        verbose = 1;
     end
     j = j+1;
 end
@@ -25,6 +28,9 @@ end
 if iscellstr(dirname)
     nc = 0;
     for j= 1:length(dirname)
+        if verbose
+            fprintf('Reading %s\n',dirname{j});
+        end
         rf = GetRFFromDir(dirname{j}, rebuild);
         if ~isempty(rf)
             nc = nc+1;
@@ -71,15 +77,11 @@ if saverfs
 end
 
 function therf = GetRFFromDir(dirname,rebuild)
-d = mydir([dirname '/*.ufl']);
 therf = [];
 
-if isempty(d)
-    return;
-end
-
 rffile = dir2name(dirname, 'rf');
-if exist(rffile,'file') && ~rebuild
+d = dir(rffile);
+if exist(rffile,'file') && ~rebuild    
     try
     load(rffile);
     return;
@@ -87,6 +89,13 @@ if exist(rffile,'file') && ~rebuild
         cprintf('red','Error Loading %s\n',rffile);
     end
 end
+
+d = mydir([dirname '/*.ufl']);
+if isempty(d)
+    return;
+end
+
+filename = dir2name(dirname,'filename');
 ts = now;
 nrf = 0;
 dates = [];
@@ -124,6 +133,56 @@ for j = 1:length(d);
         matfile = strrep(d(j).name,'.ufl','.mat');
         dates(nrf) = CreationDate(matfile);
     end
+end
+
+d = mydir([dirname '/*idx.mat']);
+areas = {};
+for j = 1:length(d)
+    load(d(j).name);
+    if isfield(Expt,'Comments')
+    id = find(strncmp('cm=VisualArea',Expt.Comments.text,10));
+    if ~isempty(id)
+        areas{j} = strrep(Expt.Comments.text{id(end)}(15:end),' .*','');
+    end
+    end
+end
+if isempty(areas)
+    va = '';
+else
+va = unique(areas);
+end
+gid = find(rfs(:,6)) > 0;
+pe = median(rfs(gid,6));
+monkey = GetMonkeyName(dirname);
+pen = ReadPen(FindPenLog(monkey,pe),'noplot');
+if isfield(pen,'files') && isfield(pen,'visualarea')
+    areas = {};
+    nf=0;
+    for j = 1:length(pen.files)
+        if strfind(pen.files{j},filename)
+            nf = nf+1;
+            areas{nf} = pen.visualarea{j};
+        end
+    end
+    if nf
+        vb = unique(areas);
+        if isempty(va)
+            va = vb;
+        elseif ~strcmp(va,vb)
+            mycprintf('blue','Area Assignment mismatch for %s: %s in idx, %s in pen log\n',filename, va{:}, vb{:});
+        end
+    end
+else
+    fprintf('No Visual area data for %s (pe %.0f)\n',filename,pe);
+end
+if isfield(pen,'enterdepth') && isempty(StartDepth)
+    StartDepth = pen.enterdepth;
+end
+
+if isempty(va)
+    therf.area = 'unknown';
+else
+    therf.area = va{1};
 end
 dates = dates(dates>0);
 if isempty(dates)

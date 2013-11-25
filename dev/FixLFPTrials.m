@@ -5,10 +5,13 @@ function Expt = FixLFPTrials(Expt, varargin)
 
 MAXPROBES = 96;
 pad = NaN;
+needft = 0;
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'zeropad',6)
         pad = 0;
+    elseif strncmpi(varargin{j},'ft',2)
+        needft = 1;
     elseif strncmpi(varargin{j},'fixspike',6)
         Expt = FixLFPSpike(Expt,varargin{:});
         return;
@@ -18,7 +21,11 @@ end
 
 for j = 1:length(Expt.Trials)
     sizes(j,:) = size(Expt.Trials(j).LFP);
+    if isempty(Expt.Trials(j).lfptime)
+        starts(j) = 0;
+    else
     starts(j) = Expt.Trials(j).Start(1) - Expt.Trials(j).lfptime;
+    end
 end
 
 if max(sizes(:,2)) > MAXPROBES
@@ -46,7 +53,13 @@ for j = 1:length(Expt.Trials)
         Expt.Trials(j).LFP = Expt.Trials(j).LFP(1:maxl,:);
     end
     newsizes(j,:) = size(Expt.Trials(j).LFP);
+    if needft
+       Expt.Trials(j).FTlfp = fft(Expt.Trials(j).LFP);
+    end
 end
 Expt.Header.lfplen = min(newsizes(:,1));
 Expt.Header.lfptimes = (10000 .* [1:Expt.Header.lfplen] .* Expt.Header.LFPsamplerate) - (Expt.Header.preperiod);
+if needft
+    Expt.Header.LFPfreq = [1:Expt.Header.lfplen] .* 1./(Expt.Header.lfplen .* Expt.Header.LFPsamplerate);
+end
 max(np);

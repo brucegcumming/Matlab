@@ -156,6 +156,10 @@ for j = 1:length(d)
     end
 end
 
+if isempty(d)
+    cprintf('red','No spkblk files in %s\n',dname);
+    return;
+end
 if rescan == 2  %updating any new spkblks
     [sfiles, aid] = unique({probes.file});
     sfiledate = [probes(aid).filetime];

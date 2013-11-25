@@ -455,7 +455,7 @@ elseif strncmpi(str,'Psych',4)
                       title(sprintf('Bias %.1f, Slope %.3f',fit.fit(1),abs(fit.fit(2))));
                   end
               dres.psych = fit;
-              ures.psych = [];
+              ures.psych = fit;
               else
                   dres.psych = [];
                   ures.psych = [];
@@ -490,8 +490,6 @@ elseif strncmpi(str,'Psych',4)
               ures.psych = [];
 %              plot(sd2cv(dres.psychval) .*sgn,dres.presp./dres.psum,'o');
           else
-              if showplot == 1
-                  plot(dres.psychval,dres.presp./dres.psum,'o');
                   for j = 1:size(dres.x,1)
                       pp(j).x = dres.x(j);
                       pp(j).n = dres.psum(j);
@@ -499,7 +497,9 @@ elseif strncmpi(str,'Psych',4)
                   end
                   fit = fitpsf(pp);
                   dres.psych = fit;
-                  ures.psych = [];
+                  ures.psych = fit;
+              if showplot == 1
+                  plot(dres.psychval,dres.presp./dres.psum,'o');
                   if isfield(fit,'data')
                       h = fitpsf(fit.data,'showfit',fit,psfargs{:},'color',colors{1});
                   end
@@ -1179,7 +1179,8 @@ for nc = 1:length(cvals)
             axes(laxis)
         end
 
-        if showplot & ~mksdf & isfield(result,'x') & ~plotsimple & ie <= size(result.x,2) && nc <= size(result.x,3)
+% This test needs && so that no field x stops testing
+        if showplot && ~mksdf && isfield(result,'x') && ~plotsimple && ie <= size(result.x,2) && nc <= size(result.x,3)
             result.means(find(result.n == 0)) = NaN;
             is = mod(ie-1,length(symbols))+1;
             if isempty(colorids)

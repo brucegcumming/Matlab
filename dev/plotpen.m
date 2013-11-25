@@ -29,7 +29,7 @@ end
 
 
 pens = map.pen;
-idx = find(pens(:,2) == x & pens(:,3) == y);
+idx = find(abs(pens(:,2) - x) < 0.6 & abs(pens(:,3) - y) < 0.6);
 
 if isempty(idx)
   fprintf('There are no cells at %.1f, %.1f\n',x,y);

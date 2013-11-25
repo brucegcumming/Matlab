@@ -25,7 +25,7 @@ DATA = SetAllExpts(DATA);
 
 function DATA = SetAllExpts(DATA)
 DATA.AllExpts = {}; %clear any previous
-for j = 1:length(DATA.Expts.Spikes)
+parfor j = 1:length(DATA.Expts.Spikes)
     Expt = All2Expt(DATA.Expts,j,'all');
     DATA.AllExpts{j}.plotres = PlotExpt(Expt,'rcnmin',5);
     DATA.AllExpts{j}.Header = Expt.Header;

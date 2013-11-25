@@ -1208,13 +1208,19 @@ details.snr = 0;
         details.refid = refid;
         n = length(dxid);
         if plottype ==1
+            tid = find(res.times > 400);
             dxstr = sprintf('%.2f ',res.x(dxid,1));
             for k = 1:size(asdf,2)
             a = plot(csdf(:,k),-asdf(:,k),'color',colors{k+coff});
             h(k) = a(1);
-            [a,b] = max(lsdf(:,k));
-            id = find(lsdf(1:b,k) < a/2);
-            ht(1) = id(end);
+            [a,b] = max(lsdf(tid,k));
+            b = b+tid(1)-1;
+            id = find(lsdf(1:b,k) < a/2); %id(end) is half max on rising edged
+            if isempty(id)
+                ht(1) = tid(1);  %40ms
+            else
+                ht(1) = id(end);
+            end
             id = find(lsdf(b:end,k) < a/2);
             ht(2) = b+ht(1)-1;
             hold on;

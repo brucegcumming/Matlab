@@ -35,7 +35,7 @@ classifyfromcluster = 1;
 parallel = 0;
 listtasks = 0;
 Expts = {};
-
+mklog = 0;  %don't make RunAll.log by default - doesn't work properly yet
 
 exargs = {};
 parid = 0;
@@ -294,27 +294,34 @@ if strcmp(checktype,'quantify')
         cls = {};
         
         parfor (e = 1:length(exids))
+            t = mygetCurrentTask();
         efile = strrep(logfile,'RunAll',['Expt' num2str(ex(e)) 'Run']);
+        if mklog
         fid = fopen(efile,'a');
         if fid < 0
             cprintf('errors','Cant open log %s\n',efile);
         end
-        t = getCurrentTask();
+        else
+            fid = -1;
+        end
+        
         for k = 1:length(exids{e})
             j = exids{e}(k);
-            fprintf('Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+            fprintf('Worker %d Processing Expt%d %s %s\n',t.ID,j,vfiles{j},datestr(now));
 
             if fid > 0
-                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,vfiles{j},datestr(now));
             end
             try
               cls{e}{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
             catch ME
                 cls{e}{j}.errstate = ME;
-                cprintf('errors','Error!!!! %s:%d %s\n',vfiles{j},cids(j),ME.message)
+                cprintf('errors','Error!!!!(W%d) %s:%d %s\n',t.ID,vfiles{j},cids(j),ME.message)
             end
         end
-        fclose(fid);
+        if fid > 0
+            fclose(fid);
+        end
     end
     res.cls = cls;
 
@@ -401,21 +408,27 @@ if parallel  %have to do this by expt. If two probes in one expt done at the sam
     fprintf('Calling parfor with %d expts\n',length(exids));
     parfor (e = 1:length(exids))
         efile = strrep(logfile,'RunAll',['Expt' num2str(ex(e)) 'Run']);
-        fid = fopen(efile,'a');
-        if fid < 0
-            cprintf('errors','Cant open log %s\n',efile);
+        if mklog
+            fid = fopen(efile,'a');
+            if fid < 0
+                cprintf('errors','Cant open log %s\n',efile);
+            end
+        else
+            fid  = -1;
         end
         t = getCurrentTask();
         for k = 1:length(exids{e})
             j = exids{e}(k);
-            fprintf('Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+            fprintf('Worker %d Processing %s %s %s\n',t.ID,names{j},cfiles{j},datestr(now));
             jj = x(j);
             if fid > 0
-                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,cfiles{j},datestr(now));
             end
             cls{e}{k} = DoFile(names{j},cfiles{j},classifyfromcluster,args{:});
         end
-        fclose(fid);
+        if fid > 0
+            fclose(fid);
+        end
     end
     res.cls = cls;
 elseif listtasks
@@ -478,6 +491,7 @@ while j <= length(varargin)
     end
     j = j+1;
 end
+t = mygetCurrentTask();
     res = [];
      if ctype ==2
          if exist(cfile)
@@ -494,7 +508,7 @@ end
          catch ME
              res.errstate = ME;
              res.filename = cfile;
-             cprintf('errors','Error!!!! %s: %s\n',name,ME.message)
+             cprintf('errors','Error!!!!(W%d) %s: %s\n',t.ID,name,ME.message)
          end
      elseif ctype == 1 || ctype == 3
          load(cfile);

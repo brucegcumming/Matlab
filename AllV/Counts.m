@@ -4,7 +4,10 @@ function [count, vals] = Counts(x, varargin)
 %[counts, vals] = Counts(x, vals)
 %return counts for each value in vals. N.B. not a histogram, 
 % only counts exact matches
-
+% if x is a cell array of strings, vals is returns a cell array
+% if x is a cell array of numeric values, count returns a vector, with counts
+%  counts(1) is the number of unique elements. counts(2:n+1) is the count of unique values of
+%  the nth element of each element of x. 
 minval= NaN;
 if isempty(x)
     count = [];
@@ -26,14 +29,33 @@ end
 
 if length(varargin) & isnumeric(varargin{1})
     vals = varargin{1};
+elseif iscellstr(x) 
+    vals = unique(x);
+elseif iscell(x)
+    for j = 1:length(x)
+        lens(j) = length(x{j});
+        for k = 1:length(x{j})
+            allvals(j,k) = x{j}(k);
+        end
+    end
+    count(1) = length(unique(lens));
+    if max(lens) > 1
+    for j = 1:size(allvals,2);
+    count(j+1) = length(unique(allvals(:,j)));
+    vals{j} = unique(unique(allvals(:,j)));
+    end
+    else
+        vals = unique(cat(1,x{:}));
+    end
 else
-vals = unique(x);
+    vals = unique(x);
 end
 
 if iscellstr(x)
     for j = 1:length(vals)
         count(j) = sum(strcmp(vals{j},x(:)));
     end
+elseif iscell(x)
 else
     for j = 1:length(vals)
         count(j) = sum(x(:) == vals(j));

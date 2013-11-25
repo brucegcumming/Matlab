@@ -33,7 +33,9 @@ for j = 1:length(d)
     for k = 1:length(Expt.Comments.text)
         if strncmp(Expt.Comments.text{k},' Electrode',7)
         elseif strncmp(Expt.Comments.text{k},'Electrode',7)
+        elseif strncmp(Expt.Comments.text{k},'Experimenter Not Set',7)
         elseif strncmp(Expt.Comments.text{k},'rf=',3)
+        elseif strncmp(Expt.Comments.text{k},'cm=NotSet',9)
         elseif strncmp(Expt.Comments.text{k},'cm=back=',8)
         else
             Comments(nc).text = Expt.Comments.text{k};
@@ -44,14 +46,37 @@ for j = 1:length(d)
     end
     for k = 1:length(ExptList)
         ExptsList(ne).name = ExptList(k).expname;
-        ExptsList(ne).start =  ConvertTime(Expt, ExptList(k).start./10000);
-        ExptsList(ne).end =  ConvertTime(Expt, ExptList(k).end./10000);
+        ExptsList(ne).start =  ConvertTime(Expt, ExptList(k).start);
+        ExptsList(ne).end =  ConvertTime(Expt, ExptList(k).end);
         ExptsList(ne).depth(1) =  FindElectrodeDepth(Expt, ExptList(k).start);
         ExptsList(ne).depth(2) =  FindElectrodeDepth(Expt, ExptList(k).end);
         ExptsList(ne).ntrials =  CountTrials(Expt, [ExptList(k).start ExptList(k).end]);
         ne = ne+1;
     end
+    if isfield(Expt.Trials,'rf') && size(Expt.Trials.rf,2) > 5
+        pes(j) = median(Expt.Trials.rf(:,6));
+    end
 end
+
+pe = median(pes);
+logfile = sprintf('/bgc/bgc/anal/%s/pens/pen%d.log',GetMonkeyName(path),pe);
+pen = ReadPen(logfile,'noplot');
+if isempty(Comments)
+    exptcomments = {};
+else
+    exptcomments = {Comments.text};
+end
+if isfield(pen, 'comments')
+for j = 1:length(pen.comments)
+    if ~strncmp(pen.comments{j},'NotSet',6) &&  isempty(strcmp(pen.comments{j},exptcomments))
+        Comments(end+1).text = pen.comments{j};
+        Comments(end).time = pen.date(pen.cmtime(j));
+        Comments(end).depth = pen.depths(pen.cmtime(j));
+    end
+end
+end
+
+
 if ~isempty(Comments)
 [a, b] = sort([Comments.time]);
 Comments = Comments(b);
@@ -68,7 +93,7 @@ end
 function truet = ConvertTime(Expt, t)
 %t in seconds
 
-truet = Expt.Header.CreationDate + t ./(24 .* 60 .* 60);
+truet = Expt.Header.CreationDate + t ./(24 .* 60 .* 60 .* 1000);
 
 function d = FindElectrodeDepth(Expt, t)
 

@@ -1,5 +1,5 @@
 function [monk, monkeyname, xdir] = GetMonkeyName(name)
-%[monk, monkyename] = GetMonkeyName(name)
+%[monk, monkyename dirsuffix] = GetMonkeyName(name)
 %
 
 monk = [];

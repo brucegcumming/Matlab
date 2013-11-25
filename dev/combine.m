@@ -22,6 +22,10 @@ LFP = [];
 setexpts = [];
 layout = [];
 
+
+%disp(varargin);
+
+
 nextcell = 0;
 newprobe = 0;
 DATA.bysuffix = 0;
@@ -42,7 +46,9 @@ else
         elseif strncmpi('layout',varargin{j},6)
             j = j+1;
             DATA.layoutfile = varargin{j};
-
+        elseif strncmpi(varargin{j},'nevdir',6)
+            j = j+1;
+            DATA.nevdir = varargin{j};
         elseif strncmpi('expts',varargin{j},4)
             j = j+1;
             setexpts = varargin{j};
@@ -106,6 +112,14 @@ recombine = 0;
 plotall = 0;
 preprocess = 0;
 plotallspikes = 0;
+calltype = 'unknown';
+if ischar(name)
+    calltype = name;
+end
+if isfield(DATA,'toplevel') && DATA.state.verbose
+    fprintf('Got combine data for %s\n',calltype);
+end
+
 j = 1;
 while j <= length(varargin)
     if isstruct(varargin{j})
@@ -134,6 +148,7 @@ while j <= length(varargin)
         DATA.gui.FontSize = varargin{j};
     elseif strncmpi(varargin{j},'newprobe',6)
         newprobe = 1;
+        calltype = varargin{j};
     elseif strncmpi(varargin{j},'nospikes',6)
         newprobe = 1;
         argon = [argon varargin(j)];
@@ -227,7 +242,7 @@ if iscell(name)  %given a cell arrary of Expts
     DATA.state.psychonly = 1;
     DATA.state.plotpsych = 1;
     DATA.state.online = 0;
-    DATA = ListExpts(DATA,Expts);
+    DATA = cListExpts(DATA,Expts);
     set(DATA.toplevel,'UserData',DATA);
 elseif isfigure(name)
 elseif strncmpi(name,'autocut',6)
@@ -320,7 +335,7 @@ elseif strncmpi(name,'readlog',6)
        PrintLogData(DATA,5);
        
 elseif strncmpi(name,'relistexps',8)
-    DATA = ListExpts(DATA, DATA.Expts);
+    DATA = cListExpts(DATA, DATA.Expts);
     set(DATA.toplevel,'UserData',DATA);
 elseif strncmpi(name,'testcounts',8)
     spikelist = WhichClusters(DATA.toplevel);
@@ -610,6 +625,7 @@ elseif strncmpi(name,'setexp',6)
     id = get(DATA.elst,'value');
     DATA.exabsid = DATA.expid(id);
     SetFigure(DATA.tag.dataplot,DATA,'noforce');
+    fprintf('Created Figure\n');
     if DATA.state.plotcombined
         rc = DATA.plot.condenseRC;
         DATA.plot.condenseRC = 0;
@@ -670,7 +686,7 @@ elseif strncmpi(name,'setexp',6)
         PlotCellList(DATA);
     end
     if strncmp(DATA.filetype,'Grid',4) && playspk 
-        if DATA.state.usensx
+        if DATA.state.usensx && DATA.state.online == 0
            DATA = ReadGridFile(DATA);
             DATA.plot.useprobe = zeros(size(DATA.probelist));
         else
@@ -898,6 +914,7 @@ elseif strncmpi(name,'setexp',6)
     DATA.spikelist = WhichClusters(DATA.toplevel);
      
     for j = id(1:end)
+        fprintf('Counting Spikes for expt %d\n',j);
         tc=now;
 %        eid = DATA.expid(j); %eid already used for DATA.clst value
         p = GetProbe(DATA, DATA.expid(j), DATA.probe);
@@ -999,7 +1016,10 @@ elseif strncmpi(name,'savelfp',7) || strncmpi(name,'makelfp',7)
     useraw = 0;
     outname = regexprep(outname,'\.c[0-9]\.','.lfp.');
     outname = regexprep(outname,'\.p[0-9]*c[0-9]\.','.lfp.');
-    if DATA.state.online
+    if strncmp(DATA.filetype,'Grid',4)
+        Expt = LoadLFP(Expt,'zeropad','ft','verbose');
+        name = 'makelfp'; %don't save these outputs 
+    elseif DATA.state.online
         for j = 1:length(DATA.combineids)
             if max([DATA.probes.source]) >= 1 %if >1 data file, LFP is in #2
             lfpfile = strrep(DATA.Expts{DATA.combineids(j)}.Header.Name,'/Expt','A/LFPS');
@@ -1025,6 +1045,9 @@ elseif strncmpi(name,'savelfp',7) || strncmpi(name,'makelfp',7)
     elseif useraw
         lfpfile = [drive strrep(Expt.Header.Name,'.mat','A.lfp.mat')];
         Expt= LoadSpike2LFP(Expt,'reload','lfpfile',lfpfile,'fixshort',5);
+    elseif strncmp(DATA.filetype,'Grid',4)
+        Expt = LoadLFP(Expt,'zeropad','ft','verbose');
+        name = 'makelfp'; %don't save these outputs 
     else   
         Expt= LoadSpike2LFP(Expt,'reload','drive',drive,'fixshort',5);
     end
@@ -1032,17 +1055,20 @@ elseif strncmpi(name,'savelfp',7) || strncmpi(name,'makelfp',7)
     if isfield(Expt.Trials,'LFP') %successfully got LFP Data
     ck = CheckLFP(Expt,'verbose');
     ns = mode(ck.lens);
-    Expt.Trials = rmfield(Expt.Trials,{'Spikes' 'OSpikes' 'Ocodes' 'count'});
+    Expt.Trials = rmfields(Expt.Trials,{'Spikes' 'OSpikes' 'Ocodes' 'count'});
     LFP = Expt;
-    if sum(ck.lens .* ck.nch) > 100e6
-        LFP.Trials = rmfield(LFP.Trials,'FTlfp');
-    end
     tic;
     if strncmpi(name,'savelfp',7)
-    save(outname,'LFP');
+        if sum(ck.lens .* ck.nch) > 100e6
+            mycprintf('blue','Removing FTs from LFP before saving\n');
+            LFP.Trials = rmfield(LFP.Trials,'FTlfp');
+        end
+        save(outname,'LFP');
+        fprintf('Saved %d samples/trial. %s Loading LFP tookd %.2f, saving %.2f\n',ns,outname,ltime,toc)
     end
+    LFP = FixExpt(LFP,'auto')
+    DATA.LFP = LFP;
     if DATA.plot.lfpplot > 0
-        DATA.LFP = LFP;
         if DATA.state.online
             gains = std(cat(1,DATA.LFP.Trials.LFP));
             for j = 1:length(DATA.LFP.Trials)
@@ -1054,7 +1080,7 @@ elseif strncmpi(name,'savelfp',7) || strncmpi(name,'makelfp',7)
         set(DATA.toplevel,'UserData',DATA);
         ShowLFPPlot(DATA);
     end
-    fprintf('Saved %d samples/trial. %s Loading LFP tookd %.2f, saving %.2f\n',ns,outname,ltime,toc)
+    set(DATA.toplevel,'UserData',DATA);
     else
         fprintf('No LFP Data for %s\n',outname);
     end
@@ -1108,7 +1134,7 @@ elseif strncmpi(name,'save',4) & isfield(DATA,'Expt')
     combines.trials(id,:) = [Expt.Trials(1).Trial Expt.Trials(end).Trial];
     DATA.combines = combines;
     %tic;
-    DATA = ListExpts(DATA,DATA.Expts);
+    DATA = cListExpts(DATA,DATA.Expts);
    % toc
     set(DATA.toplevel,'UserData',DATA);
   %  combine('listexpts');
@@ -1195,12 +1221,13 @@ elseif strncmpi(name,'trackcluster',8)
     
 elseif strncmpi(name,'relist',6)
     DATA = ReadDir(DATA, DATA.name,'setprobe',DATA.probe);
+    if  strncmp(DATA.filetype,'Grid',4)
+        DATA.grididx = BuildGridIndex(DATA.nevdir, DATA.Expts,'reindex','noerrs');
+        DATA.fullvidx = ListExpts(DATA.name,'fullv');
+    end
     DATA = combine('listexps',DATA,'Tag',DATA.tag.top);
     eid = get(DATA.clst,'value');
     DATA = ListSubExpts(DATA,eid);
-    if  strncmp(DATA.filetype,'Grid',4) && ~isfield(DATA,'grididx')
-        DATA.grididx = BuildGridIndex(DATA.name, DATA.Expts,'reindex');
-    end
 
     set(DATA.toplevel,'UserData',DATA);
     if DATA.state.autoupdatelist
@@ -1233,7 +1260,9 @@ elseif exist(name,'dir') % do dir before file, since dirs pass exist(name,'file'
             end
         end
     elseif strncmp(DATA.filetype,'Grid',4)
-    DATA = LoadClusters(DATA,ClusterFile(DATA),'allprobes');
+        DATA.grididx = BuildGridIndex(DATA.nevdir, DATA.Expts,'noerrs');
+        DATA.fullvidx = ListExpts(DATA.name,'fullv');
+        DATA = LoadClusters(DATA,ClusterFile(DATA),'allprobes');
     else
     DATA = LoadClusters(DATA,ClusterFile(DATA));
     end
@@ -1246,6 +1275,7 @@ elseif exist(name,'dir') % do dir before file, since dirs pass exist(name,'file'
     end
     set(DATA.toplevel,'UserData',DATA);
     SetGui(DATA);
+
 elseif strncmpi(name,'newfile',6)
     DATA.datafilename = get(findobj(DATA.toplevel, 'Tag','FileName'),'string');
     combine(DATA.datafilename);
@@ -1390,7 +1420,9 @@ while j <= length(varargin)
 end
 SetGui(DATA);
 NotBusy(DATA);
-
+if DATA.state.verbose
+fprintf('Leaving Combine (%s)\n',calltype);
+end
        
 function layout = ReadLayout(file)   
 
@@ -1539,6 +1571,7 @@ end
     DATA.monkey = GetMonkeyName(name);
     
     DATA.logfid = fopen(strrep(name,'.mat', '.log'),'a');
+    ts = now;
     if isfield(DATA,'toplevel')
     set(findobj(DATA.toplevel, 'Tag','FileName'),'string',name);
     end
@@ -1554,7 +1587,9 @@ end
             DATA.lastread = 0;
         end
     else
+        ts = now;
         [Trials, Expts, All] = APlaySpkFile(name, args{:});
+        fprintf('APlaySpkFile Took %.2f\n',mytoc(ts));
         if isfield(Trials,'DataType')
             DATA.filetype = Trials.DataType;
         end
@@ -1586,6 +1621,8 @@ end
             if sum(DATA.probelist == DATA.probe) == 0 % current probe not in list
                 DATA.probe = DATA.probelist(1);
             end
+            DATA.ArrayConfig = GetArrayConfig(name);
+
             if np > 1
                 DATA = AddMultiProbeGUI(DATA);
             end
@@ -1654,7 +1691,7 @@ end
             DATA.cellfile = [name, '.cells.mat'];
         elseif DATA.bysuffix
             [a,b] = fileparts(name);
-            DATA.cellfile = [a '/CellList.mat'];
+            DATA.cellfile = [a '/CellList.mat']
         elseif strncmp(DATA.filetype,'GridData',8)
             [a,b] = fileparts(name);
             DATA.cellfile = [a '/CellList.mat'];
@@ -1663,7 +1700,7 @@ end
         end
 
     end
-    DATA = ListExpts(DATA,Expts);
+    DATA = cListExpts(DATA,Expts);
 
     Trialids = [];
     TrialTimes = [];
@@ -1948,6 +1985,9 @@ function ShowLFPPlot(DATA)
             a.Header = DATA.LFP.Header;
             a.Header.exptype = regexprep(a.Header.expname,'.*\.','');
         end
+    elseif ismember(DATA.plot.lfpplot,[16])        
+        [a,b] = PlotMLFP(DATA.LFP,'lines','ftpwr');
+        setappdata(DATA.toplevel,'LFPresult',b);
     end
     hold off;
     probelist = DATA.probelist;
@@ -2127,21 +2167,21 @@ function str =ShowString(DATA, Expt)
     fn = fields(DATA.show);
     
     for k = 1:length(fn)
-        if isempty(strmatch(fn{k},'times') )
+        if ~strcmp(fn{k},'times')
             x = GetEval(Expt,fn{k});
-        if strmatch(fn{k},'Fr') & x > 1
-         str = [str sprintf(' %s=%.1f',fn{k},x)];
-        elseif DATA.show.(fn{k})
-            if strmatch(fn{k},{'jx' 'pi'})
-                str = [str sprintf(' %s=%.3f',fn{k},x)];
-            elseif strmatch(fn{k},{'or' 'sl' 'se' })
-                str = [str sprintf(' %s=%.0f',fn{k},x)];
-            elseif strcmp(fn{k},'ntrials')
-                str = [str sprintf(' %s=%.0f',fn{k},length(Expt.Trials))];
-            else
-                str = [str sprintf(' %s=%.2f',fn{k},x)];
+            if strcmp(fn{k},'Fr') & x > 1
+                str = [str sprintf(' %s=%.1f',fn{k},x)];
+            elseif DATA.show.(fn{k})
+                if sum(strcmp(fn{k},{'jx' 'pi'}))
+                    str = [str sprintf(' %s=%.3f',fn{k},x)];
+                elseif sum(strcmp(fn{k},{'or' 'sl' 'se' }))
+                    str = [str sprintf(' %s=%.0f',fn{k},x)];
+                elseif strcmp(fn{k},'ntrials')
+                    str = [str sprintf(' %s=%.0f',fn{k},length(Expt.Trials))];
+                else
+                    str = [str sprintf(' %s=%.2f',fn{k},x)];
+                end
             end
-        end
         end
     end
 
@@ -3202,7 +3242,18 @@ end
         
 %    save(DATA.outname,'Expt'); %use save to do the saving....
 
+
+function SetProbeList(DATA)
+    it = findobj(DATA.toplevel,'Tag','ProbeId');
+    if isfield(DATA,'ArrayConfig') && isfield(DATA.ArrayConfig,'id') && length(DATA.probenames) == length(DATA.ArrayConfig.id)
+       [a,b] = sort(DATA.ArrayConfig.id);
+       set(it,'string',DATA.probenames(b),'value',DATA.probe);
+       setappdata(it,'probelist',b);
+    else
+        set(it,'string',DATA.probenames,'value',DATA.probe);
+    end
     
+
    
 function DATA = ReadDir(DATA, name, varargin)  %% Online Plots
 
@@ -3222,6 +3273,8 @@ if nx > 5 %temporary - need to cherk expected number
     DATA.bysuffix = 1;
 end
 
+ts = now;
+AllExpts = {};
 d = d(b);
 reindex = 0;
 args = {};
@@ -3240,6 +3293,9 @@ DATA.cellfile = [name, '/Cells.mat'];
 end
  DATA = LoadCellFile(DATA);
 DATA.datadir = name;
+if isempty(DATA.nevdir)
+    DATA.nevdir = name;
+end
 
 j = 1;
 while j <= nargin-2
@@ -3289,7 +3345,7 @@ end
     nexpts = 0;
     suffixlist = [];
     suffixid = [];
-    DATA.ArrayConfig = GetArrayConfig(name);
+
 
     ts = now;
     for j = 1:length(d)
@@ -3341,7 +3397,9 @@ end
                 else
                     args = {'online' args{:}};
                 end
+                ts = now;
             [trls, exps, All] = APlaySpkFile([name '/' d(j).name],'Defaults',DATA.defaults,args{:});
+%            fprintf('APlaySpkFile took %.2f\n',mytoc(ts));
                 soffid = [];
                 sonid = [];
             if isfield(trls,'DataType')
@@ -3412,7 +3470,7 @@ end
                 Trialids = [Trialids newt];
                 TrialTimes = [TrialTimes news];
                 Expts{nexp}.gui.ntrials = length(newt);
-                if nexp > 1 && isfield(Spikes,'values') && size(Spikes.values,2) == size(All.Spikes.values,2)
+                if nexp > 1 && isfield(Spikes,'values') && isfield(All.Spikes,'values') && size(Spikes.values,2) == size(All.Spikes.values,2)
                     Spikes.values = cat(1,Spikes.values, All.Spikes.values);
                     if isfield(All.Spikes,'dVdt')
                     Spikes.dVdt = cat(1,Spikes.dVdt, All.Spikes.dVdt);
@@ -3455,6 +3513,7 @@ end
         end
     end
     fprintf('Loading took %.1f (%.1f)\n',mytoc(ts),sumload);
+    DATA.ArrayConfig = GetArrayConfig(DATA.nevdir);
 
     if exist('probenames','var') %can be empty for online relist
     np = 0;
@@ -3523,6 +3582,9 @@ end
                 DATA.probe = DATA.probelist(1);
             end
 
+        for j = 1:length(DATA.ArrayConfig.id)
+            DATA.probenames{j} = sprintf('%d(E%d %d,%d)',j,DATA.ArrayConfig.id(j),DATA.ArrayConfig.X(j),DATA.ArrayConfig.Y(j));
+        end
         if np > 1
                 DATA = AddMultiProbeGUI(DATA);
         end
@@ -3530,14 +3592,13 @@ end
     if sum(DATA.probelist < 100) > 1 % count # of recording chans
         DATA.state.includeprobename = 1;
     end
-    it = findobj(DATA.toplevel,'Tag','ProbeId');
-    set(it,'string',DATA.probenames,'value',DATA.probe);
-
+    
+    SetProbeList(DATA);
 
     if nexp == 1
         questdlg(sprintf('No expts in %s',name),'test','OK','OK');
     else
-        DATA = ListExpts(DATA,Expts);
+        DATA = cListExpts(DATA,Expts);
         DATA.Expts = Expts;
         DATA.AllData = All;
         DATA.AllData.Spikes = Spikes;
@@ -3560,10 +3621,12 @@ end
                 for k = 1:size(DATA.CellDetails.excludetrials,2)
                     for c = 1:size(DATA.CellDetails.excludetrials,3)
                         if ~isempty(DATA.CellDetails.excludetrials{j,k,c})
+                            if k <= length(DATA.AllClusters{eid})
                             if c > length(DATA.AllClusters{eid}(k).excludetrialids)
                                 DATA.AllClusters{eid}(k).excludetrialids{c} = DATA.CellDetails.excludetrials{j,k,c};
                             else
                             DATA.AllClusters{eid}(k).excludetrialids{c} = union(DATA.AllClusters{eid}(k).excludetrialids{c},DATA.CellDetails.excludetrials{j,k,c});
+                            end
                             end
                         end
                     end
@@ -3594,7 +3657,7 @@ end
             AllExpts{j}.ids = [DATA.Expts{j}.Trials.id];
         end
         explistfile = [DATA.name '/AllExpts.mat'];
-        if ~exist(explistfile,'file')
+        if ~exist(explistfile,'file') && ~isempty(AllExpts)
             save(explistfile,'AllExpts');
         end
     else
@@ -6642,7 +6705,7 @@ set(it,'string',sprintf('%.2f',x(2)));
 SetGui(DATA);
 set(DATA.toplevel,'UserData',DATA);
 
-function DATA = ListExpts(DATA, Expts)
+function DATA = cListExpts(DATA, Expts)
 
 SpkDefs;
 explist = {};
@@ -6891,7 +6954,14 @@ for j = 1:length(DATA.Expts);
             subexplist{na} = [DATA.explist{id(eid)} num2str(j) label];
         end
         DATA.explabels{j} = subexplist{na};
-        if DATA.Expts{j}.gui.clustertype == 0
+        if DATA.state.online && strncmp(DATA.filetype,'Grid',4)
+            if ismember(j,DATA.grididx.expt) % have .ns5 files
+                subexplist{na} = [subexplist{na} '*'];
+            end
+            if ismember(j,DATA.fullvidx) % have .ns5 files
+                subexplist{na} = [subexplist{na} '(V)'];
+            end
+        elseif DATA.Expts{j}.gui.clustertype == 0
             subexplist{na} = [subexplist{na} '*'];
         elseif DATA.Expts{j}.gui.clustertype == 2
             subexplist{na} = [subexplist{na} '(O)'];
@@ -6938,7 +7008,7 @@ function timerfn(tim, varargin)
 %         fprintf('List\n');
          if length(Expts) > length(DATA.Expts)
              DATA.Expts = Expts;
-             DATA = ListExpts(DATA,Expts);
+             DATA = cListExpts(DATA,Expts);
  %            fprintf('listexp\n');
              DATA = combine('listexps',DATA,'Tag',DATA.tag.top);
 %             fprintf('Set\n');
@@ -6975,7 +7045,7 @@ function LoadAllProbes(a,b, varargin)
         if DATA.state.online == 0
             DATA.AllData.Spikes = GetProbeFiles(DATA, DATA.probelist(j),DATA.subprobe,'trange',times/10000);
         else
-            filename = ['C:' DATA.Expts{DATA.currentexpt(1)}.Header.Name];
+            filename = DATA.Expts{DATA.currentexpt(1)}.Header.loadname;
             if DATA.probelist(j) > 16 || DATA.probesource(j) == 1
                 filename = strrep(filename,'/Expt','A/Expt');
             end
@@ -8201,8 +8271,9 @@ if ~isfield(DATA,'toplevel') %no GUI
     return;
 end
 ncw=1./45;
-it = findobj(DATA.toplevel,'Tag','ProbeId');
-set(it,'string',DATA.probenames,'value',DATA.probe);
+SetProbeList(DATA);
+
+
 
 if ~isempty(findobj(DATA.toplevel,'Tag','MultiProbeMenu'))
     return;
@@ -8326,7 +8397,7 @@ function ListCells(a,b)
         if pn > length(cells)
             set(pit,'value',1);
         end
-%        DATA = ListExpts(DATA, DATA.Expts);
+%        DATA = cListExpts(DATA, DATA.Expts);
     else
         set(pit,'string',DATA.probenames);
         setappdata(pit,'probelist',DATA.probelist);
@@ -9476,7 +9547,7 @@ uicontrol(gcf,'Style', 'checkbox',...
 
     bp(1) = bp(1)+bp(3);
 h = uicontrol(gcf,'Style', 'pop','String',DATA.probenames,'Units', 'norm','Position', bp,...
-      'Tag','ProbeId','Callback',@SetProbeHit,'value',1);
+      'Tag','ProbeId','Callback',@SetProbeHit,'value',1,'interruptible','off');
 if length(DATA.probelist) > 1
     bp(1) = bp(1)+bp(3);
       uicontrol(gcf,'style','pushbutton','string','+','Position',cp, 'Callback',{@SetProbeHit,'next'});
@@ -9530,6 +9601,7 @@ DATA.gui.toprow = bp(2);
 DATA.toplevel = cntrl_box;
 DATA.figpos(1).tag = DATA.tag.top;
 DATA.figpos(1).pos = get(DATA.toplevel,'Position');
+set(get(cntrl_box,'children'),'interruptible','off');
 setappdata(DATA.toplevel,'FigPos',DATA.figpos);
 
 function DoConfig(a,b, fcn)
@@ -10770,6 +10842,23 @@ end
 function str = vec2str(x)
           str = [int2str(x(1)) ':' int2str(x(end))];
 
+          
+function SpikeUIMenu(a,b);
+DATA = GetDataFromFig(a);
+tag = get(a,'Tag');
+SetMenuCheck(a,'exclusive');
+
+if strcmp(tag,'ns5')
+    DATA.state.usensx = 1;
+elseif strcmp(tag,'nev')
+    DATA.state.usensx = 2;
+else
+    DATA.state.usensx = 0;
+end
+set(DATA.toplevel,'UserData',DATA);
+
+
+
 function cntrl_box = setoptions(DATA, tag)
 
 wsc = DATA.wsc;
@@ -10799,7 +10888,10 @@ dat.parentfigtag = DATA.tag.top;
 cntrl_box = figure('Position', Figpos.(tag) , 'Menubar', 'none',...
     'NumberTitle', 'off', 'Tag',tag,'Name','Options','UserData',dat);
 set(cntrl_box,'DefaultUIControlFontSize',DATA.gui.FontSize);
-
+hm=uimenu(cntrl_box,'label','Spikes');
+uimenu(hm,'label','From NEV','tag', 'nev', 'callback',@SpikeUIMenu);
+uimenu(hm,'label','From NS5','tag', 'ns5', 'callback',@SpikeUIMenu);
+uimenu(hm,'label','From Spks.mat','tag', 'spk', 'callback',@SpikeUIMenu);
 
 top = num2str(DATA.toplevel); 
 HSPACE = 0.02;
@@ -10868,8 +10960,8 @@ bp(2) = rows(2); bp(1) = cols(1);
    uicontrol(gcf,'Style', 'CheckBox','String','Flip','units','norm','Position', bp,...
       'Tag','Flip','Callback',@Update,'value',DATA.plot.flip);
    bp(2) = rows(7);
-   uicontrol(gcf,'Style', 'CheckBox','String','Collapse 1','units','norm','Position', bp,...
-      'Tag','Collapse1','Callback',@Update,'value',DATA.plot.collapse);
+%   uicontrol(gcf,'Style', 'CheckBox','String','Collapse 1','units','norm','Position', bp,...
+%      'Tag','Collapse1','Callback',@Update,'value',DATA.plot.collapse);
   bp(2) = rows(8);
   uicontrol(gcf,'Style', 'CheckBox','String','Acov','units','norm','Position', bp,...
       'Tag','Acov','Callback',@Update,'value',DATA.plot.acov);
@@ -10877,8 +10969,8 @@ bp(2) = rows(2); bp(1) = cols(1);
    bp(1) = cols(3);
    uicontrol(gcf,'Style', 'CheckBox','String','ISIH','units','norm','Position', bp,...
       'Tag','ISIH','Callback',@Update,'value',DATA.plot.showISI);
-   bp(2) = rows(7);
-   bp(1) = cols(3);
+   bp(2) = rows(8);
+   bp(1) = cols(1);
    uicontrol(gcf,'Style', 'CheckBox','String','QuickSpk','units','norm','Position', bp,...
       'Tag','QuickSpks','Callback',@Update,'value',DATA.plot.quickspks);
 
@@ -11039,7 +11131,7 @@ bp(2) = rows(2); bp(1) = cols(1);
        DATA.plot.lfpplot = 0;
    end
    bp(1) = cols(2)+0.1; bp(3) = colw-0.1;
-  uicontrol(gcf,'Style', 'pop','String','None|Default|Stack|Image|Blank|RC|Movie|OneStim|monocs|Eig|Var|BlankVar|Frameresp|Trial|CSD|TrialStart','units','norm', 'Position',bp,...
+  uicontrol(gcf,'Style', 'pop','String','None|Default|Stack|Image|Blank|RC|Movie|OneStim|monocs|Eig|Var|BlankVar|Frameresp|Trial|CSD|TrialStart|FTpwr','units','norm', 'Position',bp,...
       'Tag','LFPPlot','Callback',@Update,'value',DATA.plot.lfpplot+1);
   
 
@@ -11316,7 +11408,9 @@ DATA.state.showspikes = playspk;
 % if > 3 probes are laoded, don't spool through them every time the probe
 % hit is changed.
 if DATA.state.nospikes
+    fprintf('Calling combine from Setprobehit\n');
     DATA = combine('setexp', DATA,'newprobe');
+    fprintf('Returned from  combine in Setprobehit\n');
     plotISI(DATA);
 elseif (DATA.state.autospool | playspk) & nloaded < 4
     DATA = combine('setexp', DATA);
@@ -11536,6 +11630,7 @@ id = find(DATA.probelist == probe);
  % multiple files (offline only)
         id = find([DATA.probes.probe] == DATA.probe);
       end
+      loaded = 1;
       onexpt = 0; %temp kludge to allow quicker probe switching set 1 1 = only load spikes for 1 expt
         if DATA.state.online == 0
             if DATA.bysuffix
@@ -11574,7 +11669,7 @@ id = find(DATA.probelist == probe);
             DATA = SetSpkLists(DATA);
             DATA.spklist = DATA.Expts{DATA.currentexpt(1)}.gui.spks;
             DATA = SetExptSpikes(DATA, eid, 0);
-        elseif strncmp(DATA.filetype,'Grid',4) && DATA.state.somespikes == 2
+        elseif strncmp(DATA.filetype,'Grid',4) && DATA.state.usensx > 0 %GetNS% deeals with NEV and NS5
                 DATA =  GetNS5Spikes(DATA, DATA.currentexpt(1),  DATA.probe);
                 DATA = SetExptSpikes(DATA, eid, 0);
         else
@@ -11592,14 +11687,19 @@ id = find(DATA.probelist == probe);
                 filename = [DATA.datafilename '/'  b '.mat'];
             end
             if strncmp(DATA.filetype,'Grid',4) && ~isfield(DATA,'probevars')
-                DATA =  GetNS5Spikes(DATA, DATA.currentexpt(1),  DATA.probe);
+                if DATA.state.usensx == 1
+                    DATA =  GetNS5Spikes(DATA, DATA.currentexpt(1),  DATA.probe);
+                else
+                    loaded = 0;
+                end
             else
                 [DATA.AllData.Spikes]= GetProbeSpikes(DATA.AllData, filename , DATA.probevars{id},[DATA.probe DATA.subprobe]);
                 DATA.spklist = [];
                 DATA = SetExptSpikes(DATA, eid, 0);
             end
-            DATA = CountSpikes(DATA,eid);
-
+            if loaded %otherwise recursively calls 
+                DATA = CountSpikes(DATA,eid);
+            end
             %  DATA = SetSpkCodes(DATA, [1:length(DATA.AllData.Spikes.times)], 0)
         end
         

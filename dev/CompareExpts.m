@@ -9,11 +9,20 @@ while j <= length(varargin)
     j = j+1;
 end
 
+if iscell(Ea) && iscell(Eb)
+    for j = 1:length(Ea)
+        CompareExpts(Ea{j},Eb{j});
+    end
+    return;
+end
+
 f = fields(Ea.Stimvals);
 for j = 1:length(f);
     if isfield(Eb.Stimvals,f{j})
     if Ea.Stimvals.(f{j}) ~= Eb.Stimvals.(f{j})
-        fprintf('Stimval %s different\n',f{j});
+        if sum(~isnan(Ea.Stimvals.(f{j}))) || sum(~isnan(Eb.Stimvals.(f{j}))) 
+            fprintf('Stimval %s different %.2f %.2f \n',f{j},Ea.Stimvals.(f{j}),Eb.Stimvals.(f{j}));
+        end
     end
     else
        fprintf('No %s in Expt2.Stimvals\n',f{j});

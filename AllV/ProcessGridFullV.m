@@ -2,7 +2,7 @@
 function DATA = ProcessGridFullV(name, varargin)
 %DATA = ProcessGridFullV(name, varargin)
 %make FullV files from .ns5 files. Apply clusters
-%ProcessGridFullV(name,'online')
+%ProcessGridFullV(name,'online') =  'chopfile','BuildV','mains', 'submean';
 %ProcessGridFullV(name,'initial') =  'chopfile','BuildV','mains', 'submean', 'refcut', 'prebuild';
 %
 %ProcessGridFullV(name,'buildv')  forces (re-)building of FullV file
@@ -44,6 +44,8 @@ usealltrials = 0;
 savespikes = 1;
 allvargs = {};
 buildargs = {};
+nevdir = [];
+
 j = 1;
 while j <= length(varargin)
     if isfield(varargin{j},'Trials')
@@ -112,6 +114,10 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'maxgap',5)
         j = j+1;
         gaplen = varargin{j};
+    elseif strncmpi(varargin{j},'nevdir',5)
+        gargs = {gargs{:} varargin{j} varargin{j+1}};
+        j = j+1;
+        nevdir = varargin{j};
     elseif strncmpi(varargin{j},'nosave',5)
         savefile = 0;
     elseif strncmpi(varargin{j},'prebuildforce',10)
@@ -132,6 +138,8 @@ while j <= length(varargin)
         smoothw = varargin{j};
     elseif strncmpi(varargin{j},'submean',5)
         buildmean = 3;
+    elseif strncmpi(varargin{j},'nosubmean',5)
+        buildmean = 0;
     elseif strncmpi(varargin{j},'refcut',5)
         refcut = 1;
     elseif strncmpi(varargin{j},'reindex',5)
@@ -251,6 +259,9 @@ elseif isdir(name)  %online
     All.Events.codes = [];
     All.Events.times = [];
     nx = 0;
+    if isempty(nevdir)
+        nevdir = name;
+    end
     d = dir([name '/Expt*.mat']);
     for j = 1:length(d)
         if isempty(strfind(d(j).name,'idx')) && isempty(strfind(d(j).name,'FullV')) ...
@@ -270,9 +281,11 @@ elseif isdir(name)  %online
             All.Events.codes = cat(1,All.Events.codes,A.Events.codes);
             All.Events.times = cat(1,All.Events.times,A.Events.times);
             Expts{nx}.loadname = [name '/' d(j).name];
+            exptstarts(nx) = Expts{nx}.Header.Start;
         end
     end
-    
+    [a,b] = sort(exptstarts);
+    Expts = Expts(b);
 else
     [Trials, Expts, All] = APlaySpkFile(name, 'nospikes',  args{:});
     for j = 1:length(Expts)
@@ -340,6 +353,7 @@ else
         expts = 1:length(Expts);
     else
         expts = expts(expts <= length(Expts));
+        gargs = {gargs{:} 'noerrs'};
     end
 
 if chopfile
@@ -427,7 +441,7 @@ if prebuild
     for e = gotexpts
         id = find(DATA.idx.expt == e);
         for suff = 1:length(id)
-        filename = [DATA.idx.datdir '/' DATA.idx.names{id(suff)}];
+        filename = [DATA.idx.nevdir '/' DATA.idx.names{id(suff)}];
         filename = strrep(filename,'nev','ns5');
         needv = [];
         for k = probes
@@ -530,6 +544,11 @@ if BuildLFP
 end
 
 if BuildV
+    if isempty(nevdir)
+        DATA.nevdir = DATA.idx.datdir;
+    else
+        DATA.nevdir = nevdir;
+    end
     DATA.mainstimes = Trials.mainstimes;
     fprintf('Building FullV for expts %s\n',sprintf('%d ',gotexpts));
     outvarname = 'FullV';
@@ -559,10 +578,10 @@ if BuildV
             end
         end
     else
-        
+        res = {};
         
         %    parfor (ex = 1:length(gotexpts))
-        if parallel
+        if parallel && length(gotexpts) > 1
             parfor (j = 1:length(gotexpts))
                 try
                     res{j} = BuildGridFullV(DATA, Expts, gotexpts(j), probes, buildargs{:});
@@ -572,6 +591,9 @@ if BuildV
                 end
             end
         else
+            if parallel
+                buildargs = {buildargs{:} 'parallel'};
+            end
             for j = 1:length(gotexpts)
                 res{j} = BuildGridFullV(DATA, Expts, gotexpts(j), probes, buildargs{:});
             end

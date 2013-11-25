@@ -365,11 +365,18 @@ end
 
 function map = rflist2map(DATA, R)
 MapDefs;
+name2area = [1 1 2 1 10];
 
 for j = 1:length(R)
     map.rf(j,:) = R{j}.rf;
     map.cellname{j} = R{j}.name;
     map.area(j) = 1;
+    if isfield(R{j},'area')
+        a = find(strcmp(R{j}.area,{'V1' 'Vd' 'V2' 'unknown' 'Vc'}));
+        if ~isempty(a)
+            map.area(j) = name2area(a);
+        end
+    end
     map.hemisphere(j) = 0;
     if isfield(R{j},'date')
         map.datestr{j} = datestr(R{j}.date);
@@ -388,6 +395,16 @@ end
 [c,d] = max(a);
 map.monkey = b{d};
 map.monkeyname = b{d};
+txt = scanlines(['/bgc/anal/' map.monkey '/pens.err']);
+for j = 1:length(txt)
+    a = sscanf(txt{j},'%f');
+    if length(a) > 2
+        id = find(map.rf(:,6) == a(1));
+        map.rf(id,7) = a(2);
+        map.rf(id,8) = a(3);
+    end
+end
+   
 map.monkey = find(strcmp(map.monkeyname, DATA.monkeynames));
 map.pen = map.rf(:,6:8);
 
@@ -876,13 +893,13 @@ RePlot(DATA);
 
 
 function PlotRFContour(DATA, type)
-[X,Y] =meshgrid(min(DATA.px):max(DATA.px),min(DATA.py):max(DATA.py));
+[X,Y] =meshgrid(floor(min(DATA.px)):ceil(max(DATA.px)),floor(min(DATA.py)):ceil(max(DATA.py)));
 for j = 1:size(X,1)
     for k = 1:size(X,2)
-        id = find(DATA.px == X(j,k) & DATA.py == Y(j,k));
+        id = find(abs(DATA.px - X(j,k)) < 0.7 & abs(DATA.py - Y(j,k)) < 0.7);
         if ~isempty(id)
-            Z(j,k) = DATA.xc(id);
-            ZY(j,k) = DATA.yc(id);
+            Z(j,k) = mean(DATA.xc(id));
+            ZY(j,k) = mean(DATA.yc(id));
         else
             Z(j,k) = NaN;
             ZY(j,k) = NaN;
@@ -898,17 +915,31 @@ Zi = Interpf(X,Y, Z, Xi, Yi, 1, 0.5);
     [c, h] = contour(X,Y,Z,floor(min(min(Z))):ceil(max(max(Z))),'r');
 clabel(c,h,'color','r');
 hold on;
-[c, h] = contour(X,Y,ZY,floor(min(min(Z))):ceil(max(max(Z))),'b');
+[c, h] = contour(X,Y,ZY,floor(min(min(ZY))):ceil(max(max(ZY))),'b');
 clabel(c,h,'color','b');
 
 elseif type == 6
-    pcolor(X,Y,Z);
+    GetFigure('XPcolor','parent',DATA.top);
+    [X,Y,Z] = fillpmesh(X,Y,Z)
+    h = pcolor(X,Y,Z);
+    set(h,'buttondownfcn',@HitImage);
     colorbar;
 elseif type == 7
-    pcolor(X,Y,ZY);
+    GetFigure('YPcolor','parent',DATA.top);
+    [X,Y,Z] = fillpmesh(X,Y,ZY)
+    h = pcolor(X,Y,Z);
+    set(h,'buttondownfcn',@HitImage);
     colorbar;
 end
 
+function HitImage(a,b)
+
+DATA = GetDataFromFig(a);
+c = get(gca,'CurrentPoint');
+px = floor(c(1));
+py = floor(c(1,2));
+fprintf('At %d,%d Pos = %.1f\n',px,py,c(1,3));
+plotpen(DATA,px,py);
 
 function PlotRFMap(DATA,gridlines)
 

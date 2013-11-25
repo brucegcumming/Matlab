@@ -595,17 +595,41 @@ end
 nr=2;
 nc=3;
 subplot(nr,nc,1);
+hold off;
 myscatter(premaxpt,premax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Pre max pt');
+ylabel('Pre max');
+
 subplot(nr,nc,2);
+hold off;
 myscatter(postmaxpt,postmax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Post max pt');
+ylabel('Post max');
+
 subplot(nr,nc,3);
+hold off;
 myscatter(minv,postmax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Min V');
+ylabel('Post max');
+
+
 subplot(nr,nc,4);
+hold off;
 myscatter(minv,premax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Min V');
+ylabel('pre max');
+
 subplot(nr,nc,5);
+hold off;
 myscatter(postmax,premax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Post max');
+ylabel('Pres max');
+
 subplot(nr,nc,6);
+hold off;
 myscatter(preshape,postshape,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('PreSum');
+ylabel('PostSum');
 
 function HitScatter(a,b,id, idb)
 DATA = GetDataFromFig(a);

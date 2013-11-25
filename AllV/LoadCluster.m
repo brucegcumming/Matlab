@@ -143,6 +143,14 @@ for j = 1:length(eid)
                 AllClusters{j}{k}.clusterprog = '';
             end
         end
+        if isfield(AllClusters{j}{k},'times') && diff(size(AllClusters{j}{k}.times)) < 0
+            cprintf('red','%s P%d times is a row vector\n',name,k);
+            AllClusters{j}{k}.times = AllClusters{j}{k}.times';
+        end
+        if isfield(AllClusters{j}{k},'t') && diff(size(AllClusters{j}{k}.t)) < 0
+            cprintf('red','%s P%d t is a row vector\n',name,k);
+            AllClusters{j}{k}.t = AllClusters{j}{k}.t';
+        end
     end
     details{j}.loadur = mytoc(ts);
 end

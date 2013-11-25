@@ -1,7 +1,13 @@
 function [nrow, ncol] = Nsubplots(nplots, varargin)
 %[nrow, ncol] = Nsubplots(nplots, varargin)
 
-if nplots > 36
+
+if isstruct(nplots) 
+    if isfield(nplots,'X') %an array config
+        nrow = max(nplots.X);
+        ncol = max(nplots.Y);
+    end
+elseif nplots > 36
     nrow = ceil(sqrt(nplots));
     ncol = ceil(nplots/nrow);
 elseif nplots > 30

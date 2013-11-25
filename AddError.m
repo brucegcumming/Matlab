@@ -1,0 +1,1 @@
+function DATA = AddError(DATA, varargin)    s = sprintf(varargin{:});    mycprintf('red',s);    fprintf('\n');    if ~isfield(DATA,'errs')        DATA.errs = {};    end    DATA.errs = {DATA.errs{:} s};        

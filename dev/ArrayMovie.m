@@ -1,5 +1,12 @@
 function ArrayMovie(Expt, ids, varargin)
+%ArrayMovie(Expt, ids, varargin)
 %Plot an array Expt data strcture as a movie
+%Expt can be and LFP Expt or spikes
+%can also be a matriz of resps, in which case ids must
+%contains details
+%
+%Use with AllExpt2mat
+
 
 timerange = [];
 j = 1; 
@@ -16,13 +23,20 @@ if isfield(Expt,'Header')
     Array = GetArrayConfig(Expt.Header.loadname);
     res.lfptimes = Expt.Header.lfptimes;
 elseif isnumeric(Expt)
-    res.lfpresp = Expt;
     if isfield(ids,'sdfs') && isfield(ids.sdfs,'lfptimes') %RevCor return struct
         Array = GetArrayConfig(ids.Header.loadname);
-        res.lfptimes = ids.sdfs.lfptimes;
-    else
+        res.lfptimes = ids.sdfs.lfptim\es;
+    elseif isfield(ids,'X') && isfield(ids,'id')
+        Array = ids;
+    else %details from AllExpt2mat
         Array = GetArrayConfig(ids.loadname);
         res.lfptimes = ids.times;
+        if isfield(ids,'celllist')
+            res.spkresp = Expt;
+        end
+    end
+    if ~isfield(res,'spkresp')
+        res.lfpresp = Expt;
     end
 end
 
@@ -102,8 +116,11 @@ lfpstep = 10000;
 
 
 if isfield(res,'spkresps')
-res.surange(1) = min(res.spkresps(:));
-res.surange(2) = max(res.spkresps(:));
+    res.surange(1) = min(res.spkresps(:));
+    res.surange(2) = max(res.spkresps(:));
+elseif isfield(res,'spkresp')
+    res.surange(1) = min(res.spkresp(:));
+    res.surange(2) = max(res.spkresp(:));
 end
 if isfield(res,'lfpresp')
     
@@ -193,6 +210,24 @@ if isfield(res,'lfprespa')
     else
         title(sprintf('%.1f ms',res.lfptimes(b)./10));
     end
+elseif isfield(res,'spkresp')
+    subplot(1,1,1);
+    nplots = 1;
+    [a,b] = min(abs(t-mean(res.mtimes,1)));
+    if isfield(res,'probemap')
+        im = zeros(res.arraysize);
+        if b > size(res.spkresp,2)
+            im(res.probemap) = res.spkresp(:,end);
+        else
+            im(res.probemap) = res.spkresp(:,b);
+        end
+        imagesc(im);
+    else
+        imagesc(squeeze(res.spkresp(b,:))');
+    end
+    caxis(res.surange);
+    title(sprintf('%.1f ms',res.mtimes(1,b)));
+    slidertime = res.mtimes(b);
 elseif isfield(res,'spkresps')
     subplot(2,1,1);
     nplots = 2;
@@ -200,6 +235,7 @@ elseif isfield(res,'spkresps')
     imagesc(squeeze(res.spkresps(b,:,:))');
     caxis(res.surange);
     title(sprintf('%.1f ms',res.times(1,b)./10));
+    slidertime = res.times(b)./10;
 end
 
 if isfield(res,'lfpresp')
@@ -225,13 +261,13 @@ if isfield(res,'lfpresp')
     else
         title(sprintf('%.1f ms',res.lfptimes(b)./10));
     end
+    slidertime = res.lfptimes(b)./10;
+end
     if isfield(res,'slider')
-        t = res.lfptimes(b)./10;
-        if t <= get(res.slider,'Max') & t >= get(res.slider,'Min')
-            set(res.slider,'value',res.lfptimes(b)./10);
+        if slidertime <= get(res.slider,'Max') & slidertime >= get(res.slider,'Min')
+            set(res.slider,'value',slidertime);
         end
     end
-end
 
 
 function PlotTimeCourseProbes(rc, probes, style, sumy)

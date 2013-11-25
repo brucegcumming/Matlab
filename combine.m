@@ -3158,8 +3158,9 @@ end
 if nx > 5 %temporary - need to cherk expected number 
     DATA.bysuffix = 1;
 end
-
+AllExpts = {};
 d = d(b);
+ts = now;
 reindex = 0;
 args = {};
 j = 1;
@@ -3523,7 +3524,7 @@ end
             AllExpts{j}.ids = [DATA.Expts{j}.Trials.id];
         end
         explistfile = [DATA.name '/AllExpts.mat'];
-        if ~exist(explistfile,'file')
+        if ~exist(explistfile,'file') && ~isempty(AllExpts)
             save(explistfile,'AllExpts');
         end
     else

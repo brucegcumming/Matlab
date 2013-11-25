@@ -6,8 +6,11 @@ function res = RunAllGridFiles(name, varargin)
 %To apply quantification of quick saves, use
 %RunAllGridFiles(file,'quantify','savespikes')  
 %
-%To remake all files using saveed clusterse
+%To remake all files using saved clusterse
 %RunAllGridFiles(file,'savespikes','reclassifyall')  
+%
+%To Apply clusters from RefClusters
+%RunAllGridFiles(file,'refcut', 'savespikes')  
 %
 %RunAllGridFiles(file,'expts', exlist, 'probes', probelist, ...)  
 %    sets expts/probes to be done. (can set 
@@ -299,10 +302,10 @@ if strcmp(checktype,'quantify')
         t = getCurrentTask();
         for k = 1:length(exids{e})
             j = exids{e}(k);
-            fprintf('Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+            fprintf('Worker %d Processing %s %s\n',t.ID,vfiles{j},datestr(now));
 
             if fid > 0
-                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,vfiles{j},datestr(now));
             end
             try
               cls{e}{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
@@ -405,10 +408,10 @@ if parallel  %have to do this by expt. If two probes in one expt done at the sam
         t = getCurrentTask();
         for k = 1:length(exids{e})
             j = exids{e}(k);
-            fprintf('Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+            fprintf('Worker %d Processing %s %s\n',t.ID,cfiles{j},datestr(now));
             jj = x(j);
             if fid > 0
-                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,cfiles{j},datestr(now));
             end
             cls{e}{k} = DoFile(names{j},cfiles{j},classifyfromcluster,args{:});
         end

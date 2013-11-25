@@ -29,7 +29,7 @@ while j <= length(varargin)
 end
 
 if iscellstr(E) %list of names
-    FindExpts(E, varargin);
+    [names, details] = FindExpts(E, varargin{:});
 elseif psych
     [names,details] = ListPsychDir(E, 0);
 elseif iscell(E)
@@ -87,7 +87,13 @@ while j <= length(varargin)
     end
     j = j+1;
 end
-if iscell(namelist{1})
+if iscellstr(namelist) && isdir(namelist{1}) %cell array of dir names
+    for j = 1:length(namelist)
+        [names{j}, ids{j}] = ListExptDir(namelist{j},varargin{:});
+    end
+    return;
+
+elseif iscell(namelist{1}) %not a cell array of strings = array of cellstrings
     ids = {};
     for j = 1:length(namelist)
         if ~isempty(namelist{j})
@@ -96,13 +102,16 @@ if iscell(namelist{1})
             good(j) = 0;
         end
     end
-   % namelist = namelist(find(good));
+    namelist = namelist(find(good)); %need to remove empties
+    exdetails = exdetails(find(good));
+    goodlist = find(good);
     for j = 1:length(namelist)
         [names{j}, id{j}] = FindExpts(namelist{j},varargin{:});
         details.matches(j) = length(names{j});
         if j <= length(exdetails) && isfield(exdetails{j},'ntrials')
         details.ntrials(j) = sum(exdetails{j}.ntrials(id{j}));
         end
+        details.matchnames{j} = unique(names{j});
     end
     details.ids = id;
     clear id;
@@ -110,7 +119,13 @@ if iscell(namelist{1})
     details.ids = details.ids(id);
     details.matches = details.matches(id);
     details.ntrials = details.ntrials(id);
-    details.matchid = id;
+    details.matchnames = details.matchnames(id);
+    details.matchid = goodlist(id);
+    allnames = {};
+    for j = 1:length(details.matchnames)
+        allnames = {allnames{:} details.matchnames{j}{:}};
+    end
+    [details.namecounts,details.allnames] = Counts(allnames);
     if ~isempty(details)
         for j = 1:length(id)
             details.dirpath{j} = exdetails{id(j)}.dirpath;
@@ -121,6 +136,9 @@ if iscell(namelist{1})
     return;
 end
 
+
+%get here if its a cell array of strings that are not dir names
+%= should be a list of expt names
 
 findstr = {};
 ids = [];
@@ -173,24 +191,54 @@ for j = 1:length(E)
     elseif isfield(E{j},'ntrials')
         details.ntrials(j) = E{j}.ntrials;
     end
+    fn = fieldnames(E{j}.Trials);
+    fn = setdiff(fn,{'Start' 'TrialStart' 'End' 'dur' 'id' 'TrueEnd' 'bstimes' 'delay' 'Trial' 'exvals' 'endevent' 'Spikes' 'count' 'OptionCode' 'rwtimes'});
+    fn = setdiff(fn,{'ch' 'op' 'rw' 'se' });
+    str = [];
+    
+    for k = 1:length(fn)
+        str = [str fn{k} ','];
+    end
+        
     if isfield(E{j}.Header,'human')
         [a,b] = CountReps(E{j});
         fprintf('%d: (%d * %.1frep = %dTrials) %s\n',j,b,a,details.ntrials(j),Expt2Name(E{j}));
     else
-        fprintf('%d: (%dTrials) %s %s\n',j,details.ntrials(j),names{j},Expt2Name(E{j}));
+        fprintf('%d: (%dTrials) %s %s. Fields %s\n',j,details.ntrials(j),names{j},Expt2Name(E{j}),str);
     end
 end
 
 
 function [names, details] = ListExptDir(E, varargin)
 
+
 relist = 0;
+listfullv = 0;
 j = 1;
 while j <=length(varargin)
-    if strncmpi(varargin{j},'relist',5)
+    if strncmpi(varargin{j},'fullv',5)
+        listfullv = 1;
+    elseif strncmpi(varargin{j},'relist',5)
         relist = 1;
     end
     j = j+1;
+end
+
+if listfullv
+    expts = [];
+    probes = [];
+    sizes = [];
+    d = dir([E '/Expt*FullV.mat']);
+    for j = 1:length(d)
+        expts(j) = GetExptNumber(d(j).name);
+        probes(j) = GetProbeFromName(d(j).name);
+        sizes(j) = d(j).bytes;
+    end
+    names = unique(expts);
+    details.expts = expts;
+    details.probes = probes;
+    details.sizes = sizes;
+    return;
 end
 
 outname = [E '/AllExptList.mat'];
@@ -204,8 +252,9 @@ d = dir([E '/*idx.mat']);
 nx = 0;
 names = {};
 details = [];
+details.dirpath = E;
 for j = 1:length(d)
-    if strcmp(d(j).name,'FileIdx.mat')
+    if sum(strcmp(d(j).name,{'FileIdx.mat' 'OldIdx.mat'}))
     else
     name = [E '/' d(j).name];
     clear ExptList;
@@ -216,20 +265,22 @@ for j = 1:length(d)
     else
         fileno = sscanf(d(j).name(id(1)+1:end),'%d');
     end
-    if ~exist('ExptList','var')
+    if ~exist('ExptList','var') && exist('Expt','var')
         ExptList = BuildExptList(Expt, Expts);
     end
-    for k = 1:length(ExptList)
-        e = find([Expts.start] == ExptList(k).start);
-        if isempty(Expts(e).result)
-            Expts(e).result = 2;
-        end
-        if length(e) && Expts(e).result == 2
-            nx = nx+1;
-            names{nx} = ExptList(k).expname;
-            details.ntrials(nx) = Expts(e).lasttrial-Expts(e).firsttrial;
-            details.filename{nx} = d(j).name;
-            details.exptno(nx) = k+fileno;
+    if exist('ExptList','var')
+        for k = 1:length(ExptList)
+            e = find([Expts.start] == ExptList(k).start);
+            if isempty(Expts(e).result)
+                Expts(e).result = 2;
+            end
+            if length(e) && Expts(e).result == 2
+                nx = nx+1;
+                names{nx} = ExptList(k).expname;
+                details.ntrials(nx) = Expts(e).lasttrial-Expts(e).firsttrial;
+                details.filename{nx} = d(j).name;
+                details.exptno(nx) = k+fileno;
+            end
         end
     end
     end
@@ -260,13 +311,21 @@ for j = 1:length(Expts)
     if Expts(j).lasttrial - Expts(j).firsttrial > 10
         nx = nx+1;
         ts = Expts(j).firsttrial;
-        ExptList(nx).et = Expt.Trials.et{ts};
-        ExptList(nx).e2 = Expt.Trials.e2{ts};
-        ExptList(nx).e3 = Expt.Trials.e3{ts};
+        if isfield(Expt.Trials,'et')
+            ExptList(nx).et = Expt.Trials.et{ts};
+            ExptList(nx).e2 = Expt.Trials.e2{ts};
+            ExptList(nx).e3 = Expt.Trials.e3{ts};
+        elseif isfield(Expts,'et')
+            ExptList(nx).et = Expts(j).et;
+            ExptList(nx).e2 = Expts(j).e2;
+            ExptList(nx).e3 = Expts(j).e3;
+        end
         ExptList(nx).start = Expts(j).start;
         ExptList(nx).expname = [ExptList(nx).et 'X' ExptList(nx).e2 'X' ExptList(nx).e3];
+        if isfield(Expt.Trials,'OptionCode')
         if strfind(Expt.Trials.OptionCode{ts},'+fS')
             ExptList(nx).expname = [ExptList(nx).expname 'FS'];
+        end
         end
     end
 end

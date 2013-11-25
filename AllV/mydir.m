@@ -17,10 +17,10 @@ if iscellstr(path)
     end
     d = cat(1,d{good});
 else
-root = fileparts(path);
-d = dir(path);
-for j = 1:length(d)
-    d(j).filename = d(j).name;
-    d(j).name = [root '/' d(j).name];
-end
+    root = fileparts(path);
+    d = dir(path);
+    for j = 1:length(d)
+        d(j).filename = d(j).name;
+        d(j).name = [root '/' d(j).name];
+    end
 end

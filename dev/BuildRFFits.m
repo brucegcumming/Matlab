@@ -2,13 +2,18 @@ function fits = BuildRFFits(dirname, varargin)
 %find OP/PP expts and fit x,Y, positions
 %currently crashed on M009
 savefits = 0;
-refit = 1;
+refit = 0;
 parallel = 0;
-
+oldfits = [];
+args ={};
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'refit',4)
         refit = 1;
+        args = {args{:} 'rebuild'};
+    elseif strncmpi(varargin{j},'check',4)
+        j = j+1;
+        oldfits = varargin{j};
     elseif strncmpi(varargin{j},'save',4)
         savefits = 1;
     elseif strncmpi(varargin{j},'parallel',6)
@@ -18,7 +23,13 @@ while j <= length(varargin)
 end
 
 if iscellstr(dirname)
-    if parallel
+    if ~isempty(oldfits)
+        for j = 1:length(dirname)
+            if isempty(oldfits{j})
+                fprintf('No fits for %s\n',dirname{j});
+            end
+        end
+    elseif parallel
         parfor j = 1:length(dirname)
             fprintf('Worker %d Doing %s\n',mygetCurrentTask('number'),dirname{j})
             try
@@ -59,14 +70,19 @@ end
         fits = {fits{:} a{:}};
     end
     if isempty(fits)
+        fits.dirname = dirname;
+        fits.nfits = 0;
         return;
     end
     X.fits = fits;
     clear fits;
-    therf = BuildRFData(dirname);
-    X = CopyFields(X, therf,{'StartDepth' 'electrode'});
+    therf = BuildRFData(dirname,args{:});
+    X = CopyFields(X, therf,{'StartDepth' 'electrode' 'area' 'date' 'depth'});
     Array = GetArrayConfig(dirname);
     X = CopyFields(X, Array,{'spacing'});
+    if ~isfield(X,'spacing')
+        X.spacing = 0;
+    end
     if isfield(Array,'idstr')
         X.electrodeidstr = Array.idstr;
     end
@@ -91,9 +107,15 @@ end
 fits = F.fits;
 for j = 1:length(fits)
     if isfield(fits{j},'pvar')
+        if isnan(fits{j}.depth) && isfield(F,'depth')
+            F.fits{j}.depth = F.depth;
+            fits{j}.depth = F.depth;
+        end
         pvar(j) = fits{j}.pvar;
+        
         probe(j) = fits{j}.probe;
         meanpos(j) = fits{j}.mean;
+        fitamp(j) = fits{j}.amp;
         meansd(j) = fits{j}.sd;
         expts{j} = fits{j}.expt;
         depth(j) = fits{j}.depth;
@@ -125,32 +147,43 @@ if ~isempty(probe)
     probes = unique(probe);
     nrf = 0;
     for j = 1:length(probes)
-        pid = find(probe == probes(j) & exptype == 1 & pvar > 0.5);
-        oid = find(probe == probes(j) & exptype == 2 & pvar > 0.5);
+        pid = find(probe == probes(j) & exptype == 1 & pvar > 0.5 & fitamp > 0);
+        oid = find(probe == probes(j) & exptype == 2 & pvar > 0.5 & fitamp > 0);
+        a = depth([oid pid]);
+        meandepth = mean(a(~isnan(a)));
+        if isempty(meandepth)
+            a = zeros(size(a));
+        else
+            a(isnan(a)) = meandepth;
+        end
+        depth([oid pid]) = a;
         if ~isempty(oid) && ~isempty(pid)
             d = sort(depth([oid pid]));
             bid = find(diff((d)) > 0.5); %500uM break in position
             bid = [bid length(d)];
             start = -2;
             for nd = 1:length(bid)
-                dpid = pid(find(depth(pid) > start & depth(pid)  <= d(bid(nd))));
-                doid = oid(find(depth(oid) > start & depth(oid)  <= d(bid(nd))));
-                if ~isempty(doid) & ~isempty(dpid)
-                    ppos = mean(meanpos(dpid));
-                    opos = mean(meanpos(doid));
-                    rf = op2xy([opos ppos],ros(dpid(1)));
-                    rf(3) = mean(meansd(doid));
-                    rf(4) = mean(meansd(dpid));
-                    rf(5) = median(ros([doid dpid]));
-                    rf(6) = F.Pn;
-                    rf(7) = F.Xp;
-                    rf(8) = F.Yp;
-                    nrf = nrf+1;
-                    rf(9) = mean(fxs([doid dpid]));
-                    rf(10) = mean(fys([doid dpid]));
-                    rf(11) = mean(depth([doid dpid]));
-                    proberf(nrf,:) = [rf probes(j)];
-                    fitids{nrf} = [dpid doid]; 
+                ro = unique(ros([pid oid]));
+                for o = 1:length(ro)
+                    dpid = pid(find(depth(pid) > start & depth(pid)  <= d(bid(nd)) & ros(pid) == ro(o)));
+                    doid = oid(find(depth(oid) > start & depth(oid)  <= d(bid(nd)) & ros(oid) == ro(o)));
+                    if ~isempty(doid) & ~isempty(dpid)
+                        ppos = mean(meanpos(dpid));
+                        opos = mean(meanpos(doid));
+                        rf = op2xy([opos ppos],ro(o));
+                        rf(3) = mean(meansd(doid));
+                        rf(4) = mean(meansd(dpid));
+                        rf(5) = ro(o);
+                        rf(6) = F.Pn;
+                        rf(7) = F.Xp;
+                        rf(8) = F.Yp;
+                        nrf = nrf+1;
+                        rf(9) = mean(fxs([doid dpid]));
+                        rf(10) = mean(fys([doid dpid]));
+                        rf(11) = mean(depth([doid dpid]));
+                        proberf(nrf,:) = [rf probes(j)];
+                        fitids{nrf} = [dpid doid];
+                    end
                 end
                 start = d(bid(nd));
             end
@@ -235,7 +268,7 @@ for j = 1:length(d)
             end
             if isfield(E.Header,'depth')
                 depth = E.Header.depth;
-            elseif isfield(E.Stimvals,'ed')
+            elseif isfield(E.Stimvals,'ed') && Expt.Stimvals.ed > 0
                 depth = E.Stimvals.ed;
             elseif isfield(E.Trials,'ed')
                 depth = mean([E.Trials.ed]);

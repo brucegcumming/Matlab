@@ -30,7 +30,7 @@ if strcmp(sortby,'total')
 else
     [a,b] = sort(selftime,'descend');
 end
-for j = 1:10
+for j = 1:min([10 length(b)])
     id = b(j);
     F = P.FunctionTable(b(j));
     fprintf('Function %s (%d)  %.3f(%.3f):\n',F.FunctionName,id,a(j),sum(F.ExecutedLines(:,3)));

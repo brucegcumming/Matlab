@@ -7,12 +7,15 @@ while j <= length(varargin)
     j = j+1;
 end
 
-rid = strmatch('Right',T.text);
-eid = strmatch('Electrode',T.text);
-if isempty(eid)
-    eid = strmatch(' Electrode',T.text);
+if ~iscellstr(T.text) %worth converting for faster GetPenInfo
+    T.text = CellStr(T.text);
 end
-tid = strmatch('Tube',T.text);
+rid = find(strncmp('Right',T.text,5));
+eid = find(strncmp('Electrode',T.text,9));
+if isempty(eid)
+    eid = find(strncmp(' Electrode',T.text,9));
+end
+tid = find(strncmp('Tube',T.text,4);
 allid = sort([rid; eid; tid]);
 if isempty(allid)
     id = strmatch('uf',T.text(1:10,:));

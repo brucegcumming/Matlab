@@ -230,7 +230,11 @@ else
         probes = MakeProbeIndex(path,'suffixrecalc',expts);
         res.probes = probes;
     else
-    probes = MakeProbeIndex(path);
+        probes = MakeProbeIndex(path);
+    end
+    if ~isfield(probes,'probe')
+        cprintf('red','Missing Probe data in Index\n');
+        return;
     end
     probelist = unique([probes.probe]);
     if isempty(expts)

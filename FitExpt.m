@@ -43,7 +43,11 @@ if isfield(dat,'type')
     end
 end
 
+if isfield(dat,'Data')
 T = dat.Data.Trials;
+else 
+    T = [];
+end
 
 if isfield(dat,'bestdelay') %its an RC expt
     if isnan(dat.bestdelay)

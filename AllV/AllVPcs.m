@@ -1,27 +1,28 @@
 function res = AllVPcs(V, varargin)
-%AllVPcs(name, ...)  loads FullV file (MxN matrix, electrode by voltage of continuous
-%voltages), extracts segments triggered off one row, and plots PCS.
+%AllVPcs(V, ...)  takes an MxN matrix (electrode by voltage) of continuous
+%voltages, extracts segments triggered off one row, and plots PCS.
 %  V can also be a filename of a FullV file.  Will only load if new. 
 %
-%AllVPcs(name,'tchan',c,..    uses Channel c to find trigger points.
-%AllVPcs(name,'tchan',c,'reclassify')  uses saved clustering and exaclty
+%AllVPcs(V,'tchan',c,..    uses Channel c to find trigger points.
+%AllVPcs(V,'tchan',c,'reclassify')  uses saved clustering and exaclty
 %recaptiulates
-%AllVPcs(name,'tchan',c,'reapply')  uses saved clustering parameters, but
+%AllVPcs(V,'tchan',c,'reapply')  uses saved clustering parameters, but
 %appies them to new data (e.g. changes in trigger, new probe).
-%AllVPcs(name,'tchan',c,'reapply', Clusters{p}) uses cluster given
+%AllVPcs(V,'tchan',c,'reapply', Clusters{p}) uses cluster given 
 %
-%AllVPcs(name, 'tchan',c,'trigdt') or AllVPcs(V, 'tchan',c,'dtthr')  trigggers off dVdt
-%AllVPcs(neam, 'tchan',c,'dtthr2') Triggers off second temporal derivative
+%AllVPcs(name, 'tchan', c, 'refcut')    Applies the cluster defined in RefClusters.mat, if no cluster is yet defined
+%AllVPcs(name, 'tchan', c, 'refclusterforce') forces application of cluster defined in RefClusters.mat;
 %
-%AllVPcs(name, 'tchan',c,'dtthr3') Triggers off energy.  N.B. This is dagnerous, because 
+%AllVPcs(V, 'tchan',c,'trigdt') or AllVPcs(V, 'tchan',c,'dtthr')  trigggers off dVdt
+%AllVPcs(V, 'tchan',c,'dtthr2') Triggers off second temporal derivative
+%
+%AllVPcs(V, 'tchan',c,'dtthr3') Triggers off energy.  N.B. This is dagnerous, because 
 %  of an attempt to align spikes. The trigger point is moved to the nearest max (th+) or min (th-)
 %  in the voltage record.  The means that the histogram of trigger values is altered (measures energy at the new
 %  trigger point, whihc is different, so no longer get a hard edge to the histogram.
 %   ....'dtthr3','thboth') disables the voltage alignment so that the tirgger values are correct
 %  but this can produce artifactual clustering...
-%
-%AllVPcs(name, 'tchan', c, 'refcut')    Applies the cluster defined in RefClusters.mat, if no cluster is yet defined
-%AllVPcs(name, 'tchan', c, 'refclusterforce') forces application of cluster defined in RefClusters.mat;
+
 
 %AllVPcs(V, 'tchan',c, 'triggertemplate', Clusters{p}) convolves trgger
 %    channel with template in cluster, triggers on peaks
@@ -194,6 +195,7 @@ DATA.errstates = {};
 DATA.saveallspikes = 1;
 DATA.ArrayConfig = [];
 DATA.xyplot.density = 0;
+DATA.errpopup = 0;
 Expts = {};
 
 forcetrigger = 0;
@@ -634,6 +636,10 @@ if isstruct(V)
                 DATA.Expt = LoadExptA(DATA,Vall.matfile,Vall.exptno);
             elseif exist(Vall.matfile) %%Need this for Utah files
                 DATA.Expt = LoadExptA(DATA,Vall.matfile,Vall.exptno);                
+            elseif exist(dir2name(fileparts(Vall.loadname),'file'),'file') %%Need this for Utah files
+                newfile = dir2name(fileparts(Vall.loadname),'file');
+                AddErr(DATA,'Cant Read %s, using %s instead',Vall.matfile,newfile);
+                DATA.Expt = LoadExptA(DATA,newfile,Vall.exptno);                
             else
                 [DATA.Expt, DATA.matfile] = LoadExpt(DATA,Vall.exptno);
             end
@@ -2266,7 +2272,7 @@ if isfield(Vall,'Spikes')
         AllV(DATA.probe(1),:,:) = double(S.values') .* S.maxv./S.maxint;
         chspk = DATA.probe(1); %1 for single Fullv files
     end
-    res.t = S.times./10000;
+    res.t = S.times(:)'./10000; %column vector    
     spts = DataClusters{p}.spts;
     tpt = find(spts ==0);
     DATA.spts = spts;
@@ -2347,7 +2353,6 @@ allid = repmat(id,length(spts),1) + repmat(spts',1,length(id));
 AllV = reshape(Vall.V(:,allid),[size(Vall.V,1) size(allid)]);
 end
 DATA.nevents = size(AllV,3);
-
 if DATA.Trigger(1) <0
     res.xsd = std(DATA.rV(1,:));
 else
@@ -2433,6 +2438,7 @@ else
 end
 clear avar;
 clear bvar;
+res.t = res.t(:)';  %force to a row vector
 
 if length(bid)
     DATA.artifacttimes = res.t(bid);
@@ -5411,6 +5417,37 @@ end
       details.dip = HartigansDipTest(sort(xy(:,1)));
   end
 
+function DATA = CheckClusterMarks(Clusters, DATA)
+    
+    if isfield(DATA,'ArrayConfig')
+        A = DATA.ArrayConfig;
+    else
+        return;
+    end
+    
+    A.badexpts(end+1:DATA.exptno) = 0;
+    A.badprobes(end+1:DATA.allnprobes) = 0;
+    nerr = 0;
+    for j = 1:length(Clusters)
+        C = Clusters{j};
+        if isfield(C,'marked') && isfield(C,'exptno')
+            e = C.exptno;
+            if C.marked == -1000 & A.badexpts(e) == 0
+                fprintf('E%dP%d BadExpt in Cluster, not in arrayconfig\n',e,j);
+                nerr = nerr+1;
+            end
+            if C.marked == 3 & A.badprobes(j) == 0
+                fprintf('E%dP%d BadProbe in Cluster, not in arrayconfig\n',e,j);
+                nerr = nerr+1;
+            end
+        end
+    end
+    if nerr
+        msg = sprintf('%d Bad Marks in Clusters',nerr);
+        DATA.errpopup = msgbox(msg);
+        set(DATA.toplevel,'Name',msg);
+    end
+  
  function CheckClusters(Clusters, str, varargin)
 
      if isempty(Clusters)
@@ -5572,7 +5609,13 @@ function CheckClusterValues(DATA, C)
         end
     end
 
+        
 function [DATA, id] = SaveClusters(DATA, outname,varargin)
+
+    
+    if nargin == 1
+        outname = ClusterFile(DATA.name,DATA.Expt,'subdir',DATA.clustersubdir);
+    end
 
     quickmode = 0;
    if DATA.loadfromspikes
@@ -5613,6 +5656,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
     if sum(strcmp(DATA.DataType,{'Spike2'  'Default'})) && isempty(DATA.ArrayConfig)
         SaveArrayConfig(DATA);
     end
+    DATA = CheckClusterMarks(DataClusters,DATA);
     if DATA.checkclusters
     CheckClusters(DataClusters,'Save');
     CheckClusters(DataClusters,'CheckNexts','Save');
@@ -7666,7 +7710,9 @@ function ProbeSelector(DATA)
    if length(marked) < DATA.allnprobes
        marked(DATA.allnprobes) = 0;
    end
-   
+   if isfield(DATA.ArrayConfig,'badprobes')
+       marked(find(DATA.ArrayConfig.badprobes)) = 100;
+   end
    
    if isfield(DATA,'CellList')
    C = DATA.CellList;
@@ -7714,7 +7760,7 @@ function ProbeSelector(DATA)
                set(it,'foregroundcolor','r');
            elseif marked(j) == 4 %good MU
                set(it,'foregroundcolor','b');
-           elseif marked(j) == 3 || marked(j) == 5 %BAD
+           elseif marked(j) == 3 || marked(j) == 5 || marked(j) == 100 %BAD
                set(it,'foregroundcolor','g');
            else
                set(it,'foregroundcolor',fc);
@@ -8255,6 +8301,10 @@ elseif strncmp(fcn,'iteratefit',9)
     IterateFit(DATA, 1);
     DATA = get(DATA.toplevel,'UserData');
     finish = 1;
+elseif strncmp(fcn,'markbadexpt',11)
+    SetClusters(ClusterFile(DATA.name,DATA.Expt),'badexpt');
+    DATA.ArrayConfig = GetArrayConfig(DATA.datadir,'badexpt',DATA.exptno);
+    return;
 elseif strncmp(fcn,'mark',4)
     DATA.cluster.marked = find(strcmp(fcn,{'marknone' 'markgood' 'markbadprobe' 'markmugood' 'markduplicateprobe'}));
     label{3} = 'Bad';
@@ -8437,6 +8487,9 @@ elseif ismember(fcn,[12 25])
         AllVPcs(DATA.toplevel, 'newexpt', DATA.exptno+1, DATA.probeswitchmode);
     end
     figure(DATA.toplevel);
+    if isfigure(DATA.errpopup)
+        figure(DATA.errpopup);
+    end
     return;
 
 elseif fcn == 13
@@ -9547,6 +9600,7 @@ if isnew
         sm = uimenu(hm,'Label','&Mark','Tag','MarkMenu');
         uimenu(sm,'Label','&Good','Callback',{@PCCluster, 'markgood'},'Tag','MarkGood');
         uimenu(sm,'Label','&Bad Probe','Callback',{@PCCluster, 'markbadprobe'},'Tag','MarkBad');
+        uimenu(sm,'Label','&Bad Expt FullV','Callback',{@PCCluster, 'markbadexpt'},'Tag','MarkBad');
         uimenu(sm,'Label','&Duplicate Probe','Callback',{@PCCluster, 'markduplicateprobe'},'Tag','MarkDup');
         uimenu(sm,'Label','Good &MU','Callback',{@PCCluster, 'markmugood'},'Tag','MarkMu');
 %        uimenu(sm,'Label','&Good','Callback',{@PCCluster, 'markgood'},'Tag','MarkGood');
@@ -15504,6 +15558,8 @@ DATA.elmousept.dragfcn = get(F,'WindowButtonMotionFcn');
 DATA.clustericon = SetClusterIcon(DATA);
 
 %should get old Fcns, then reset them after button release
+
+set(F, 'interruptible','off');
 set(F, 'WindowButtonDownFcn',@ButtonPressed);
 set(F, 'WindowButtonMotionFcn',@PCButtonDragged);
 set(F, 'WindowButtonUpFcn',@ButtonReleased);
@@ -15528,6 +15584,9 @@ set(sv, 'WindowButtonMotionFcn',@PCButtonDragged);
 set(sv, 'WindowButtonUpFcn',@ButtonReleased);
 set(sv, 'WindowScrollWheelFcn',@ScrollWheel);
 set(sv,'UserData',X);
+%set(F, 'Interruptible','off');
+
+
 
 function MiscMenu(a, b, type)
     DATA = GetDataFromFig(a);

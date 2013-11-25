@@ -21,7 +21,7 @@ if size(C,1) == 1 && size(C,2) > 1
         if iscell(C{k})
             for j= 1:length(C{k})
                 if isempty(f)
-                    M(j,k) = size(C{k}{j});
+                    M(j,k) = length(C{k}{j});
                 elseif isfield(C{k}{j},f)
                     M(k,j,1:length(C{k}{j}.(f))) = C{k}{j}.(f);
                 else
@@ -51,7 +51,9 @@ else
     end
 for j = 1:size(C,1)
     for k = 1:size(C,2)
-        if isfield(C{j,k},f)
+        if isempty(f)
+            M(j,k) = length(C{j,k});
+        elseif isfield(C{j,k},f)
             if isempty(fa)
                 x = C{j,k}.(f);
             elseif isfield(C{j,k}.(f),fa)

@@ -40,26 +40,27 @@ while(j < nargin -1)
         ylabels = {};
         xlabels = {};
     elseif(strncmpi(varargin{j},'paper',5))
-        fontname = 'Arial'
+        fontname = 'Arial';
     end
     j = j+1;
 end
 
 
 set(ax,'FontName',fontname,'FontWeight','Bold','LineWidth',lineweight);
-t = get(ax,'Title');
-set(t,'FontName',fontname,'FontWeight','Bold');
-x = get(ax,'Xlabel');
-set(x,'FontName',fontname,'FontWeight','Bold');
-y = get(ax,'Ylabel');
-set(y,'FontName',fontname,'FontWeight','Bold');
-if exist('fontsize')
-    set(ax,'FontSize',fontsize);
-    set(x,'FontSize',fontsize);
-    set(y,'FontSize',fontsize);
-    set(t,'FontSize',fontsize);
+for j = 1:length(ax)
+    t = get(ax(j),'Title');
+    set(t,'FontName',fontname,'FontWeight','Bold');
+    x = get(ax(j),'Xlabel');
+    set(x,'FontName',fontname,'FontWeight','Bold');
+    y = get(ax(j),'Ylabel');
+    set(y,'FontName',fontname,'FontWeight','Bold');
+    if exist('fontsize')
+        set(ax(j),'FontSize',fontsize);
+        set(x,'FontSize',fontsize);
+        set(y,'FontSize',fontsize);
+        set(t,'FontSize',fontsize);
+    end
 end
-
 if exist('ylabels','var')
     set(ax,'YTickLabel',ylabels);
 end
@@ -69,7 +70,7 @@ end
 
 lines = get(fig,'Children');
 for j = 1:length(lines)
-    h = get(lines(j))
+    h = get(lines(j));
     if isfield(h,'LineWidth')
         set(lines(j),'LineWidth',lineweight);
     end
@@ -77,16 +78,18 @@ end
 
 set(ax,'color','none');
 
-lines = get(gca,'Children');
-for j = 1:length(lines)
-    f = get(lines(j));
-    if isfield(lines(j),'color')
-    c = get(lines(j),'color');
-    end
-    %    set(lines(j),'LineWidth',lineweight,'MarkerFaceColor',c);
-    set(lines(j),'LineWidth',lineweight);
-    if forcefill
-        set(lines(j),'MarkerFaceColor',c);
+for k = 1:length(ax)
+    
+    lines = get(ax(k),'Children');
+    for j = 1:length(lines)
+        f = get(lines(j));
+        if isfield(lines(j),'color')
+            c = get(lines(j),'color');
+        end
+        %    set(lines(j),'LineWidth',lineweight,'MarkerFaceColor',c);
+        set(lines(j),'LineWidth',lineweight);
+        if forcefill
+            set(lines(j),'MarkerFaceColor',c);
+        end
     end
 end
-

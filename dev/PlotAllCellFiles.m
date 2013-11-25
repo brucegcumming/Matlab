@@ -1,10 +1,12 @@
 function PlotAllCellFiles(name, varargin)
-
+% plot expts from an allexpt Structure
 DATA.tag.allexpts = 'AllCellPlot';
 DATA.toplevel = 0;
+plotargs = {};
 
 j = 1;
 while j <= length(varargin)
+    plotargs{j} = varargin{j};
     j = j+1;
 end
 if isstruct(name)
@@ -21,17 +23,20 @@ end
 a = SetFigure(DATA.tag.allexpts,DATA);
 DATA = get(a.toplevel,'UserData');
 %set(DATA.toplevel,'UserData',DATA);
-DATA = SetAllExpts(DATA);
+DATA = SetAllExpts(DATA, plotargs{:});
 
-function DATA = SetAllExpts(DATA)
-DATA.AllExpts = {}; %clear any previous
-for j = 1:length(DATA.Expts.Spikes)
+function DATA = SetAllExpts(DATA, varargin)
+AllExpts = {}; %clear any previous
+args = {};
+parfor j = 1:length(DATA.Expts.Spikes)
     Expt = All2Expt(DATA.Expts,j,'all');
-    DATA.AllExpts{j}.plotres = PlotExpt(Expt,'rcnmin',5);
-    DATA.AllExpts{j}.Header = Expt.Header;
-    DATA.AllExpts{j}.Stimvals = Expt.Stimvals;
-    DATA.AllExpts{j}.cellid = Expt.Header.cellnumber;
+    AllExpts{j}.plotres = PlotExpt(Expt,'rcnmin',5,varargin{:});
+    AllExpts{j}.Header = Expt.Header;
+    AllExpts{j}.Stimvals = Expt.Stimvals;
+    AllExpts{j}.cellid = Expt.Header.cellnumber;
+    AllExpts{j}.plotres(1).cellid = Expt.Header.cellnumber;
 end
+DATA.AllExpts = AllExpts;
 PlotAllCells(DATA,[], 'rates');
 setappdata(DATA.toplevel,'AllCellRes',DATA.AllExpts);
 

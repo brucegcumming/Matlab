@@ -7,10 +7,31 @@ function [result, details] = CalcCellSize(C, varargin)
 %
 %CalcCellSize(C, 'nofit') read data but does not fit Gaussians = much quicker
 %
+%CalcCellSize(result,'onepercell') returns a result containing only marked cells, and only 1 file per cell
+%
+%
 %CalcCellSize(result,'plot',plotttype) plots results
 %                 default is to plot mahal distance(1D) vs SD of spread
-%                           '2dgauss' plots fitted dprime gauss vs SD
-%                            'sdspkw' plots spike width vs SD.
+%                    '2dgauss' plots fitted dprime gauss vs SD
+%                    'sdspkw' plots spike width vs SD.
+%                    'mahal' fitted dprime vs 1D mahal distances
+%                    'mahal2' fitted dprime vs 2D mahal distances
+%                    'mahal3' 2D vs 2D mahal
+%                    'muamp' spread SD for mu vs sd for SU
+%                    'dprime' histogram of usefulness of differen voltge samples, using dprime
+%                    'dprimeb' histogram of usefulness voltage samples from adjacent probes
+%                    'dprimec' scatterplot most useful vs 2nd most useful
+%                    'pcs' PCA analysis of all meanpike V.  (Need to limit this to same trigger point/sign)
+%                    'shapes' plots Pre/Post max V and sample # shape metrics
+%                    'shapeim' image plot of all shapes
+%                    'spkw' compares 2 width measures
+%                    'sdspkw' width vs spread
+%
+%  If a refit has been run to define multiple clusters, then max and min of mahal
+%  across differet N cluster are also recoded
+%                    'mind'  plot min(D) vs max(D)
+%                    'mahalmind' 2D mahal vs min(D)
+%
 % result{}.dip is [1-Dmahal fitdprime 2-Dmahal];
 
 %get voltage amplitude too
@@ -28,6 +49,7 @@ useauto = 0;
 ClusterDetails = [];
 loadxy = 1;
 parallel = 0;
+loadmean = 0;
 
 plottype = 'mahal1';
 figlabel = 'CellShapes';
@@ -41,6 +63,8 @@ while j <= length(varargin)
         j = j+1;
         CellDetails = varargin{j};
     elseif strncmpi(varargin{j},'cellsonly',6)
+    elseif strncmpi(varargin{j},'loadmean',6)
+        loadmean = 1;
     elseif strncmpi(varargin{j},'loadxy',6)
         loadxy = 1;
     elseif strncmpi(varargin{j},'onepercell',6)
@@ -121,7 +145,10 @@ end
 
 if iscell(C) && isfield(C{1},'amp')
     if onepercell
-        C = OncePerCell(C,varargin{:});
+        [C, details]= OncePerCell(C,varargin{:});
+    end
+    if loadmean
+        C = AddMeanSpike(C, varargin{:});
     end
     PlotCellSizeResult(C, varargin{:});
     result = C;
@@ -192,6 +219,7 @@ if isfield(C, 'MeanSpike')
     result.cluster = C.cluster;
     [fit, maxi] = FitSDs(sds, dofit);
     result.V = C.MeanSpike.ms(maxi,:);
+    result.muV = C.MeanSpike.mu(maxi,:);
     if maxi == 1
         result.nextV = C.MeanSpike.ms([maxi+1 maxi+2],:);
     elseif maxi == size(C.MeanSpike.ms,1)
@@ -371,10 +399,14 @@ hold off;
 if strcmp(plottype,'2dgauss')
     myscatter(dips(nid,2),sds(nid),'o','ids',nid,'buttonpress',callback);
     myscatter(dips(cid,2),sds(cid),'ro','ids',cid,'buttonpress',callback);
+    xlabel('Fit Dprime')
+    ylabel('Amp SD');
 elseif strcmp(plottype,'mahal') %dips 2 vs 1 = my fit vs 1D GM
     myscatter(dips(nid,2),dips(nid,1),'o','ids',nid,'buttonpress',callback);
     myscatter(dips(cid,2),dips(cid,1),'ro','ids',cid,'buttonpress',callback);
     myscatter(dips(c2id,2),dips(c2id,1),'go','ids',c2id,'buttonpress',callback);
+    xlabel('Fit Dprime')
+    ylabel('Mahel 1-D');
 elseif strcmp(plottype,'mahal2')%dips 2 vs 3 = my fit vs 2D GM
     myscatter(dips(nid,2),dips(nid,3),'o','ids',nid,'buttonpress',callback,'color',[0.5 0.5 0.5]);
     colors = mycolors('spkcolors');
@@ -384,25 +416,29 @@ elseif strcmp(plottype,'mahal2')%dips 2 vs 3 = my fit vs 2D GM
     myscatter(dips(cid,2),dips(cid,3),'ro','ids',cid,'colors', cc,'buttonpress',callback);
  %   myscatter(dips(c2id,2),dips(c2id,3),'go','ids',c2id,'buttonpress',callback);
     xlabel('dprime from indep 1-D fits');
-    ylabel('dprime 2D GM fit');
+    ylabel('Mahal 2D');
 elseif strcmp(plottype,'mahal3')%dips 1 vs 3 = 1DGM vs 2D GM
     myscatter(dips(nid,1),dips(nid,3),'o','ids',nid,'buttonpress',callback);
     myscatter(dips(cid,1),dips(cid,3),'ro','ids',cid,'buttonpress',callback);
     myscatter(dips(c2id,1),dips(c2id,3),'go','ids',c2id,'buttonpress',callback);
-    xlabel('dprime 1D GM fit');
-    ylabel('dprime 2D GM fit');
+    xlabel('Mahal 1D GM fit');
+    ylabel('Mahal 2D GM fit');
 elseif strcmp(plottype,'muamp')
     myscatter(sds(nid),usds(nid),'o','ids',nid,'buttonpress',callback);
     myscatter(sds(cid),usds(cid),'ro','ids',cid,'buttonpress',callback);
     xlabel('Sigma for SU');
-    xlabel('Sigma for MU');
+    ylabel('Sigma for MU');
+    set(gca,'xlim',[0 4],'ylim',[0 4]);
+    refline(1);
 elseif strcmp(plottype,'mahalmind')
     [a,b] = max(CellToMat(R,'mind')');
+    if length(a) >= size(dips,1)
     myscatter(dips(nid,2),a(nid),'o','ids',nid,'buttonpress',callback);
     myscatter(dips(cid,2),a(cid),'ro','ids',cid,'buttonpress',callback);
     myscatter(dips(c2id,1),a(c2id),'go','ids',c2id,'buttonpress',callback);
     xlabel('2-D GM');
     xlabel('max(mind)');
+    end
 elseif strcmp(plottype,'mind')
     colors = mycolors;;
     hold off;
@@ -421,10 +457,14 @@ elseif strcmp(plottype,'dprimeb') %dips 2 vs 1 = my fit vs 1D GM
     PlotDprimes(DATA.cells,cid,'oprobe');
 elseif strcmp(plottype,'dprime') %dips 2 vs 1 = my fit vs 1D GM
     PlotDprimes(DATA.cells,cid);
+elseif strcmp(plottype,'dprimec') %dips 2 vs 1 = my fit vs 1D GM
+    PlotDprimes(DATA.cells,cid,'scatter');
 elseif strcmp(plottype,'pcs') %dips 2 vs 1 = my fit vs 1D GM
     PlotPCs(DATA.cells,cid);
 elseif strcmp(plottype,'shapes') %dips 2 vs 1 = my fit vs 1D GM
     PlotShapes(DATA.cells,cid);
+elseif strcmp(plottype,'shapeim') %dips 2 vs 1 = my fit vs 1D GM
+    PlotShapes(DATA.cells,cid,'image');
 elseif sum(strcmp(plottype,{'sdspkw' 'spkw'}))
     for j = 1:length(R)
         [a,b] = max(R{j}.V);
@@ -445,8 +485,12 @@ elseif sum(strcmp(plottype,{'sdspkw' 'spkw'}))
     end
     if strcmp(plottype,'spkw')
         myscatter(w(id,1),w(id,2),'o','buttonpress',callback);
+        xlabel('Width (max-min)');
+        ylabel('Width (20%%max');
     else
         myscatter(w(id,2),sds(id),'o','buttonpress',callback);
+        xlabel('Width (max-min)');
+        ylabel('Spread (sigma)');
         id = find(dips(:,2) < -2.5);
     end
 else
@@ -489,10 +533,13 @@ end
 function PlotDprimes(R, cid, varargin)
 
 otherprobe = 0;
+scatter = 0;
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'oprobe',5)
         otherprobe = 1;
+    elseif strncmpi(varargin{j},'scatter',5)
+        scatter = 1;
     end
     j = j+1;
 end
@@ -500,6 +547,8 @@ end
 for k = 1:length(cid)
     C = R{cid(k)};
     p = find(C.chspk == C.probe);
+    if size(C.vdprime,1) ~= size(C.vdiff,1)
+    else
     vsd = C.vdiff./C.vdprime;
     vdiff = C.vdiff - repmat(C.vdiff(:,C.triggerpt),1, size(C.vdiff,2));
     vdprime = vdiff./vsd;
@@ -512,6 +561,7 @@ for k = 1:length(cid)
     [a,b] = sort(s(id),'descend');
     dpi(k,1:length(id)) = id(b)-C.triggerpt;
     dp(k,1:length(id)) = a;
+    end
     if size(R{cid(k)}.vdprime,1) > p       
 %        vdiff = R{cid(k)}.MeanSpike.ms-R{cid(k)}.MeanSpike.mu;
         s = abs(smooth(R{cid(k)}.vdprime(p+1,:),2,'gauss'));
@@ -519,6 +569,9 @@ for k = 1:length(cid)
         [a,b] = sort(s(id),'descend');
         adpi(k,1:length(id)) = id(b)-C.triggerpt;
         adp(k,1:length(id)) = a;
+    else
+        adpi(k,:) = 0;
+        adp(k,:) = 0;
     end
     if p > 1
         s = abs(smooth(R{cid(k)}.vdprime(p-1,:),2,'gauss'));
@@ -526,20 +579,31 @@ for k = 1:length(cid)
         [a,b] = sort(s(id),'descend');
         bdpi(k,1:length(id)) = id(b)-C.triggerpt;
         bdp(k,1:length(id)) = a;
+    else
+        bdpi(k,:) = 0;
+        bdp(k,:) = 0;
     end
 end
-if otherprobe == 0
+if scatter
+    subplot(1,1,1);
+    gid = find(dpi(:,2) ~= 0);
+    myscatter(dpi(:,1),dpi(:,2),'o','ids',cid,'buttonpress',@HitScatter);
+    xlabel('best sample');
+    ylabel('second best sample');
+    return;
+elseif otherprobe == 0
     myscatter(dpi(:,1),dp(:,1),'o','ids',cid,'buttonpress',@HitScatter);
     gid = find(dpi(:,2) ~= 0);
     myscatter(dpi(gid,2),dp(gid,2),'ro','ids',cid,'buttonpress',@HitScatter);
 else
-    dpi = cat(1, adpi,bdpi);
-    dp = cat(1, adp,bdp);
+    n = min([size(adpi,2) size(bdpi,2)]);
+    dpi = cat(1, adpi(:,1:n),bdpi(:,1:n));
+    dp = cat(1, adp(:,1:n),bdp(:,1:n));
     id = find(dp(:,1) > 0);
     dp = dp(id,:);
     dpi = dpi(id,:);
     myscatter(adpi(:,1),dp(:,1),'o','ids',cid,'buttonpress',@HitScatter);
-    myscatter(bdpi(:,2),dp(:,2),'ro','ids',cid,'buttonpress',@HitScatter);
+    myscatter(adpi(:,2),dp(:,2),'ro','ids',cid,'buttonpress',@HitScatter);
     myscatter(bdpi(:,1),dp(:,1),'o','ids',cid,'buttonpress',@HitScatter);
     myscatter(bdpi(:,2),dp(:,2),'ro','ids',cid,'buttonpress',@HitScatter);
     gid = find(dpi(:,2) ~= 0);
@@ -560,6 +624,13 @@ plot(x,sums(:,1).*yl(2)./max(sums(:,1)),'r');
 hold on;
 plot(x,sums(:,2).*yl(2)./max(sums(:,2)),'b');
 %GetFigure('CellHistogram');
+if otherprobe
+    xlabel('Voltage Sample (adjacent probe)');
+else
+    xlabel('Voltage Sample');
+end
+ylabel('Dprime SU vs MU');
+title('Spikes aligned at trigger point');
 
 function id = LocalMaxima(x)
 
@@ -567,20 +638,32 @@ sgn = diff(sign(diff(x)));
 id = find(sgn < 0);
 
 function PlotPCs(R, id)
-for j = 1:len(id)
-    V(j,:) = R{id(j)}.V;
+for j = 1:length(id)
+    sV = R{id(j)}.V;
+    V(j,1:length(sV)) = sV;
 end
+V(isnan(V)) = 0;
 [a,b] =eig(cov(V));
 pcs = V * a;
 PlotND(pcs(:,37:40),[],'marker','o','callback',@HitScatter, id);
 
-function PlotShapes(R, id)
+function PlotShapes(R, id, varargin)
+
+plotimage = 0;
+j = 1;
+while j <= length(varargin)
+    if strncmpi(varargin{j},'image',4)
+        plotimage = 1;
+    end
+    j = j+1;
+end
 
 for j = 1:length(id)
     V = R{id(j)}.V;
     V = V./std(V);
     [a,b] = min(V);
     minv(j) = a;
+    minpt(j) = b;
     [c,d] = max(V(1:b));
     premaxpt(j) = d-b;
     premax(j) = c;
@@ -592,27 +675,76 @@ for j = 1:length(id)
     postshape(j) = V(endpts)*endpts'./sum(endpts);
     preshape(j) = V(prepts)*prepts'./sum(prepts);
 end
+
+if plotimage
+    [a, sid] = sort(postshape);
+    for j = 1:length(id);
+        V = R{id(sid(j))}.V;
+        Im(j,1:length(V)) = V;
+    end
+    subplot(1,1,1);
+    imagesc(Im);
+    return;
+end
 nr=2;
 nc=3;
+
 subplot(nr,nc,1);
+hold off;
 myscatter(premaxpt,premax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Pre max pt');
+ylabel('Pre max');
+
 subplot(nr,nc,2);
+hold off;
 myscatter(postmaxpt,postmax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Post max pt');
+ylabel('Post max');
+
 subplot(nr,nc,3);
+hold off;
 myscatter(minv,postmax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Min V');
+ylabel('Post max');
+
+
 subplot(nr,nc,4);
+hold off;
 myscatter(minv,premax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Min V');
+ylabel('pre max');
+
 subplot(nr,nc,5);
+hold off;
 myscatter(postmax,premax,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('Post max');
+ylabel('Pres max');
+
 subplot(nr,nc,6);
+hold off;
 myscatter(preshape,postshape,'o','ids',id,'buttonpress',@HitScatter);
+xlabel('PreSum');
+ylabel('PostSum');
 
 function HitScatter(a,b,id, idb)
 DATA = GetDataFromFig(a);
 C = DATA.cells{id};
 fit = [];
+x = get(a,'xdata');
+y = get(a,'ydata');
+
+if isfield(C,'monkey')
+    fprintf('%s',C.monkey)
+end
 if isfield(C,'tag')
-fprintf('%s:',C.tag)
+fprintf('%s',C.tag)
+cname = C.tag;
+   for j = 1:length(DATA.details.dir)
+       if ~isempty(strfind(DATA.details.dir{j},C.tag))
+           cname = DATA.details.dir{j};
+       end
+   end
+aid = 0;
 elseif isfield(DATA.details,'dir') && ischar(DATA.details.dir) %just one directory
     aid = 0;
     cname = DATA.details.dir; 
@@ -623,6 +755,7 @@ elseif isfield(DATA.details,'nres')
 else
     aid = 0;
 end
+fprintf('at %.2f,%.2f: ',x,y);
 if strcmp(DATA.plot.plottype,'mahal1') && DATA.plot.refit
     [fit, maxi] = FitSDs(DATA.cells{id}.amp,1);
     DATA.cells{id}.sd = abs(fit.sd);
@@ -641,7 +774,20 @@ if isfield(fit,'fitted')
 end
 title(sprintf('E%dP%d',C.eid,C.probe));
 subplot(2,1,2);
-plot(C.V);
+hold off;
+plot(C.V,'r');
+if isfield(C,'muV')
+    hold on;
+    plot(C.muV,'color',[0.5 0.5 0.5]);
+end
+if isfield(C,'MeanSpike')
+    cl = C.cluster;
+    hold on;
+    plot(squeeze(C.MeanSpike(:,C.probe,:))');
+    GetFigure('MeanSpike');
+    imagesc(squeeze(C.MeanSpike(cl,:,:)));
+    GetFigure('Spike');
+end
 
 title(sprintf('E%dP%dcl%d',C.eid,C.probe,C.cluster));
 
@@ -657,11 +803,14 @@ if DATA.plot.showxy && length(aid) == 1
     else
         [Clusters,a,b] = LoadCluster(cname, C.eid,'getxy');
         X = Clusters{p};
-        fprintf('Load  took %.2f\n',b.loadtime);
+        DATA.cells{id}.xy = X.xy;
+        DATA.cells{id}.clst = X.clst;
+        fprintf('Load  took %.2f\n',b.loadur);
     end
     if isfield(X,'xy')
         colors = mycolors('spkcolors');
         GetFigure('XYplot');
+        if isfield(X,'eid')
         if aid > 0
             xid = DATA.details.nres(1,aid):DATA.details.nres(2,aid);
             xid = xid(xid <= length(DATA.cells)); %in case removed some
@@ -671,6 +820,10 @@ if DATA.plot.showxy && length(aid) == 1
         expts = CellToMat(DATA.cells(xid),'eid');
         probes = CellToMat(DATA.cells(xid),'probe');
         oid = find(expts == X.eid & probes == X.probe);
+        if isfield(X,'dirid')
+            dirs = CellToMat(DATA.cells(xid),'dirid');
+            oid = intersect(oid, find(dirs == X.dirid));
+        end
         if length(oid) > 1 %may be more spaces
             xy = [];
             for j = 1:length(oid)
@@ -690,6 +843,9 @@ if DATA.plot.showxy && length(aid) == 1
         else
             xy = X.xy;
         end
+        else
+            xy = X.xy;
+        end
         if DATA.plot.density
         PlotND(xy,[],'idlist',X.clst,'density');
         else
@@ -701,6 +857,8 @@ if DATA.plot.showxy && length(aid) == 1
             GetFigure('FitDistance');
             newid = cluster(G, X.xy);
             plot(X.mind,X.maxd,'ro-');
+            xlabel('smallest Mahal distance');
+            ylabel('largest distance');
             GetFigure('XYplot');
             PlotND(X.xy,[],'idlist',newid,'colors',colors);
         end
@@ -753,9 +911,10 @@ function [X, Gn] = Refit(DATA, X)
     if DATA.plot.nrefit
         for nd = 1:4
             G{nd} = GMfit(X.xy,nd+1,1);
-            [a,b] = gmdprime(G{nd});
+            [a,b] = GMdprime(G{nd});
             mind(nd) = min(b.d(:));
             maxd(nd) = max(b.d(:));
+            ll(nd) = G{nd}.NlogL;
         end
         id = find(mind > 2);
         if ~isempty(id)
@@ -769,6 +928,7 @@ function [X, Gn] = Refit(DATA, X)
         end
         X.mind = mind;
         X.maxd = maxd;
+        X.ll = ll;
         Gn = G{best};
     end
 
@@ -780,8 +940,84 @@ function [X, Gn] = Refit(DATA, X)
         end
         [Gn, allg] = GMfit(X.xy,nc,1,'idlist',X.clst);
     end
+    
+    
+function res = AddMeanSpike(C, varargin)    
+details = [];
+tag = [];
+j = 1;
+while j <= length(varargin)
+    if isfield(varargin{j},'dir')
+        details = varargin{j};
+    end
+    j = j+1;
+end
 
-function res = OncePerCell(res, varargin)
+for j = 1:length(C)
+    dirtag{j} = C{j}.tag;
+    tags{j} = sprintf('%s.%d.%d',C{j}.tag,C{j}.eid,C{j}.probe);
+end
+[a,b] = Counts(tags);
+dirs = unique(dirtag);
+for j = 1:length(dirs)
+    id = find(strcmp(dirs{j},dirtag));
+    if isfield(C{id(1)},'dirid')
+        dirid = C{id(1)}.dirid;
+        name = sprintf('%s/CellList.mat',details.dir{dirid});
+    else
+        name = sprintf('\\data/lem/%s/CellList.mat',dirs{j});
+        dirid = 0;
+    end
+    if exist(name,'file');
+    load(name);
+    for k = 1:length(id)
+        eid = C{id(k)}.eid;
+        if size(CellList,1) >= eid
+            xid = find(CellList(eid,C{id(k)}.probe,:) == C{id(k)}.cell);
+        else
+            xid = [];
+        end
+        if ~isempty(xid)
+              cid(id(k)) = xid(1);
+              if ~isfield(C{id(k)},'cluster')
+                  C{id(k)}.cluster = xid(1);
+              end
+        elseif ~isfield(C{id(k)},'cluster')
+                  C{id(k)}.cluster = 0;
+        end
+    end
+    else
+        fprintf('No CellList %s\n',name);
+    end
+end
+for j = 1:length(C)
+    if ~isempty(details)
+        name = sprintf('%s/Expt%dClusterTimes.mat',details.dir{C{j}.dirid},C{j}.eid);
+    else
+        name = sprintf('\\data/lem/%s/Expt%dClusterTimes.mat',C{j}.tag,C{j}.eid);
+    end
+    if exist(name)
+        load(name);
+        Cl = Clusters{C{j}.probe};
+        nc = 1;
+        clear M;
+        M(nc,:,:) = Cl.MeanSpike.ms;
+        if isfield(Cl,'next')
+        for k = 1:length(Cl.next)
+            if isfield(Cl.next{k},'MeanSpike')
+                nc = nc+1;
+                M(nc,:,:) = Cl.next{k}.MeanSpike.ms;
+            end
+        end
+        end
+        C{j}.MeanSpike = M;
+    else
+        fprintf('Cant file Clusters for %s%s\n',C{j}.monkey,C{j}.tag);
+    end
+end
+res = C;
+    
+function [res, details] = OncePerCell(res, varargin)
 details = [];
 tag = [];
 j = 1;
@@ -792,12 +1028,17 @@ while j <= length(varargin)
         for k = 1:size(details.nres,2)
             a = details.nres(1,k);
             b = details.nres(2,k);
+            monkey = GetMonkeyName(details.dir{k});
             [c, dirname] = fileparts(details.dir{k});
             if b > a
                 c = OncePerCell(res(1+a:b),'tag',dirname);
                 if isempty(c)
                     fprintf('No cells in %s\n',details.dir{k});
                 else
+                    for ci = 1:length(c)
+                        c{ci}.dirid = k;
+                        c{ci}.monkey = monkey;
+                    end
                     newres = {newres{:} c{:}};
                 end
             end

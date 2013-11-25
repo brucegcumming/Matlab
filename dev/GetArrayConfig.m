@@ -10,11 +10,15 @@ function ArrayConfig = GetArrayConfig(name,varargin)
 
 rebuild = 0;
 markprobe = 0;
+markbadexpt = 0;
 setprobe=0;
 setlabel = [];
 j = 1;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'rebuild',6)
+    if strncmpi(varargin{j},'badexpt',6)
+        j = j+1;
+        markbadexpt = varargin{j};
+    elseif strncmpi(varargin{j},'rebuild',6)
         rebuild =1;
     elseif strncmpi(varargin{j},'set',3)
         j = j+1;
@@ -37,6 +41,7 @@ BlackRockPath();
 ArrayConfig = [];
 aname = [];
 badprobes = [];
+badexpts = [];
 if isfield(name,'MetaTags')
     nsx = name;
 elseif iscellstr(name) %Cell arary of strings - do all
@@ -44,6 +49,12 @@ elseif iscellstr(name) %Cell arary of strings - do all
         ArrayConfig{j} = GetArrayConfig(name{j});
     end
     return;
+elseif iscell(name) && iscluster(name)
+    if isfield(name{end},'loadname')
+        ArrayConfig = GetArrayConfig(name{end}.loadname, varargin{:});
+        return;
+    elseif isfield(name{end},'spkfile')
+    end
 elseif isdir(name)
     aname = [name '/ArrayConfig.mat'];
     if ~isempty(setlabel)
@@ -68,14 +79,23 @@ elseif isdir(name)
         ArrayConfig.type = SetArrayType(ArrayConfig);
         if setprobe && markprobe
             ArrayConfig.badprobes(setprobe) = markprobe;
+            BackupFile(aname);
             save(aname,'ArrayConfig');            
+        elseif markbadexpt
+            ArrayConfig.badexpts(markbadexpt) = 1;
+            BackupFile(aname);
+            save(aname,'ArrayConfig');                        
         end
         if ~isfield(ArrayConfig,'badprobes')
             ArrayConfig.badprobes = [];
         end
+        if ~isfield(ArrayConfig,'badexpts')
+            ArrayConfig.badexpts = [];
+        end
         if ~isfield(ArrayConfig,'id')
             rebuild = 1;
             badprobes = ArrayConfig.badprobes;
+            badexpts = ArrayConfig.badexpts;
         else
             if length(ArrayConfig.X) > 96
                 if ~isfield(ArrayConfig,'CreationDate') || ArrayConfig.CreationDate < datenum('1/1/2014')
@@ -115,6 +135,7 @@ elseif isdir(name)
             end
         else %used to be elseif rebuild. But getting here means need to save. 
             ArrayConfig.badprobes = badprobes; %keep list if rebuild
+            ArrayConfig.badexpts = badexpts; %keep list if rebuild
             save(aname,'ArrayConfig');
         end
         return;
@@ -147,6 +168,8 @@ type = 'unknown';
 
 if isfield(Array,'type')
     type = Array.type;
+elseif ~isfield(Array,'X')
+    type = 'unknown';
 elseif length(Array.X) == 24 && length(unique(Array.X) == 2)
     type = '12x2';
 elseif length(Array.X) == 96
@@ -173,7 +196,11 @@ else
         np = 96;
     end
     for j = 1:np;
-        E(j) = sscanf(nsx.MetaTags.ElecLabel(j,:),'elec%d');
+        if strncmp(nsx.MetaTags.ElecLabel(j,:),'chan',4)
+            E(j) = sscanf(nsx.MetaTags.ElecLabel(j,:),'chan%d');
+        else
+            E(j) = sscanf(nsx.MetaTags.ElecLabel(j,:),'elec%d');
+        end
     end
 end
 
@@ -188,6 +215,7 @@ Array = [];
     if isempty(d)
         return;
     end
+    etext = [];
     allpen = [];
     for j = 1:length(d)
         pen = [];
@@ -197,6 +225,9 @@ Array = [];
             if ~isempty(id)
                 a = sscanf(txt{k}(id(1)+3:end),'%d');
                 pen(k) = a(1);
+            end
+            if strncmp('Electrode',txt{k},7)
+                etext = txt{k};
             end
         end
         allpen = [allpen unique(pen(pen>0))];
@@ -211,6 +242,10 @@ Array = [];
     id = find(strncmp('Electr',txt,6));
     if ~isempty(id)
         fprintf('Array Based on "%s" in penlog\n',txt{id(end)});
+    elseif ~isempty(etext)
+        txt{end+1} = etext;
+        id = length(txt);
+        fprintf('Array Based on "%s" in ufl\n',txt{id(end)});
     else
         return;
     end
@@ -239,17 +274,22 @@ function Array = GetArrayByName(name)
 Array = [];
 labels = {};
 match = [];
+Arrays = {};
 d = mydir('/bgc/group/arrays/*.mat');
 for j = 1:length(d)
-    load(d(j).name);
-    Arrays{j} = ArrayConfig;
-    labels{j} = ArrayConfig.label;
-    if strncmp(labels{j},'24 probe',6)
-        aid(24) = j;
-    elseif strncmp(labels{j},'8 probe',6)
-        aid(8) = j;
-    elseif strncmp(labels{j},'Utah96',6)
-        aid(96) = j;
+    try
+        load(d(j).name);
+        Arrays{j} = ArrayConfig;
+        labels{j} = ArrayConfig.label;
+        if strncmp(labels{j},'24 probe',6)
+            aid(24) = j;
+        elseif strncmp(labels{j},'8 probe',6)
+            aid(8) = j;
+        elseif strncmp(labels{j},'Utah96',6)
+            aid(96) = j;
+        end 
+    catch
+        mycprintf('red','Error Reading %s\n',d(j).name);
     end
 end
 if isempty(Arrays)
@@ -265,6 +305,8 @@ if isdir(name)
         return;
     end
     match = [];
+    id = find(~(strcmp('FileIdx.mat',{d.name})));
+    d = d(id);
     for j = 1:length(d)
         load([name '/' d(j).name]);
         if exist('Expt','var') && isfield(Expt,'Comments') && isfield(Expt.Comments,'Peninfo')

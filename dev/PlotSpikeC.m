@@ -47,6 +47,7 @@ makeV = 0;
 prefix = [];
 lastblk = 0;
 checkblocks = 1;
+useall = 0;
 
 while j <= length(varargin)
     if isstruct(varargin{j})
@@ -114,12 +115,18 @@ if length(spk) > 1 && sumv
     if isempty(C)
         return;
     end
+
     if isstruct(C) %given a list of "probes" structs
     [chspk, lens, starts, offsets, f, X] = CountProbeChans(C, spk);
     else
     [chspk, lens, starts, offsets, f, X] = CountChans(C, spk);
     end
     
+    if useall
+            np = max(chspk);
+            V(np,npts) = 0; % preallocate
+            res.samper = X.samper;
+    end
     probelist = unique(chspk);
     id = find(X.nchans < length(probelist));
     if length(id)

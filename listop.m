@@ -150,6 +150,16 @@ elseif strncmpi(op,'copy',4)
     if doac
         id = regexp(fstrings{j},'[0-9,F][A-Z][A-Z]*\.mat');
         suffix = fstrings{j}(id:end-4);
+        if isempty(id)
+            id = regexp(fstrings{j},'[0-9,F][A-Z][A-Z]*\.cell[0-9]*.mat');
+            if isempty(id)
+                id = regexp(fstrings{j},'[0-9,F][A-Z][A-Z]*\.mu[0-9]*.mat');
+                cid = regexp(fstrings{j},'\.mu[0-9]*.mat');
+            else
+                cid = regexp(fstrings{j},'\.cell[0-9]*.mat');
+            end
+            suffix = fstrings{j}(id:cid(1)-1);
+        end
         [a,b] = regexp(fstrings{j},'\.[a-z][a-z]*\.','start','end');
         stim = fstrings{j}(a+1:b-1);
         acfile = regexprep(fstrings{j},suffix,'AC');

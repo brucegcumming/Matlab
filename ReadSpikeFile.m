@@ -64,9 +64,21 @@ end
 if loadallspikes
     xname = regexprep(spkfile,'.p([0-9])*t','.p$1xt');
     if exist(xname)
-    X = load(xname);
-    Spikes.xmaxv = X.Spikes.maxv;
-    Spikes.xvalues = X.Spikes.values;
-    Spikes.xchans = X.Spikes.chspk;
+        X = load(xname);
+        Spikes.xmaxv = X.Spikes.maxv;
+        if ndims(X.Spikes.values) == 2
+            Spikes.xvalues(1,:,:) = X.Spikes.values;
+        else
+            Spikes.xvalues = X.Spikes.values;
+        end
+        if ~isfield(X.Spikes,'xVrange')
+            Spikes.xVrange = double([min(X.Spikes.values(:)) max(X.Spikes.values(:))]) .* X.Spikes.maxv./X.Spikes.maxint;
+        else
+            Spikes.xVrange = X.Spikes.xVrange;
+        end
+        Spikes.xchans = X.Spikes.chspk;
+        if isfield(X.Spikes,'TriggerV')
+            Spikes.TriggerV = X.Spikes.TriggerV;
+        end
     end
 end

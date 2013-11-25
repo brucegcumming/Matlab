@@ -118,12 +118,5 @@ if highpass && isfield(FullV,'highpass') && ~isnan(FullV.highpass)
      FullV.filtertime = mytoc(ts);
 end
 if addtime
-    first = 1;
-    vt = zeros(size(FullV.V));
-    for j = 1:length(FullV.blklen)
-        last = first+FullV.blklen(j)-1;
-        vt(first:last) = FullV.blkstart(j)+[1:FullV.blklen(j)].*FullV.samper;
-        first = last+1;
-    end
-    FullV.t = vt;
+    FullV.t = BuildFullVt(FullV);
 end

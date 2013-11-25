@@ -40,6 +40,8 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'marker',5)
         j = j+1;
         marker = varargin{j};
+    elseif strncmpi(varargin{j},'normalize',5)
+        X = myNormalize(X,'std');
     end
     j = j+1;
 end
@@ -61,7 +63,7 @@ if nargin ==1 || isempty(plots)  %automatic
         plots = [1 2; 1 3; 1 4; 2 3; 2 4; 3 4;]
         nplots = 6;
         nr=2;
-        nc=2;
+        nc=3;
     elseif min(size(X)) == 5
         plots = [1 2; 1 3; 1 4; 1 5; 2 3; 2 4; 2 5; 3 4;];
         nplots = 8;

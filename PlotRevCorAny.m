@@ -110,6 +110,7 @@ addheader = 0;
 autobox = 0;
 nz = 0;
 blankref = 0;
+selecttrials = 0;
 
 binsiz = [0 0];
 centerRFvals = 0;
@@ -382,6 +383,7 @@ while j < nargin
     elseif strncmpi(varargin{j},'trials',6)
         j = j+1;
         Expt.Trials = Expt.Trials(varargin{j});
+        selecttrials = 1;
     elseif strncmpi(varargin{j},'yval',4)
         j = j+1;
         setyvals = varargin{j};
@@ -397,7 +399,7 @@ while j < nargin
 end
 
 
-if isfield(Expt.Trials,'Fr') & length(unique([Expt.Trials.Fr])) > 1
+if isfield(Expt.Trials,'Fr') && length(unique([Expt.Trials.Fr])) > 1 && selecttrials == 0
     Frs = unique([Expt.Trials.Fr]);
     for j = 1:length(Frs)
         id = find([Expt.Trials.Fr] == Frs(j));
@@ -865,7 +867,9 @@ endoffset = 5; %% 0.5ms
 
 if isfield(Expt,'RCparams')
     tx = [Expt.Trials.(type)]; %safe if RCparams - means this is checked already
+    if ~isempty(yvals)
     ty = [Expt.Trials.(btype)];
+    end
     durs = [Expt.Trials.dur];
 else
     for j = 1:length(Expt.Trials)

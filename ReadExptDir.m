@@ -61,7 +61,7 @@ for j = 1:length(Ex)
     end
 end
 [a,b,c] = GetMonkeyName(name);
-outname  = [name '/' a b 'Expts.mat'];
+outname  = [name '/' a c 'Expts.mat'];
 Expts = AllExpts;
 Idx = Ex;
 save(outname, 'Expts','Idx');

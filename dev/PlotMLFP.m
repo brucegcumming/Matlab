@@ -29,7 +29,7 @@ ec = [];
 ed = [];
 result = [];
 
-if isfield(Expt.Header,'exptvars')
+if isfield(Expt.Header,'exptvars')  && ~isempty(strfind(Expt.Header.Options,'+exm'))
     extypes = split(Expt.Header.exptvars,',');
     et = extypes{1};
     if length(extypes) > 1
@@ -135,6 +135,14 @@ if Expt.Header.rc
     return;
 end
 
+for j = 1:length(Expt.Trials)
+    if ~isnan(Expt.Trials(j).lfpstart);
+        good(j) = true;
+    end
+end
+Expt.Trials = Expt.Trials(good);
+
+
 if isempty(et)
     et = GetEval(Expt,'et');
 end
@@ -160,19 +168,23 @@ if isempty(extypes)
     extypes{1} = et;
     if isfield(Expt.Trials,eb)
         extypes{2} = eb;
-    else
+    elseif isfield(Expt.Trials,'st')
         extypes{2} = 'st';
+    else
+        extypes{2} = '';
     end
 end
 
 for j = 1:length(extypes)
-    if ~isfield(Expt.Trials,extypes{j})
-        fprintf('Not Field %s in Trials\n',extypes{j});
-        return;
+    if ~isempty(extypes{j})
+        if ~isfield(Expt.Trials,extypes{j})
+            fprintf('No Field %s in Trials\n',extypes{j});
+            return;
+        end
+        vals{j} = [Expt.Trials.(extypes{j})];
+        uvals{j} = unique(vals{j});
+        env(j) = length(uvals{j});
     end
-    vals{j} = [Expt.Trials.(extypes{j})];
-    uvals{j} = unique(vals{j});
-    env(j) = length(uvals{j});
 end
     
 
@@ -190,6 +202,8 @@ if isempty(xvals)
 else
     xvals = allx(xvals);
 end
+
+
 
 if checkdim
     nch = 24;
@@ -256,7 +270,9 @@ end
 
 
 for j = 1:length(extypes)
+    if ~isempty(extypes{j})
     cx{j} = 1;
+    end
 end
 
 allids = {};
@@ -393,6 +409,7 @@ elseif plottype ==  9 % plot power vs expt var
                 [cx{:}] = ind2sub(env,j);
                 if alln(j,k) > 0
                     nl = nl+1;
+                    result.(extypes{1})(nl) = uvals{1}(cx{1});
                     labels{nl} = sprintf('%s=%.2f',et,xvals(k));
                     for m = 2:length(cx)
                         result.(extypes{m})(nl) = uvals{m}(cx{m});
@@ -421,3 +438,6 @@ elseif plottype ==  9 % plot power vs expt var
     result.alln = alln;
     result.labels = labels;
 end
+
+result.Header = Expt.Header;
+result.Stimvals = Expt.Stimvals;

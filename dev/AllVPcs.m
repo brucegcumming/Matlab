@@ -1485,7 +1485,7 @@ if reclassifyall == 2
             end
             if needc == 0
                 DATA.probe = ispk(j);
-                d = dir(SpkFilename(DATA));
+                d = dir(SpkFileName(DATA));
                 if isempty(d) || d.datenum < C.savetime(1)-0.01;
                     fprintf('Spike File %s is older than cluster\n',d.name);
                     needc = 1;
@@ -2383,14 +2383,14 @@ elseif minenergy
     clear energy;
     clear spkvar;
     clear AllV;
-    AllV = BuildAllV(DATA, id, spts);
+    [AllV, DATA] = BuildAllV(DATA, id, spts);
     res.t = vt(id(ie));
     [a,b] = ismember(DATA.postevents,ie);
     DATA.postevents = b;
     id = id(ie);
     DATA.trigtimes{DATA.probe(1)} = id;
 else
-    AllV = BuildAllV(DATA, id, spts);
+    [AllV, DATA] = BuildAllV(DATA, id, spts);
 end
 DATA.nevents = size(AllV,3);
 if DATA.Trigger(1) <0
@@ -2414,7 +2414,6 @@ elseif isfield(DATA.cluster,'version')
 end
 
 if isfield(Vall,'meanV')
-    DATA.meanV = Vall.meanV(allid);
     if isfield(Vall,'meanV') && DATA.addmean
 %  slightly faster, but might cause memory swapping
 %        mV = shiftdim(repmat(Vall.meanV(allid),[1 1 24]),2);
@@ -2526,10 +2525,7 @@ clear allid;
 fullcov = 1;
 DATA.nevents = size(AllV,3);
 res.spkrate = DATA.nevents./DATA.duration;
-if DATA.interactive >= 0
-    setappdata(DATA.toplevel,'MeanV', DATA.meanV);
-    DATA = rmfields(DATA,'meanV');
-end
+DATA = mysetappdata(DATA,'MeanV', DATA.meanV);
 
 if isfield(DATA.cluster,'addmean')
     DATA.addmean = DATA.cluster.addmean;
@@ -2538,7 +2534,7 @@ if recluster == 2  % 'reclassify' = compare with last also
     if checklast && isfield(DATA,'oldtrigtimes')
     [t, ida] = setdiff(DATA.oldtrigtimes,res.t);
     if checklast == 2
-        spkfile = SpkFilename(DATA);
+        spkfile = SpkFileName(DATA);
         try
           a = load(spkfile);
           if isfield(a.Spikes,'maxv')
@@ -3757,7 +3753,8 @@ function [AllV, DATA] = BuildAllV(DATA, id, spts)
     end
     mysetappdata(DATA,'AllV',AllV);
     if isfield(V,'meanV')
-        mysetappdata(DATA,'MeanV',V.meanV(allid));
+        DATA.meanV = V.meanV(allid);
+        mysetappdata(DATA,'MeanV',DATA.meanV);
     end
 
 function val = myisappdata(DATA,str)
@@ -3799,7 +3796,7 @@ function [DATA, V] = ReadSpikeFiles(DATA, name)
     id = regexp(V.name,'Expt[0-9]*');
     DATA.exptno = sscanf(V.name(id+4:end),'%d');
     DATA.Expt.exptno = DATA.exptno;
-    s = SpkFilename(DATA);
+    s = SpkFileName(DATA);
     V.Spikes = ReadSpikeFile(s,'allprobes');
     V.exptno = DATA.exptno;
     [monk, monkey, mdir] = GetMonkeyName(DATA.name);
@@ -5905,7 +5902,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
     elseif isfield(Clusters{p},'excludetrialids')
         Clusters{p} = rmfield(Clusters{p},'excludetrialids');
     end
-    Clusters{p}.spkfile = SpkFilename(DATA);
+    Clusters{p}.spkfile = SpkFileName(DATA);
     Clusters{p}.exptno = DATA.Expt.exptno;
     ClusterDetails{p}.Evec = DATA.Evec;
     if isfield(DATA,'rV')
@@ -5988,6 +5985,9 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
     if DATA.cluster.bestspace(2) == 3
         Clusters{p}.vspace = DATA.vspace;
     end
+    end
+    if isfield(DATA,'jamescluster') && strcmp(DATA.cluster.automode,'james')
+        Clusters{p}.jamescluster = DATA.jamescluster;
     end
     if DATA.checkclusters
         CheckClusters(Clusters,'CheckFitSpace');
@@ -6192,6 +6192,12 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
             DATA = AddErr(DATA,ME,'Cant move %s to %s - check permissions\n',outname,backfile);
         end
     end
+    
+    mvd = dir(outname);
+    if ~isempty(mvd)
+        fprintf('%s Still exists!!!!\n',outname);
+        warndlg(outname);
+    end
     save(outname,'Clusters','FullVData');
     DATA.savespkid = id;
 
@@ -6227,7 +6233,7 @@ end
 
 
 
-function name = SpkFilename(DATA, varargin)
+function name = SpkFileName(DATA, varargin)
     p = ProbeNumber(DATA);
     namemode = 'default';
     j = 1;
@@ -6382,12 +6388,17 @@ function [E, cluster] = CutAndSave(DATA, varargin)
         DATA.t = Vall.t(D.spk_inds);
         DATA.xy{1} = D.spike_xy;
         if(1)
-        Spikes.V = permute(AllV,[3 2 1]);
-        Spikes.times = DATA.t;
-        Spikes.trig_vals = DATA.rV';
-        Spikes.trig_thresh = D.trig_thresh;
-        apply_clustering(DATA, D.init_cluster, D.params, D.fixed, []);
+            X.Vtime = Vall.t;
+            X.Fs = 40000;
+            X.V = double(Vall.V').*Vall.intscale(1)/Vall.intscale(2);
+            Spikes.V = permute(AllV,[3 2 1]);
+            Spikes.times = DATA.t;
+            Spikes.trig_vals = DATA.rV';
+            Spikes.trig_thresh = D.trig_thresh;
+            Di = rmfields(D,{'spk_inds' 'uids' 'times' 'spike_clusts' 'spike_xy'});
+            apply_clustering(X, Di, Di.params, 0, []);
         end
+        DATA.jamescluster = Di;
         C = DATA.cluster;
         C.next = {};
         C.probe = DATA.probe;
@@ -6417,7 +6428,7 @@ function [E, cluster] = CutAndSave(DATA, varargin)
         DATA.savespikes = 1; %get the spikdi at least
         DATA =  SaveClusters(DATA, outname,'quick');
         cluster = C;
-        C.spkfile = SpkFilename(DATA,'auto');
+        C.spkfile = SpkFileName(DATA,'auto');
         E = C;
         if ~exist(C.spkfile)
             SaveSpikes(DATA,DATA.uid,C.spkfile);
@@ -7058,7 +7069,7 @@ clust_params.gmm_inits = 100;
 clust_params.min_Pcomp = 0.05;
 clust_params.use_ms = 0;
 clust_params.try_features = [1 2 4];
-clust_params.max_back_comps = 3;
+clust_params.max_back_comps = 2;
 clust_params.cluster_biase = 0.5;
 clust_params.target_rate = 50;
 V = mygetappdata(DATA,'AllV');
@@ -7072,12 +7083,13 @@ else
     Spikes.trig_thresh = DATA.Trigger;
     [details,spike_features,sum_fig] = detect_and_cluster_init(X,clust_params,DATA.chspk,Spikes);
 end
+
 spike_features(details.uids,:) = spike_features;
 spike_features(details.artifact_ids,:) = NaN;
 details.spike_xy(details.uids,:) = details.spike_xy;
 details.spike_xy(details.artifact_ids,:) = NaN;
 details.newDATA = 0;
-
+details.clust_params = clust_params;
 
 function [E, Scores, tbs, xy, details]  = AutoCut(DATA, varargin)
 usev = 0;
@@ -10788,7 +10800,7 @@ function PlotGridSpikes(DATA, nspk, varargin)
         if mod(j,10) == 1
             voff = 0;
         end
-        s = SpkFilename(DATA,'probe',j);
+        s = SpkFileName(DATA,'probe',j);
         Spikes = ReadSpikeFile(s,'double');
         id = ceil(rand(1,nspk) .* size(Spikes.values,1));
         cells = unique(Spikes.codes(:,1));

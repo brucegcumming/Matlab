@@ -514,6 +514,7 @@ elseif strncmpi(name,'options',5)
     set(DATA.toplevel,'UserData',DATA);
 elseif strncmpi(name,'loadclusters',6)
     DATA = LoadClusters(DATA,ClusterFile(DATA));
+    args = {args{:} varargin{j}};
 elseif strncmpi(name,'loadsaccades',6)
     for j = 1:length(DATA.Expts)
         E = LoadEmData(DATA.Expts{j});
@@ -914,8 +915,8 @@ elseif strncmpi(name,'setexp',6)
     DATA.spikelist = WhichClusters(DATA.toplevel);
      
     for j = id(1:end)
-        fprintf('Counting Spikes for expt %d\n',j);
         tc=now;
+        fprintf('Counting Spikes for expt %d (%.2f)\n',j,mytoc(ts));
 %        eid = DATA.expid(j); %eid already used for DATA.clst value
         p = GetProbe(DATA, DATA.expid(j), DATA.probe);
         if DATA.state.recount | DATA.Expts{DATA.expid(j)}.gui.counted == 0 & eid(1) > 1
@@ -933,7 +934,7 @@ elseif strncmpi(name,'setexp',6)
             end
         SetFigure(DATA.tag.dataplot,DATA);
         res = PlotExpt(DATA.Expts{DATA.expid(j)},hs,'forcecolor',colors{j},args{:},'legendpos',7,xargs{:});
-         fprintf('%.2f(%.2f) ',(now-te)*60*60*24,(te-tc)*60*60*24);
+         fprintf('%.2f plot (%.2f count)) ',(now-te)*60*60*24,(te-tc)*60*60*24);
         sp  = strfind(DATA.subexplist{j},' ');
         if sp
             names{j} = DATA.subexplist{j}(1:sp(1)-1);
@@ -1407,6 +1408,11 @@ while j <= length(varargin)
            DATA  = ReadConfig(DATA);
         end
        set(DATA.toplevel,'UserData',DATA);
+    elseif strncmpi(varargin{j},'loadclusters',8)
+        for j = 1:length(DATA.Expts)
+            DATA = CheckClusterLoaded(DATA,j,DATA.probe);
+        end
+       set(DATA.toplevel,'UserData',DATA);
     elseif strncmpi(varargin{j},'plotargs',8)
         j = j+1;
         DATA.plotargs = {};
@@ -1588,14 +1594,19 @@ end
         end
     else
         ts = now;
-        [Trials, Expts, All] = APlaySpkFile(name, args{:});
+        [Trials, Expts, All] = APlaySpkFile(name, 'expts', args{:});
         fprintf('APlaySpkFile Took %.2f\n',mytoc(ts));
         if isfield(Trials,'DataType')
             DATA.filetype = Trials.DataType;
         end
         DATA.state.nospikes = Trials.state.nospikes;
-        sonid = find(All.Events.codes(:,1) ==48); %'0' = storage on
-        soffid = find(All.Events.codes(:,1) ==49); %'1' = storage off
+        if isfield(All,'Events')
+            sonid = find(All.Events.codes(:,1) ==48); %'0' = storage on
+            soffid = find(All.Events.codes(:,1) ==49); %'1' = storage off
+        else
+            sonid = [];
+            soffid = [];
+        end
 
         if strncmp(DATA.filetype,'Grid',4)
             np = sscanf(DATA.filetype,'GridData %d');
@@ -1633,10 +1644,6 @@ end
                 Expts{nexp}.bstimes = Trials.bstimes(id);
                 end
             end
-
-            sonid = find(All.Events.codes(:,1) ==48); %'0' = storage on
-            soffid = find(All.Events.codes(:,1) ==49); %'1' = storage off
-            
         end
 
         if isfield(Trials,'Probes') &  ~isempty(Trials.Probes)
@@ -1771,7 +1778,9 @@ end
         All = rmfield(All,'AllSpikes');
     end
     DATA.AllData = All;
-    DATA.AllData.SpikeIdx = Trials.Spkid;
+    if isfield(Trials,'Spkid')
+        DATA.AllData.SpikeIdx = Trials.Spkid;
+    end
     DATA.AllData.Trialids = Trialids;
     DATA.AllData.TrialTimes = TrialTimes;
     DATA.AllData.pcs = [];
@@ -1779,7 +1788,12 @@ end
         DATA.Comments = Trials.Comments;
     end
 
-    DATA = SetSpkLists(DATA);
+    %if AllClusteres, means loding xy, times for many probes. Don't load
+    %the spikes files at startup for default probe
+   
+    if ~isfield(DATA,'AllClusters')
+        DATA = SetSpkLists(DATA);
+    end
 % load saved cluster params
     
     if DATA.state.useonlineclusters
@@ -1816,6 +1830,7 @@ end
     
     
     end
+    
 
  function DATA = CheckCellExptList(DATA)
      if isfield(DATA,'CellDetails') && isfield(DATA.CellDetails,'exptids') && isfield(DATA,'exabsid')
@@ -1988,6 +2003,7 @@ function ShowLFPPlot(DATA)
     elseif ismember(DATA.plot.lfpplot,[16])        
         [a,b] = PlotMLFP(DATA.LFP,'lines','ftpwr');
         setappdata(DATA.toplevel,'LFPresult',b);
+        fprintf('getappdata(%d, ''LFPresult'') to Get Plotted result\n',DATA.toplevel); 
     end
     hold off;
     probelist = DATA.probelist;
@@ -2882,7 +2898,7 @@ function [Expt, DATA, plotres] = CombinePlot(DATA, dlgs, varargin)
 % when combining expts with certain differences, make sure these are
 % recorded for each trial, so that they can be treared differently
 % add to this list any parameters shown manually with DATA.show
-    CheckF = {'sx' 'Fr' 'rb' 'ap' 'jx' 'ns' 'sf' 'or' 'backxo' 'bo' 'backyo' 'co' 'Bc' 'bh' 'SpikeGain' 'dd' 'puA' 'USd' 'USp' 'puF'};
+    CheckF = {'sx' 'Fr' 'rb' 'ap' 'jx' 'ns' 'sf' 'or' 'backxo' 'bo' 'backyo' 'co' 'Bc' 'bh' 'SpikeGain' 'dd' 'puA' 'USd' 'USp' 'puF' 'dx'};
     f = fields(DATA.show);
     for j = 1:length(f)
       if isempty(strmatch(f{j},{'ed'},'exact')) && DATA.show.(f{j})
@@ -4891,31 +4907,44 @@ else
 end
 
 touched = zeros(size(DATA.probelist));
-if isfield(DATA,'AllClusters') || isfield(DATA,'AllSpikes') % only save clusters that have been set
-for k = 1:nc
-    for j = 1:min([size(DATA.cluster,2) length(DATA.AllSpikes)])
-        if  isfield(DATA.cluster{k,j}, 'touched') && DATA.cluster{k,j}.touched > 0 && isfield(DATA.AllSpikes{j},'cx')
-        DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j} = DATA.cluster{k,j};
-        if sum(ismember(DATA.cluster{k,j}.params,[29 30 31])) %templates used
-            DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j}.Templates = DATA.Templates;
-        end
-          touched(j) = 1;
+if isfield(DATA,'AllClusters')
+    for k = 1:nc
+        for j = 1:min([size(DATA.cluster,2) length(DATA.AllClusters)])
+            if  isfield(DATA.cluster{k,j}, 'touched') && DATA.cluster{k,j}.touched > 0 && isfield(DATA.AllSpikes{j},'cx')
+                DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j} = DATA.cluster{k,j};
+                if sum(ismember(DATA.cluster{k,j}.params,[29 30 31])) %templates used
+                    DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j}.Templates = DATA.Templates;
+                end
+                touched(j) = 1;
+            end
         end
     end
-end
+    fprintf('Probes %s\n',num2str(find(touched >0)));
+elseif isfield(DATA,'AllSpikes') % only save clusters that have been set
+    for k = 1:nc
+        for j = 1:min([size(DATA.cluster,2) length(DATA.AllSpikes)])
+            if  isfield(DATA.cluster{k,j}, 'touched') && DATA.cluster{k,j}.touched > 0 && isfield(DATA.AllSpikes{j},'cx')
+                DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j} = DATA.cluster{k,j};
+                if sum(ismember(DATA.cluster{k,j}.params,[29 30 31])) %templates used
+                    DATA.Expts{DATA.currentexpt(1)}.Cluster{k,j}.Templates = DATA.Templates;
+                end
+                touched(j) = 1;
+            end
+        end
+    end
     fprintf('Probes %s\n',num2str(find(touched >0)));
 else
-        DATA.Expts{DATA.currentexpt(1)}.Cluster = DATA.cluster;
-        for k = 1:nc
+    DATA.Expts{DATA.currentexpt(1)}.Cluster = DATA.cluster;
+    for k = 1:nc
         if isfield(DATA.cluster{k,1},'params') & sum(ismember(DATA.cluster{k,1}.params,[29 30 31])) %templates used
             DATA.Expts{DATA.currentexpt(1)}.Cluster{k,1}.Templates = DATA.Templates;
         end
-        end
-%
-%  If the set button is hit, it means that user is happy with cluster
-%  currently shown in the XY plot. Need to track this so that ONLY these
-%  clusters are recorded in OnlineClusters. Set touched to 2, then onlhy
-% Add these to AllClusters below
+    end
+    %
+    %  If the set button is hit, it means that user is happy with cluster
+    %  currently shown in the XY plot. Need to track this so that ONLY these
+    %  clusters are recorded in OnlineClusters. Set touched to 2, then onlhy
+    % Add these to AllClusters below
     DATA.Expts{eid}.Cluster{1,DATA.probe}.touched = 2;
 end
 DATA.Expts{DATA.currentexpt(1)}.gui.clustertype = 1;
@@ -11410,7 +11439,7 @@ DATA.state.showspikes = playspk;
 if DATA.state.nospikes
     fprintf('Calling combine from Setprobehit\n');
     DATA = combine('setexp', DATA,'newprobe');
-    fprintf('Returned from  combine in Setprobehit\n');
+    if DATA.state.verbose fprintf('Returned from  combine in Setprobehit\n'); end
     plotISI(DATA);
 elseif (DATA.state.autospool | playspk) & nloaded < 4
     DATA = combine('setexp', DATA);
@@ -11507,7 +11536,7 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
     if DATA.listbycell == 2
         needcx = 1;
     end
-    if DATA.state.somespikes == 2
+    if DATA.state.somespikes == 2 || DATA.state.usensx == 2
 %if usenex == 2 it means reading spikes from NEV files. For now, can read these every time
         if (length(DATA.AllClusters) < eid || length(DATA.AllClusters{eid}) < pid)...
                 || DATA.state.usensx == 1 
@@ -11672,6 +11701,7 @@ id = find(DATA.probelist == probe);
         elseif strncmp(DATA.filetype,'Grid',4) && DATA.state.usensx > 0 %GetNS% deeals with NEV and NS5
                 DATA =  GetNS5Spikes(DATA, DATA.currentexpt(1),  DATA.probe);
                 DATA = SetExptSpikes(DATA, eid, 0);
+        elseif strncmp(DATA.filetype,'Grid',4) 
         else
             if isfield(DATA.Expts{eid}.Header,'loadname')
                 filename = DATA.Expts{eid}.Header.loadname;

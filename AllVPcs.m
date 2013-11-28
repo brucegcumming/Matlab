@@ -1307,7 +1307,14 @@ if autocutall
 F = SetFigure(DATA.tag.top, DATA);
 DATA.toplevel = F;
 set(DATA.toplevel,'UserData',DATA)
-res = AutoCutAll(ispk,  F, Vall, DATA, varargin(1:end-1));
+usearg = [];
+for j = 1:length(varargin)
+    if sum(strcmp(varargin{j},{'autocutall' 'quickautocutall'})) == 0 
+        usearg(j) = true;
+    end
+    j = j+1;
+end
+res = AutoCutAll(ispk,  F, Vall, DATA, varargin(find(usearg)));
 res.toplevel = F;
 res.logfid = DATA.logfid;
 return;

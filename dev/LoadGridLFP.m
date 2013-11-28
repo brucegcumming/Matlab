@@ -65,7 +65,11 @@ if ~isempty(eid)
             if ~isempty(id)
                 offset = round((LFP.t(id(1))- (Expt.Trials(j).Start(1)-preperiod))./(LFP.samper .*10000));
                 id = id-offset;
-                gap(j) = LFP.t(id(1))-LFP.t(id(1)-1);
+                if id(1) > 1
+                    gap(j) = LFP.t(id(1))-LFP.t(id(1)-1);
+                else
+                    gap(j) = 0;
+                end
                 Expt.Trials(j).lfpstart = LFP.t(id(1))-Expt.Trials(j).Start(1);
                 Expt.Trials(j).lfptime = LFP.t(id(1));
                 Expt.Trials(j).lfplen = length(id);
@@ -73,6 +77,10 @@ if ~isempty(eid)
                 if needft
                     Expt.Trials(j).FTlfp = abs(fft(Expt.Trials(j).LFP));
                 end
+            else
+                Expt.Trials(j).lfpstart = NaN;
+                Expt.Trials(j).lfplen = 0;
+                Expt.Trials(j).lfptime = NaN;
             end
         end
         if verbose

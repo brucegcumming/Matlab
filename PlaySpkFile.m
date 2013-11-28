@@ -61,6 +61,7 @@ state.tt = [];
 state.nospikes = 0;
 state.alltrials = 0;
 state.profiling = 0;
+state.resort = 0; %generate expt liat again. Else read from disk if there
 errs = {};
 
 mkidx =0;  %%need this up here so taht relist works
@@ -107,6 +108,8 @@ while j <= length(varargin)
        end
     elseif strncmpi(vg,'relist',4)
         mkidx = 1;
+    elseif strncmpi(vg,'resort',8)
+        state.resort = 1;
     elseif strncmpi(vg,'saveexpts',6)
         saveexpts = 1;
     elseif strncmpi(vg,'sortexpts',6)
@@ -1016,7 +1019,6 @@ end
 Expt.Header.DataType = Expt.DataType;
 
 if ~mkidx
-    [rfstr, rfdat] = MkUfl(name, Text);
     load(idxfile);
     if ~isfield(Expt,'errs')
         Expt.errs = {};
@@ -1027,8 +1029,6 @@ if ~mkidx
 % make sure name is is correct windows/unix form
     Expt.Header.Name = BuildName(Expt.Header.Name);
     Expt.Header.loadname = Header.loadname;
-    Expt.Header.rfstr = rfstr;
-    Expt.Header.rf = rfdat;
     Expt.setprobe = setprobe;
     Expt.Header.DataType = Expt.DataType;
     aText.text = {};
@@ -1052,6 +1052,9 @@ if ~mkidx
             x = sscanf(txt(id(1)+x:end),'%d');
             Expt.Comments.Peninfo.probesep = x;
         end
+        [rfstr, rfdat] = MkUfl(name, Text);
+        Expt.Header.rfstr = rfstr;
+        Expt.Header.rf = rfdat;
     end
     if iscell(Spks)  && isfield(Spks{1},'values')
         AllData.AllSpikes = Spks;
@@ -1119,7 +1122,6 @@ if ~mkidx
                 [Expts.e3] = deal('e0');
             end
    [Expts, Expt] = SortExpts(Expts, Expt.Trials, Expt.Header, thecluster, Expt, state, argon{:});
-   Expts = AddComments(Expts,Expt);
     if ~exist('Exptlist','var')
         ExptList = MkExList(Expts);
         newlist = 0;
@@ -1238,7 +1240,7 @@ end
 
 tic;
     
-aText.text = mat2cell(Text.text(:,1:end-1),ones(1,size(Text.text,1)),size(Text.text,2)-1);
+aText.text =cellstr(Text.text(:,1:end-1),ones(1,size(Text.text,1)),size(Text.text,2)-1);
 id = find(strncmp('xxx=',aText.text,4));
 ids = setdiff(1:size(Text.text,1),id);
 aText.text = aText.text(ids);
@@ -1526,7 +1528,7 @@ ExptStart = Events.times(exstartid);
 exendid = exendid(exendid > exstartid(1));
 ExptEnd = Events.times(exendid);
 if isempty(ExptEnd) %% sometimes .mat file is missing EndExpt Marker. But best to fix .smr
-    Expt = AddError(Expt, 'No EndExpt Marker');
+    Expt = AddError(Expt, 'No EndExpt Marker', Expt);
     ExptEnd = Events.times(end);
     exendid = length(Events.times)+1;
     Events.codes(exendid,1) = ENDEXPT;
@@ -2259,6 +2261,8 @@ end
 nfpj=0;
 bsctr = 0;
 waitloop = round(length(aText.text)/20); %update waitbar 20 times
+E.explabel = '';
+
 for j = 1:length(aText.text)
 %    aText.text{j} =  deblank(aText.text{j});
     txt = aText.text{j};
@@ -3223,7 +3227,7 @@ if isfield(Idx,'errs') & length(Idx.errs)
     fclose(fid);
 end
 
-function [aText, Text] = AddText(AddTxtFile, aText, Text)
+function [aText, Text, newlines] = AddText(AddTxtFile, aText, Text)
 %Add text reads lines of the form
 %t txt
 %where t is in seconds, not timestamps
@@ -3231,7 +3235,7 @@ function [aText, Text] = AddText(AddTxtFile, aText, Text)
 %
 %can also add Stimulus Values by id with
 %idxxxx str
-
+newlines = 0;
 [a,b,c] = fileparts(AddTxtFile);
 if ~strcmp(c,'.txt')
     return;
@@ -3350,8 +3354,15 @@ end
 
 
     for j = 1:length(Expts)
-        cid = find(Expt.Comments.times > Expts{j}.Header.trange(1)-100000 & ...
-       Expt.Comments.times < Expts{j}.Header.trange(2)+100000);
+        ts = Expts{j}.Header.trange(1)-10000;
+        te = Expts{j}.Header.trange(2)+100000;
+        if j > 1
+            ts = min([ ts Expts{j-1}.Header.trange(2)]);
+        end
+        if j < length(Expts)
+            te = max([ te Expts{j+1}.Header.trange(1)]);
+        end
+        cid = find(Expt.Comments.times > ts & Expt.Comments.times < te);
         if ~isempty(cid)
             bid = find(strncmp('cm=back=',Expt.Comments.text(cid),8));
             for k = 1:length(bid)
@@ -3511,6 +3522,16 @@ while j <= length(varargin)
     j = j+1;
 end
 
+outname = strrep(Header.loadname,'.mat','Expts.mat');
+if exist(outname) && state.resort == 0
+    load(outname,'ExptState');
+    if ExptState.alltrials == state.alltrials %otherwise need to reload
+        fprintf('Using Expts saved in %s\n',outname);
+        load(outname);
+        return;
+    end
+end
+
 if isfield(AllTrials,'ve') && length(AllTrials.ve) < length(AllTrials.Start)
         AllTrials.ve(length(AllTrials.Start)) = median(AllTrials.ve);
 end
@@ -3568,6 +3589,7 @@ ids = [ids find(strcmp('bsdelay',fn))];
 ids = [ids find(strcmp('stimname',fn))];
 ids = [ids find(strcmp('explabel',fn))];
 ids = [ids find(strcmp('exptvars',fn))];
+ids = [ids find(strcmp('uf',fn))];
 %ids = [ids strmatch('imver',fn)];
 %ids = [ids strmatch('imse',fn)];
 state.tt = TimeMark(state.tt,'Set Fields');
@@ -4312,6 +4334,9 @@ for nx = 1:length(AllExpts)
     end
 %  max(spkids);
 end
+Expts = AddComments(Expts,Idx);
+ExptState = state;
+save(outname,'Expts','ExptState');
     
 function  gains = MakeEyeCalfile(cExpt,emname);
  
@@ -4428,7 +4453,7 @@ else
 end
 
 if isempty(rid) && isempty(rfstrs)
-    return;s
+    return;
 end
 %a = textscan(Text.text(id,:),'cm=rf%f,%f:%fx%f,%fdeg pe%d %f %f%*s');
 % trailing spaces seem to mess this up. text(id,1:65) works for most line

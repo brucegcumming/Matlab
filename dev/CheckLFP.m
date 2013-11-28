@@ -20,7 +20,7 @@ for j = 1:length(LFP.Trials)
     if ~isempty(LFP.Trials(j).Start)
     if isfield(LFP.Trials,'lfptime')
     delays(j) = LFP.Trials(j).Start(1) - LFP.Trials(j).lfptime;
-    elseif isfield(LFP.Trials,'lfptime')
+    elseif isfield(LFP.Trials,'ftime')
     delays(j) = LFP.Trials(j).Start(1) - LFP.Trials(j).ftime;
     else
         delays(j) = NaN;

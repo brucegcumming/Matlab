@@ -4,12 +4,14 @@ function [fign, new] = GetFigure(tag,varargin)
 %whose 'Tag' property matches tag. Returns figure handle.
 %If no figure is found, a new
 %figure is created, thus GetFigure is guaranteed to return a valid
-%figure handle
+%figure handle    
 %GetFigure(tag,'front',...   brings the figure to the front.
 %any additional arguments are passed on to both findobj() and figure()
 %
 %getfigure(handle)  where handle is a graphics handle or uicontrol, finds
 %the parent figure;
+%getfigure(,...'parent',F) Sets teh "parentfigure app data to F, so that callbacks
+%  can access the data
 
 doclear = 0;
 j = 1;
@@ -18,7 +20,7 @@ nk = 1;
 parentfig = 0;
 varnew = {'Name',tag};
 varfind = {};
-if strcmp(computer,'PCWIN')
+if strncmp(computer,'PCWIN',5)
     forcefront = 1;
 else
     forcefront = 0;
@@ -84,7 +86,7 @@ else
     end
     if forcefront
         figure(fign);
-    else
+    elseif fign(1) ~= gcf
         set(0,'CurrentFigure',fign(1));
     end
 end

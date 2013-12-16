@@ -23,6 +23,8 @@ end
 
 if regexp(name,['/' monk '/[MG0-9]*/'])
     xdir = regexprep(name,['.*/' monk '/([MG0-9]*)/.*'],'$1');
+elseif regexp(name,['/' monk '/[MG0-9]*$'])
+    xdir = regexprep(name,['.*/' monk '/([MG0-9]*)'],'$1');
 elseif regexp(name,['/' monk '[MG0-9]*/'])
     xdir = regexprep(name,['.*/' monk '([MG0-9]*)/.*'],'$1');
 else

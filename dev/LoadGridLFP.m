@@ -44,6 +44,8 @@ gap = [];
 if ~isempty(eid)
     for j = 1:length(Expt.Trials)
         Expt.Trials(j).lfplen = 0;
+        Expt.Trials(j).lfpstart = NaN;
+        Expt.Trials(j).lfptime = NaN;
     end
     for j = 1:length(eid)
         name = sprintf('%s/Expt%d.lfp.mat',loaddir,eid(j));
@@ -77,10 +79,6 @@ if ~isempty(eid)
                 if needft
                     Expt.Trials(j).FTlfp = abs(fft(Expt.Trials(j).LFP));
                 end
-            else
-                Expt.Trials(j).lfpstart = NaN;
-                Expt.Trials(j).lfplen = 0;
-                Expt.Trials(j).lfptime = NaN;
             end
         end
         if verbose

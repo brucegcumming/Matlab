@@ -252,8 +252,9 @@ if parallel
     X.logfid = -1;
     X.catcherrs = 1;
     cls = {};
-    parfor (ex = expts)
-        starts(ex) = now;
+    parfor (j = 1:length(expts))
+        ex = expts(j);
+        starts(j) = now;
         err = 0;
         id = find([probes.suffix] == ex);
         eprobes = unique([probes(id).probe]);
@@ -265,7 +266,7 @@ if parallel
         if err > 0
         elseif bysuffix
             fprintf('%s from suffix\n',outname);
-            cls{ex} = ProcessSuffix(path, probes, ex,0, X,args);
+            cls{j} = ProcessSuffix(path, probes, ex,0, X,args);
         elseif exist(outname,'file') && recalc < 2
                 fprintf('Loading %s\n',outname);
                 load(outname);
@@ -273,15 +274,15 @@ if parallel
             fprintf('Making FullV for Expt %d\n',ex)
             ts = now;
             if bysuffix
-                cls{ex} =  ProcessSuffix(path, probes, ex,0, X, args);
+                cls{j} =  ProcessSuffix(path, probes, ex,0, X, args);
             else
                 
             end
             ProcessSuffix(path, probes, ex,0, X,args);
         end
     end
-    res.cls=cls;
-    res.starts = starts;
+    res.cls(expts)=cls;
+    res.starts(expts) = starts;
 else
     X.catcherrs = 0;        
     for ex = expts
@@ -393,7 +394,7 @@ probelist = unique([probes.probe]);
 eid = find([probes.suffix] == ex);
 d = dir(outname);
 ClustersUptoDate = 0;
-if isempty(d) || d(1).datenum < max([probes(eid).filetime]);
+if isfield(probes,'filetime') && (isempty(d) || d(1).datenum < max([probes(eid).filetime]))
     FullvUptoDate = 0;
 else
     FullvUptoDate = 1;
@@ -419,6 +420,11 @@ if exist(outname,'file') && X.recalc < 2 && FullvUptoDate
         FullV.V = double(FullV.V) .* FullV.intscale(1)/FullV.intscale(2);
     end
     FullV.loadname = outname;
+    if isfield(FullV,'matfile')
+        [a,b] = fileparts(FullV.matfile);
+        [c,d] = fileparts(outname);
+        FullV.matfile = [c '/' b '.mat']; 
+    end
     res.loadtime = mytoc(ts);
 %    FullV.name = outname;
     if X.logfid > 0
@@ -483,18 +489,20 @@ end
 if isfield(FullV,'matfile')
     Expt = LoadExpt(FullV.matfile, ex, X.recalc > 1, X.logfid, exptargs{:});
 else
-    Expt = [];
+    Expt = LoadExpt(path, ex, X.recalc > 1, X.logfid);
+%if Expt is empty, next step will fail.      
+%    Expt = [];
 end
 if isfield(Expt,'Trials')
-ts = Expt.Trials(1).Start./10000;
-te = Expt.Trials(end).End./10000;
-if FullV.t(1) > ts || FullV.t(end) < te
-    fprintf('ERROR!!!: FullV time range < Expt\n');
-    if X.logfid > 0
-        fprintf(X.logfid,'ERROR!!!: FullV time range (%.2f) < Expt (%.2f)\n',FullV.t(end),te);
+    ts = Expt.Trials(1).Start./10000;
+    te = Expt.Trials(end).End./10000;
+    if FullV.t(1) > ts || FullV.t(end) < te
+        fprintf('ERROR!!!: FullV time range < Expt\n');
+        if X.logfid > 0
+            fprintf(X.logfid,'ERROR!!!: FullV time range (%.2f) < Expt (%.2f)\n',FullV.t(end),te);
+        end
     end
-end
-fprintf('Ex %d: %d Ch x %d samples %.1f (%.1f)- %.1f(%.1f)\n',ex,size(FullV.V,1), size(FullV.V,2),FullV.t(1),ts,FullV.t(end),te);
+    fprintf('Ex %d: %d Ch x %d samples %.1f (%.1f)- %.1f(%.1f)\n',ex,size(FullV.V,1), size(FullV.V,2),FullV.t(1),ts,FullV.t(end),te);
 else
     fprintf('Expt %d has no trials\n',ex);
     return;

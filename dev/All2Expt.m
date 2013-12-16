@@ -40,7 +40,7 @@ for j = 1:length(f)
 end
 
 uset = ismember([Expt.Trials.id],AllE.Spikes{id}.trialid);
-if length(uset) ~= length(AllE.Spikes{j}.trialid)
+if length(uset) ~= length(AllE.Spikes{id}.trialid)
     fprintf('Trial Id length mismatch');
 end
 

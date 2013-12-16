@@ -6,6 +6,12 @@ suff = [];
 addsuff = 0;
 crtrial = 0;
 addprobe = 0;
+
+if isempty(Expt)
+    expname = 'Empty';
+    return;
+end
+
 if isfield(Expt,'Trials')
     nt = length(Expt.Trials);
 end
@@ -58,7 +64,8 @@ end
         if isfield(Expt.Header,'rc') && Expt.Header.rc
             suff = 'RC';
         end
-        if isfield(Expt.Header,'explabel')
+%if Expt is a manual type, and explabel is set, use this        
+        if isfield(Expt.Header,'explabel') && length(Expt.Header.explabel) > 1 && ~isempty(strfind(Expt.Header.Options,'+exm'))
             exptypename = Expt.Header.explabel;
         end
     end

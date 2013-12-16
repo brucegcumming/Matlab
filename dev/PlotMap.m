@@ -12,6 +12,7 @@ name = 'RfMap';
 strings = [];
 tag = 'RfMap'; %need to change these.
 init = 0;
+
 MapDefs;
 
 if length(varargin) & isnumeric(varargin{1})
@@ -34,6 +35,7 @@ if ~isempty(toplevel)
   end
 else
     DATA.monkeynames = {'duf' 'ruf' 'ica' 'lem'};
+    DATA.useautomap = 0;
     DATA.tags.toplevel = tag;
     DATA.plot.area = 1;
     DATA.plot.labelpts = 1;
@@ -428,7 +430,7 @@ elseif monkey == ICARUS
   nextfile = '/bgc/bgc/anal/icarus/penlist';
   monkeyname = 'icarus';
 elseif monkey == LEMIEUX
-  mapfile = '/bgc/bgc/anal/lem/lem.fixtab';
+  mapfile = '/bgc/bgc/anal/lem/lem.rftable';
   missfile = '/bgc/bgc/anal/lem/missed.pens';
   nextfile = '/bgc/bgc/anal/lem/penlist';
   monkeyname = 'lem';
@@ -441,6 +443,10 @@ elseif monkey == DAE
 elseif monkey == TESTMAP
   mapfile = '/bgc//bgc/anal/maps/test.tab';
   missfile = '/bgc/bgc/anal/lem/missed.pens';
+end
+automapfile = strrep(mapfile,'.rftable','.fixtab');
+if DATA.useautomap || (~exist(mapfile) && exist(automapfile))
+    mapfile = automapfile;
 end
 DATA.monkey = monkey;
 if exist('bgcfileprefix','var')

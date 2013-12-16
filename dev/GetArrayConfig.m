@@ -275,7 +275,11 @@ Array = [];
 labels = {};
 match = [];
 Arrays = {};
-d = mydir('/bgc/group/arrays/*.mat');
+if ispc %for 2013b bug
+    d = mydir('\bgc/group/arrays/*.mat');
+else
+    d = mydir('/bgc/group/arrays/*.mat');
+end
 for j = 1:length(d)
     try
         load(d(j).name);

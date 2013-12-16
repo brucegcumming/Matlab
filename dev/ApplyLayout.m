@@ -47,7 +47,9 @@ if ~exist(layoutfile)
         mycprintf('errors','Cant read Layout %s\n',layoutfile);
         return;
 end
-
+if ispc && layoutfile(1) == '/'
+    layoutfile(1) = '\';
+end
 DATA.layoutfile = layoutfile;
 try
     load(DATA.layoutfile);

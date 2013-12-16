@@ -7,7 +7,11 @@ function res = InterpretLine(txt, varargin)
 
 res = [];
 
-if strncmp(txt,'RightHemi',9) || strncmp(txt,'Electrode',8)
+if txt(1) == ' '
+    txt = txt(2:end);
+end
+
+if sum(strncmp(txt,{'RightHem' 'Electrode'},8))
     id = strfind(txt,'Contact');
     if length(id)
         x = id(1);

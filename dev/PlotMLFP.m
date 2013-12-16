@@ -19,6 +19,7 @@ chscale = 0;
 needft = 0;
 stackoff = 0.05;
 plotlines = 0;
+calcresp = 0;
 timerange = [];
 freqs = 1:nfreq;
 yvals = [];
@@ -43,7 +44,13 @@ styles = {'-' '--' '-.' ':' '-' '--' '-.' ':' '-' '--' '-.' ':' '-' '--' '-.' ':
 styles = [styles(:); styles(:)];
 j = 1;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'image',4)
+    if strncmpi(varargin{j},'calcresp',4)
+        calcresp = 1;
+        if length(varargin) > j & isnumeric(varargin{j+1})
+            j = j+1;
+            calcfreq = varargin{j};
+        end
+    elseif strncmpi(varargin{j},'image',4)
         plottype = 2;
     elseif strncmpi(varargin{j},'check',4)
         checkdim = 1;
@@ -135,12 +142,14 @@ if Expt.Header.rc
     return;
 end
 
+if isfield(Expt.Trials,'lfpstart') %Utah grid
 for j = 1:length(Expt.Trials)
     if ~isnan(Expt.Trials(j).lfpstart);
         good(j) = true;
     end
 end
 Expt.Trials = Expt.Trials(good);
+end
 
 
 if isempty(et)
@@ -148,6 +157,9 @@ if isempty(et)
 end
 if isempty(eb)
     eb = GetEval(Expt,'e2');
+end
+if isempty(ec)
+    ec = GetEval(Expt,'e3');
 end
 
 
@@ -172,6 +184,11 @@ if isempty(extypes)
         extypes{2} = 'st';
     else
         extypes{2} = '';
+    end
+    if isfield(Expt.Trials,ec)
+        extypes{3} = ec;
+    else
+        extypes{3} = '';
     end
 end
 
@@ -276,11 +293,14 @@ for j = 1:length(extypes)
 end
 
 allids = {};
-for ii = 1:prod(env)
+if length(env) == 1
+    env(2) = 1;
+end
+for ii = 1:prod(env(2:end))
     [cx{:}] = ind2sub(env,ii);
     for j = 1:length(xvals)
         idx = find(xiv == xvals(j));
-        for k = 1:length(cx)
+        for k = 2:length(cx)
             id = find(vals{k} == uvals{k}(cx{k}));
             idx = intersect(idx,id);
         end
@@ -306,6 +326,13 @@ for ii = 1:prod(env)
 end
 
 result.ids = allids;
+if isfield(Expt.Header,'LFPfreq')
+    result.freqs = Expt.Header.LFPfreq(freqs);
+else
+    period = max(Expt.Header.LFPtimes)-min(Expt.Header.LFPtimes);
+    result.freqs = [1:length(Expt.Header.LFPtimes)]./period;
+    result.freqs = result.freqs(freqs);
+end
 
 if isempty(probes)
     probes = 1:size(lfpm,3);
@@ -320,7 +347,6 @@ if plottype == 1
             plot(squeeze(lfpm(k,j,:)),'color',colors{k});
             hold on;
         end
-
     end
 elseif plottype == 3
     for j = 1:size(LFP,2)
@@ -399,14 +425,19 @@ elseif plottype == 7  %CSD
 elseif plottype ==  9 % plot power vs expt var
     subplot(1,1,1);
     hold off;
-    if plotlines
+    if calcresp
+        fid = find(result.freqs > calcfreq(1) & result.freqs < calcfreq(2)) 
+        cresp = sum(lfpft(:,:,:,fid),4);
+        imagesc(squeeze(cresp));
+        labels = {};
+    elseif plotlines
         colors = mycolors;
         hold off;
         nl = 0;
         for j = 1:size(lfpft,1)
             sc = styles{1+mod(j-1,4)};
             for k = 1:size(lfpft,2)
-                [cx{:}] = ind2sub(env,j);
+                [cx{:}] = ind2sub(env,(j-1)*env(2)+k);
                 if alln(j,k) > 0
                     nl = nl+1;
                     result.(extypes{1})(nl) = uvals{1}(cx{1});
@@ -420,9 +451,9 @@ elseif plottype ==  9 % plot power vs expt var
                     result.n(nl) = alln(j,k);
                     result.sid(nl) = j;
                     if length(xvals) == 1
-                        plot(squeeze(mean(lfpft(j,k,probes,freqs),3)),'-','color',colors{j});
+                        plot(result.freqs,squeeze(mean(lfpft(j,k,probes,freqs),3)),'-','color',colors{j});
                     else
-                        plot(squeeze(mean(lfpft(j,k,probes,freqs),3)),'color',colors{k},'linestyle',sc);
+                        plot(result.freqs,squeeze(mean(lfpft(j,k,probes,freqs),3)),'color',colors{k},'linestyle',sc);
                     end
                     hold on;
                 end
@@ -432,7 +463,9 @@ elseif plottype ==  9 % plot power vs expt var
         set(gca,'yscale','log');
         axis('tight');
     else
-        imagesc(squeeze(resps(:,:,1)));
+        resps = squeeze(mean(mean(lfpft,1),2));
+        imagesc(resps(:,freqs));
+        labels = {};
     end
     lfpm = lfpft;
     result.alln = alln;
@@ -441,3 +474,4 @@ end
 
 result.Header = Expt.Header;
 result.Stimvals = Expt.Stimvals;
+result.extypes = extypes;

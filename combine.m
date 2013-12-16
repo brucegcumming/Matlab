@@ -3510,7 +3510,7 @@ end
                     if length(xcl)
                         for k = 1:length(DATA.AllClusters{j})
                             for c = 1:length(DATA.AllClusters{j}(k).excludetrialids)
-                            DATA.AllClusters{j}(k).excludetrialids{c} =  [DATA.AllClusters{j}(k).excludetrialids{c} xcl];
+                            DATA.AllClusters{j}(k).excludetrialids{c} =  [DATA.AllClusters{j}(k).excludetrialids{c}(:)' xcl];
                             end
                         end
                     end

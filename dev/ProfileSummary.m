@@ -16,11 +16,17 @@ while j <= length(varargin)
     j = j+1;
 end
 
+filenames = unique({P.FunctionTable.FileName});
+P.src{length(filenames)} = [];
+for j = 1:length(P.FunctionTable)
+    P.FunctionTable(j).fileid = find(strcmp(P.FunctionTable(j).FileName,filenames));
+end
 for j = 1:length(P.FunctionTable)
     F = P.FunctionTable(j);
     for k =1:length(fclist)
         if strfind(F.FunctionName,fclist{k})
-            ListLines(P.FunctionTable, j);
+            P = LoadSrc(P, j);
+            ListLines(P, j);
         end
     end
     selftime(j) = F.TotalTime - sum([F.Children.TotalTime]);
@@ -33,20 +39,31 @@ end
 for j = 1:min([10 length(b)])
     id = b(j);
     F = P.FunctionTable(b(j));
-    fprintf('Function %s (%d)  %.3f(%.3f):\n',F.FunctionName,id,a(j),sum(F.ExecutedLines(:,3)));
+    fprintf('Function %s (id %d, %d calls)  %.3f(%.3f):\n',F.FunctionName,id,F.NumCalls,a(j),sum(F.ExecutedLines(:,3)));
 end
 fprintf('Total selftime %.3f\n',sum(selftime));
 
+function P = LoadSrc(P, id)
+   srcid = P.FunctionTable(id).fileid;
+   if isempty(P.src{srcid})
+       P.src{srcid} = scanlines(P.FunctionTable(id).FileName);
+   end
 
-function ListLines(T, id)
+function ListLines(P, id)
 
+T = P.FunctionTable;
 F = T(id);
+src = P.src{F.fileid};
 
-fprintf('Function %s (%d)  %.3f(%.3f):\n',F.FunctionName,id,F.TotalTime-sum([F.Children.TotalTime]),sum(F.ExecutedLines(:,3)));
+fprintf('Function %s (%d)  %.3f(+%.3f=%.3f):\n',F.FunctionName,id,F.TotalTime-sum([F.Children.TotalTime]),sum([F.Children.TotalTime]),sum(F.ExecutedLines(:,3)));
 [a,b] = sort(F.ExecutedLines(:,3));
 b = b(a> 0);
 for j = 1:length(b)
-    fprintf('%s %d %d %.3f\n',F.FunctionName,F.ExecutedLines(b(j),1),F.ExecutedLines(b(j),2),F.ExecutedLines(b(j),3));
+    fprintf('%s %d %d %.3f',F.FunctionName,F.ExecutedLines(b(j),1),F.ExecutedLines(b(j),2),F.ExecutedLines(b(j),3));
+    if ~isempty(src)
+        fprintf('\t%s',src{F.ExecutedLines(b(j),1)});
+    end
+    fprintf('\n');
 end
 fprintf('Children:\n');
 for j = 1:length(F.Children)

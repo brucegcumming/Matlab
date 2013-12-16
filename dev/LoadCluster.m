@@ -15,12 +15,17 @@ function [AllClusters, AllFullVData, details] = LoadCluster(dirname, eid, vararg
 
 AllClusters = {};
 AllFullVData = {};
+getauto = 0;
 f = {'Evec' 'clst' 't'}; %fields to copy
 rawxy = 0;
 alltimes = 0;
 j = 1;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'getxy',5)
+    if strncmpi(varargin{j},'auto',5)
+        getauto = 1;
+    elseif strncmpi(varargin{j},'noauto',5)
+        getauto = -1;
+    elseif strncmpi(varargin{j},'getxy',5)
         f = {f{:} 'xy' 'triggerV'};
     elseif strncmpi(varargin{j},'rawxy',5)
         rawxy = 1;
@@ -30,13 +35,13 @@ while j <= length(varargin)
     end
     j = j+1;
 end
-ts = now;
 details = {};
 
 if ispc && dirname(1) == '/'
     dirname(1) = '\';
 end
 for j = 1:length(eid)
+    ts = now;
     e = floor(eid(j));
     if rem(eid(j),e) == 0.1
         xs = 'a';
@@ -47,7 +52,12 @@ for j = 1:length(eid)
     dname = [dirname '/Expt' num2str(e) xs 'ClusterTimesDetails.mat'];
     daname = [dirname '/Expt' num2str(e) xs 'AutoClusterTimesDetails.mat'];
     aname = [dirname '/Expt' num2str(e) xs 'AutoClusterTimes.mat'];
-    if exist(aname,'file')
+    if getauto > 0
+        dname = daname;
+        name = aname;
+    end
+        
+    if exist(aname,'file') && getauto >= 0
         load(aname);
         AutoClusters = Clusters;
         for p = 1:length(AutoClusters)
@@ -61,7 +71,9 @@ for j = 1:length(eid)
         AutoClusters = {};
     end
     if exist(name,'file')
+        tic;
         load(name);
+        details{j}.loaddur(1) = toc;
         details{j}.loadname = name;
         AllClusters{j} = Clusters;
         if exist('FullVData','var')
@@ -81,7 +93,8 @@ for j = 1:length(eid)
         return;
     end
     details{j}.loadtime = now;
-    ClusterDetails = LoadClusterDetails(name);
+    [ClusterDetails, CD] = LoadClusterDetails(name);
+    details{j}.loaddur = cat(2,details{j}.loaddur, CD.loaddur);
 
     for k = 1:length(ClusterDetails)
         if isfield(ClusterDetails{k},'ctime') && ...
@@ -159,7 +172,7 @@ for j = 1:length(eid)
             AllClusters{j}{k}.t = AllClusters{j}{k}.t';
         end
     end
-    details{j}.loadur = mytoc(ts);
+    details{j}.loaddur(end+1) = mytoc(ts);
 end
 
 if length(AllClusters) == 1

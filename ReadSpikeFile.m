@@ -1,4 +1,7 @@
 function Spikes = ReadSpikeFile(spkfile, varargin)
+%Spikes = ReadSpikeFile(spkfile, varargin)
+%    ....,'allprobes')  loads in other probes from xspk file
+%    ....,'double')  converts int to double 
 
 loadallspikes = 0;
 converttodouble = 0;

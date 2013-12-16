@@ -107,6 +107,7 @@ DATA.usenev = 0;
     DATA.densityplot = 0;
     DATA.alldensityplot = 0;
     DATA.plot.showspikeshapes = 0;
+    DATA.plot.showallxy = 0;
     DATA.plot.clusterXrange = [0 10];
     DATA.plot.clusterYrange = [0 1.5];
     DATA.plot.clusterZrange = [0 10];

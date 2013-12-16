@@ -22,7 +22,7 @@ checkseq = 0;
 checkrpts = 0;
 forcelen = 0;
 checkTimes = 1;
-chectrials = 0;
+checktrials = 0;
 readexpts = 0;
 checkepos=0;
 addfields = {'rw' 'mD' 'Dc'};
@@ -620,8 +620,10 @@ if checktrials
     fyid = strmatch('fy',txt);
     for j = 1:length(fid)
         a = sscanf(txt(fid(j),:),'R%*c %*2s=%f %*2s=%f');
+        x = split(txt(fid(j),:));
         s = regexprep(txt(fid(j),:),'.*st=none ','');
-        d = sscanf(s,'%f %f');
+        d(1) = sscanf(x{6},'%f');
+        d(2) = sscanf(x{7},'%f');
         Trials(j).Fa = a(1);
         Trials(j).Fs = a(2);
         Trials(j).id = fid(j);
@@ -638,16 +640,23 @@ if checktrials
             d = sscanf(txt(fxid(xid(end)),:),'fx%f');
             Trials(j).fx = d(1);
         end
+        xid = find(rwid < fid(j));
+        if ~isempty(xid)
+            d = sscanf(txt(rwid(xid(end)),:),'rw%f');
+            Trials(j).rw = d(1);
+        end
     end
     nt = j;
     for j = 1:length(bid)
-        if ~isempty(strfind(txt(bid(j),:),'st=none'))
+        if ~isempty(strfind(txt(bid(j),:),'st='))
             a = sscanf(txt(bid(j),:),'R%*c %*2s=%f %*2s=%f');
-            s = regexprep(txt(bid(j),:),'.*st=none ','');
-            d = sscanf(s,'%f %f');
+            s = regexprep(txt(bid(j),:),'.*st=[A-z]* ','');
+            x = split(txt(bid(j),:));
+            d(1) = sscanf(x{6},'%f');
+            d(2) = sscanf(x{7},'%f');
             xid = find(fid > bid(j));
             if ~isempty(xid)
-                s = regexprep(txt(fid(xid(1)),:),'.*st=none ','');
+                s = regexprep(txt(fid(xid(1)),:),'.*st=[A-z]* ','');
                 gd = sscanf(s,'%f %f');
                 gd = gd(1)-d(1); %
             else
@@ -677,6 +686,7 @@ if checktrials
             Trials(j+nt).Result = -1;
         end
         result.Trials = Trials;
+        result.totalrw = sum([Trials([Trials.Result] == 1).rw]);
     end
      return;
 end

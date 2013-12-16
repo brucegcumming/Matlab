@@ -37,6 +37,8 @@ end
         DATA.mcycle = [];
         xid = [];
         sumv = [];
+        
+        ts = now;
         if ~forcebuild
             doprobes = [];
             for (p = probes)
@@ -63,7 +65,7 @@ end
             end
         else
             for (p = probes)
-                [FullV, Arrays{p}] = BuildFullVProbe(DATA, Expts{e}, p);
+                [FullV, Arrays{p}] = BuildFullVProbe(DATA, Expts{e}, p, args{:});
                 if DATA.buildmean == 3
                     V = double(FullV.V);
                     if isempty(sumv)
@@ -91,6 +93,7 @@ end
                 sumv = BuildMeanV(DATA.idx.datdir,e,probes, 'save');
             end
             sumsq = sumv*sumv';
+            savedur(1) = 0;
             for p = probes
                 outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p' num2str(p) 'FullV.mat'];
                 X = load(outfile);
@@ -101,14 +104,16 @@ end
                 FullV.V = int16(FullV.V);
                 FullV.savetime(2) = now;
                 SaveFullV(outfile, FullV);
+                savedur(p) = mytoc(FullV.savetime(2));
             end
             MeanV.probes = probes;
             MeanV.savetime = now;
             if reloadmean == 0
-                fprintf('Saving %s\n',meanfile);
+                fprintf('Saving %s at %s',meanfile,datestr(now));
                 save(meanfile,'sumv','MeanV')
+                fprintf('Took %.2f sec\n',mytoc(MeanV.savetime));
             end
-            fprintf('Mean subtratction took %.1f at %s\n',mytoc(ts),datestr(now));
+            fprintf('Mean subtratction took %.1f (%1f writing) at %s\n',mytoc(ts),sum(savedur),datestr(now));
             comparenoise = 0;
             if comparenoise
             p = 1;
@@ -122,6 +127,7 @@ end
             plot(sumtrig,onetrig)
             end
         end
+        result.builddur = mytoc(ts);
 
 function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
      xid = [];

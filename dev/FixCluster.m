@@ -16,6 +16,9 @@ end
 
 if iscell(C)
     for j = 1:length(C)
+        if ~isfield(C{j},'probe')
+            C{j}.probe = j;
+        end
         [C{j}, err] = FixCluster(C{j},varargin{:});
         errs = {errs{:} err};
     end
@@ -41,6 +44,9 @@ if ~isfield(C,'auto')
     nerr = nerr+1;
     errs{nerr} = 'missingauto';
     C.auto = 0;
+end
+if ~isfield(C,'savetime')
+    C.savetime = [0 0];
 end
 if ~isfield(C,'exptno')
     nerr = nerr+1;

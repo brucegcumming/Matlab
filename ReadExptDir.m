@@ -1,5 +1,5 @@
 function [AllExpts, Ex] = ReadExptDir(name, varargin)
-% Expts = ReadExptDir(name, varargin)
+% [Expts, Idx] = ReadExptDir(name, varargin)
 % Read all SPike2 .mat files in a directory and combines the Expts lists
 % into one list
 %
@@ -49,7 +49,9 @@ sid = b(a> 0);
 for j = 1:length(sid)
     fprintf('Reading %s\n',d(sid(j)).name);
     [Ex{j}, Expts] = APlaySpkFile(d(sid(j)).name,'nospikes','noerrs', varargin{:});
-    AllExpts = {AllExpts{:} Expts{:}};
+    if ~isempty(Expts)
+        AllExpts = {AllExpts{:} Expts{:}};
+    end
 end
 
 for j = 1:length(Ex)

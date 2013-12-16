@@ -78,7 +78,11 @@ elseif ~loaded
             lfpfile = regexprep(expname,'([0-9])(\.[0-9]*)\.mat','$1A$2.lfp.mat');
         end
         if isempty(lfpfile)
-            lfpfile = [drive strrep(expname,'.mat','.lfp.mat')];
+            if strncmp(drive,expname,length(drive)) %already has drive in name
+                lfpfile = [strrep(expname,'.mat','.lfp.mat')];
+            else
+                lfpfile = [drive strrep(expname,'.mat','.lfp.mat')];
+            end
             if ~exist(lfpfile,'file')
                 lfpfile =  strrep(lfpfile,'.lfp.mat','A.lfp.mat');
             end

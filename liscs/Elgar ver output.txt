@@ -1,0 +1,13 @@
+------------------------------------------------------------------------------------------------
+MATLAB Version: 8.0.0.783 (R2012b)
+MATLAB License Number: 359834
+Operating System: Microsoft Windows 7 Version 6.1 (Build 7601: Service Pack 1)
+Java Version: Java 1.6.0_17-b04 with Sun Microsystems Inc. Java HotSpot(TM) Client VM mixed mode
+------------------------------------------------------------------------------------------------
+MATLAB                                                Version 8.0        (R2012b)
+Curve Fitting Toolbox                                 Version 3.3        (R2012b)
+Image Processing Toolbox                              Version 8.1        (R2012b)
+Optimization Toolbox                                  Version 6.2.1      (R2012b)
+Parallel Computing Toolbox                            Version 6.1        (R2012b)
+Signal Processing Toolbox                             Version 6.18       (R2012b)
+Statistics Toolbox                                    Version 8.1        (R2012b)

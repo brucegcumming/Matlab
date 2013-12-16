@@ -452,6 +452,7 @@ end
             Expts{j}.Header.expname,Expts{j}.Header.Start/10000);
     end
 if prebuild
+    ts = now;
     for e = gotexpts
         id = find(DATA.idx.expt == e);
         for suff = 1:length(id)
@@ -514,6 +515,7 @@ if prebuild
         end
         end
     end
+    DATA.prebuilddur = mytoc(ts);
 end
 
 DATA.prebuild = prebuild;

@@ -32,6 +32,10 @@ end
 stimtypes = {'none' 'gabor' 'rds' 'grating' 'bar' 'circle' 'rect' 'square' 'probe' ...
     '2grating' 'cylinder' 'corrug' 'sqcorrug' 'twobar' 'rls' 'annulus' 'rdssine' 'nsine' 'rlssine' 'radial' 'image' 'chacker'};
 
+if isempty(Expt)
+    tf = NaN;
+    return;
+end
 if strcmp(type,'probesep')
     [tf, tflist] = ReadPenSep(Expt.Header);
     return;
@@ -63,7 +67,11 @@ if(isfield(Expt.Trials,type))
   if length(Expt.Trials(1).(type)) > 1
       x = [];
       for j = 1:length(Expt.Trials)
+          if ischar(Expt.Trials(j).(type))
+              x{j} = Expt.Trials(j).(type);
+          else
           x = [x; Expt.Trials(j).(type)];
+          end
       end
   else
       x = cat(1,Expt.Trials.(type));
@@ -80,6 +88,9 @@ if(isfield(Expt.Trials,type))
   tflist = sort(unique(x(:)));
   if tnum > 0 && tnum <= length(Expt.Trials)
       tf = Expt.Trials(tnum).(type);
+  elseif iscellstr(x)
+       [a,b] = Counts(x);     
+      tf = b{1};
   elseif(getmode == 1)
     tf = mode(x(:));
   elseif(getmode == 2)

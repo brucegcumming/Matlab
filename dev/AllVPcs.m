@@ -1,4 +1,4 @@
-function res = AllVPcs(V, varargin)
+function [res, varargout] = AllVPcs(V, varargin)
 %AllVPcs(V, ...)  takes an MxN matrix (electrode by voltage) of continuous
 %voltages, extracts segments triggered off one row, and plots PCS.
 %  V can also be a filename of a FullV file.  Will only load if new. 
@@ -119,7 +119,10 @@ DATA.plotspk.showmean = 0;
 DATA.plotspk.showfullv = 0;
 DATA.plotspk.nfullvprobes = 1;
 DATA.plotspk.includeprepost = 0;
+DATA.plotspk.oneprobe = 0;
+
 DATA.savetrigger = 0;
+DATA.cutmode = 'manual';
 
 DATA.plottype = 1;
 DATA.hanldes = [];
@@ -157,6 +160,8 @@ DATA.layoutfile = [];
 DATA.configfile = [];
 DATA.plot.isi = 0;
 DATA.plot.xyseq = 0;
+DATA.plot.vare = 0; %Show Var/Energy  plot
+DATA.plot.covar = 0; %plot covariance matrix
 DATA.plot.xcorrprobes = 0;
 DATA.subtractmeanV = 0;
 DATA.isicheck = [20 3];
@@ -191,6 +196,7 @@ DATA.auto.replotcluster = 0;
 DATA.auto.checkcluster = 1;
 DATA.auto.showxysaved =0;
 DATA.auto.quickcut=0;
+DATA.auto.trigstats = 0;
 DATA.checkclusters = 1;
 DATA.check.dropi = [0 2.5];
 DATA.probelabel = [];
@@ -399,6 +405,9 @@ while j <= length(varargin)  %some varags must be parsed first
     elseif strncmp(varargin{j},'noninteract',7)
         DATA.interactive = -1;
         DATA.checkclusters = 0;
+        DATA.auto.trigstats = 1;
+    elseif strncmpi(varargin{j},'trigstats',6)
+        DATA.auto.trigstats = 1;
     elseif strncmpi(varargin{j},'toplevel',6)
         j = j+1;
         DATA.toplevel = varargin{j};
@@ -497,6 +506,7 @@ if ischar(V)
             DATA.name = X.name;
             DATA.interval = X.interval;
             DATA.fullvname = X.fullvname;
+            newdata = 2;
         elseif strcmp(a,b) && isappdata(toplevel,'Vall')
             DATA = GetGuiState(DATA, toplevel);
             if verbose > 1
@@ -717,7 +727,7 @@ elseif isfigure(V)
     DATA = get(V,'UserData');
     Vall = mygetappdata(DATA,'Vall');
     vt = DATA.t;
-
+    newdata = 2;
 elseif ~isfield(DATA,'name')
     Vall.V = V;
     newdata = 1;
@@ -1111,7 +1121,7 @@ while j <= length(varargin)
     elseif strncmp(varargin{j},'tryall',5)
         tryall = ones(size(csds));
     elseif strncmp(varargin{j},'tchan',5)
-        if strncmp(varargin{j},'tchannew',7)
+        if strncmp(varargin{j},'tchannew',7) || newdata == 2 %set earlier
             newdata = 2;
             DATA = ResetDataForNewProbe(DATA);
         else
@@ -1247,6 +1257,8 @@ while j <= length(varargin)
                 DATA.cluster.TemplateUsed =  circshift(DATA.cluster.TemplateUsed,pshift);
                 end
                 DATA.cluster.probe = ispk(1);
+                DATA.cluster.chspk = DATA.cluster.chspk+pshift;
+                DATA.cluster.chspk = DATA.cluster.chspk(DATA.cluster.chspk >0 & DATA.cluster.chspk <= DATA.allnprobes); 
                 p = size(DATA.cluster.MeanSpike.vdprime,1);
                 if pshift > 0 && p > 2
                     DATA.cluster.MeanSpike.vdprime(p+pshift-2:p+pshift,:) = DATA.cluster.MeanSpike.vdprime(p-2:p,:);
@@ -1356,7 +1368,7 @@ while j <= length(varargin)
          else
             DATA.trigdt = 1;
          end
-    elseif strncmp(varargin{j},'triggertemplate',3)
+    elseif strncmp(varargin{j},'triggertemplate',10)
         if strncmp(varargin{j},'triggertemplatedt',17)
             DATA.trigdt = 5;
         else
@@ -1714,9 +1726,11 @@ if newdata %things to reset if its a new file, OR just a new probe
         end
         end
         end
-        DATA = LoadCellFile(DATA);
-        AddCellMenu(DATA);
-        DATA = LoadComments(DATA);
+        if newdata == 1
+            DATA = LoadCellFile(DATA);
+            AddCellMenu(DATA);
+            DATA = LoadComments(DATA);
+        end
         if DATA.auto.uselastcluster && length(DATA.LastClusters) >= DATA.probe(1)
             DATA.cluster = DATA.LastClusters{DATA.probe(1)};
             forcecluster = 1;
@@ -1755,7 +1769,8 @@ if DATA.logfid > 0
     end
 end
 
-if newdata == 1 && isfield(DATA,'name');
+
+if newdata > 0  && isfield(DATA,'name');
     DATA.msg = {};
     DATA.plotspk.subtrigger = 0;
     DATA.plotspk.submean = 0;
@@ -1766,17 +1781,19 @@ if newdata == 1 && isfield(DATA,'name');
 
     DATA.currenttrial = 1;
     DATA.plotspk.muscale = muscale;
-    DataClusters = {};
-    DATA.clst = [];
-    tt = TimeMark(tt, 'Loading Clusters ', DATA.profiling);
-    DataClusters = LoadDataClusters(DATA);
-elseif newdata == 2 %%Keep DataClusters if newdata == 2 - new probe
+    if newdata == 1 %%Keep DataClusters if newdata == 2 - new probe
+        DataClusters = {};
+        DATA.clst = [];
+        tt = TimeMark(tt, 'Loading Clusters ', DATA.profiling);
+        DataClusters = LoadDataClusters(DATA);
+    end
+elseif newdata == 2 
 else
     DataClusters = {};
 end
 tt = TimeMark(tt, 'Loaded Clusters ', DATA.profiling);
 
-if newdata == 1 || autocutone;
+if newdata || autocutone;
     if spkrate && setnspk == 0
        setnspk = round(DATA.duration .* spkrate);
     else
@@ -1907,6 +1924,9 @@ if recluster
     end
 else
     DATA.recluster = 0;
+    if setnspk == 0
+        setnspk = round(spkrate .* DATA.duration);
+    end
 end
 
 if ~isfield(DATA,'cluster') || ~ClusterIsSet(DATA.cluster, DATA.currentcluster)
@@ -2034,7 +2054,8 @@ if DATA.trigdt
 end
 DATA.triggersmooth = smoothsd;
 DATA.triggerchan = ispk;
-
+DATA.cluster.trigparams.preperiod = DATA.preperiod;
+DATA.cluster.trigparams.postperiod = DATA.postperiod;
 
 if smoothv && newdata
     for j = 1:size(Vall.V,1)
@@ -2087,7 +2108,7 @@ elseif recluster == 2
     if forcecluster == 0 && isfield(DataClusters{p},'Evec')
         DATA.cluster.Evec = DataClusters{p}.Evec;
     end
-    mysetappdata(DATA,'Custers',DataClusters);
+    DATA = mysetappdata(DATA,'Custers',DataClusters);
     end
     if oldxyloaded && length(DATA.trigtimes) >= DATA.probe(1)
         SetFigure(DATA.tag.oldxy, DATA);
@@ -2159,6 +2180,8 @@ else
     DATA.thsign = thsign;
     if setnspk > 0
         DATA.setnspk = setnspk;
+    elseif DATA.spkrate > 0
+        DATA.setnspk = 0;
     end
     if recluster == 1 && matcheventcounts
         DATA.Trigger = 0;
@@ -2184,6 +2207,7 @@ else
         end
     end
     DATA.cluster.eventrate = D.nevents./length(smv);
+    DATA.cluster.trigparams = CopyFields(DATA.cluster.trigparams,D,{'skew' 'roc' 'qq'});
 end
 tt = TimeMark(tt,'End Trig', DATA.profiling);
 if spkrate > 0
@@ -2278,7 +2302,7 @@ end
 
 
 if checklast == 2 || keeptrigger
-    setappdata(DATA.toplevel,'TriggerV',smv);
+    DATA = mysetappdata(DATA,'TriggerV',smv);
 end
 
 clear smv;
@@ -2625,7 +2649,7 @@ if length(ispk) == 1
            0 5 0 16; ...
            0 12 0 20];
 end
- if newdata == 1
+ if newdata == 1 || ~isfield(DATA,'vspace')
     DATA.tmplots(1,:) = [1 3];
     DATA.tmplots(2,:) = [1 4];
     DATA.tmplots(3,:) = [1 2];
@@ -2668,8 +2692,8 @@ end
     DATA.restricttimerange = [];
     DATA.excludetrialids = [];
     DATA.selectprobe = zeros(1,DATA.nprobes);
-
  end
+ 
 DATA.minenergy = minenergy;
 DATA.minvar = minvar;
 DATA.energy = [];
@@ -2684,12 +2708,20 @@ if nprobepc < 0
 elseif loadfromspikes
     DATA.chspk = DataClusters{DATA.probe(1)}.chspk;
 elseif ismember(recluster,[1 2]) && isfield(DATA.cluster,'chspk')
-    DATA.chspk = DATA.cluster.chspk;
+    if ~strncmp(DATA.DataType,'Grid',4)
+        dp = ispk(1) - DATA.cluster.probe(1); %happens if apply cluster from another probe
+    else
+        dp = 0;
+    end
+    DATA.chspk = DATA.cluster.chspk+dp;    
 else
     if size(AllV,1) ==1
         nprobepc = 0;
     end
     DATA.chspk = SetProbesToUse(DATA, ispk, nprobepc);
+    if ~isfield(DATA.cluster,'chspk')
+        DATA.cluster.chspk = DATA.chspk;
+    end
 end
 
 np = size(AllV,1);
@@ -2859,19 +2891,16 @@ res.chspk = DATA.chspk;
 res.memsz = [0 DATA.fullvsize];
 str = 'manual';
 if saveautocut || autocutone
-    str = 'auto';
+    str = 'auto';    
 end
+DATA.cutmode = str;
 if verbose
     fprintf('Making Cut %s %s (%.1f) (%s)\n',IDStr(DATA),datestr(now,'HHMM:ss'),mytoc(tt(1).time),ClusterFile(DATA.name,DATA.Expt,str,'subdir',DATA.clustersubdir));
 end
 
 F = SetFigure(DATA.tag.top,DATA);
 DATA.toplevel = F;
-if DATA.interactive >= 0
-    setappdata(F,'AllV',AllV);
-else
-    DATA.AllV = AllV;
-end
+DATA =  mysetappdata(DATA,'AllV',AllV);
 
 if saveautocut == 1
     [E, res.cluster] = CutAndSave(DATA,'refine');
@@ -3092,8 +3121,11 @@ elseif autocutone == 2
         if (ismember(recluster,[1 2]) || forceevec) && clusterspace == 1
             
             if isfield(DATA.cluster,'Evec') && (recluster == 2 || forceevec) %recalssify used old PCs. 
-            [a,DATA.Evec, DATA.pcs] = CalcPCs(DATA, AllV, DATA.nprobepc, DATA.cluster.Evec);
-            DATA.cluster.forceevec = 1;
+                if ~isfield(DATA.cluster.Evec,'chspk')
+                    DATA.cluster.Evec.chspk = DATA.cluster.chspk;
+                end
+                [a,DATA.Evec, DATA.pcs] = CalcPCs(DATA, AllV, DATA.nprobepc, DATA.cluster.Evec);
+                DATA.cluster.forceevec = 1;
             elseif loadfromspikes == 0
 %When do we need to do this?  SHould have been done above?  ?? for rclassify                
             [a,DATA.Evec, DATA.pcs(DATA.uid,:)] = CalcPCs(DATA, AllV, DATA.nprobepc);
@@ -3137,7 +3169,9 @@ elseif autocutone == 2
     flipstr = [];
     flip = 1;
     DATA.cluster = CheckScoreScaling(DATA, DATA.cluster);
-    if DATA.cluster.shape > 0 %not an ellipse - check sign
+    if DATA.cluster.auto && strcmp(DATA.cluster.automode,'james')
+        DATA.autocutmode = 'james';
+    elseif DATA.cluster.shape > 0 %not an ellipse - check sign
         if DATA.cluster.crit < 0
             ncut = sum(DATA.xy{1}(DATA.uid,1) < DATA.cluster.crit);
             nalt =  sum(DATA.xy{1}(DATA.uid,1) > -DATA.cluster.crit);
@@ -3218,7 +3252,7 @@ elseif autocutone == 2
 
     %if an error messed up the classification, don't copy meanspike
     res.cluster = SmallCluster(DATA.cluster);
-    ReplotPCs(DATA,[]);
+    ReplotPCs(DATA,[],'tofront');
     if recluster ~= 1 %will have been called in ClassifySpikes
         PlotTriggerHist(DATA,DATA.cluster);
     end
@@ -3594,7 +3628,7 @@ if DATA.csd && DATA.interactive >= 0
 end
 
 
-if DATA.interactive >= 0
+if DATA.interactive >= 0 && DATA.plot.covar
 SetFigure(DATA.tag.covar, DATA);
 imagesc(C);
 end
@@ -3654,21 +3688,19 @@ end
 
 
 DATA.MeanSpike = PlotMeanSpike(DATA,'recalc');
-SetFigure(DATA.tag.vare, DATA);
-hold off;
-c = DATA.probe(1);
-plot(DATA.energy(1,:),DATA.spkvar(c,:)./DATA.energy(1,:),'.');
+if DATA.interactive >= 0
+    SetFigure(DATA.tag.vare, DATA);
+    hold off;
+    c = DATA.probe(1);
+    plot(DATA.energy(1,:),DATA.spkvar(c,:)./DATA.energy(1,:),'.');
+    set(DATA.toplevel,'UserData',DATA);
+    ShowTaggedProbes(DATA);
 
 
-           
-set(DATA.toplevel,'UserData',DATA);
-ShowTaggedProbes(DATA);
-
-
-
-SetFigure(DATA.tag.spikes, DATA);
-DATA.plotdvdt = 0;
-PlotSpikes(DATA,1:100);
+    SetFigure(DATA.tag.spikes, DATA);
+    DATA.plotdvdt = 0;
+    PlotSpikes(DATA,1:100);
+end
 
 if oldscores & ~isempty(DataClusters{DATA.probe(1)})
     DATA = CalcTemplatesFromMean(DATA, DataClusters{DATA.probe(1)}.MeanSpike);
@@ -3722,8 +3754,15 @@ if ~isfield(DATA.cluster,'next')
     DATA.cluster.next = {};
 end
 DATA = CloseLog(DATA);
-set(F,'UserData',DATA);
-
+if F > 0
+    set(F,'UserData',DATA);
+end
+if nargout > 2
+    Clusters = mygetappdata(DATA,'Clusters');
+    ClusterDetails = mygetappdata(DATA,'ClusterDetails');
+    varargout{1} = Clusters{ProbeNumber(DATA)};
+    varargout{2} = ClusterDetails{ProbeNumber(DATA)};
+end
 SetGUI(DATA);
 
 function DATA = mysetappdata(DATA, str, val)
@@ -3751,11 +3790,16 @@ function [AllV, DATA] = BuildAllV(DATA, id, spts)
     if isinteger(AllV)
         AllV = double(AllV) .* V.intscale(1)/V.intscale(2);
     end
-    mysetappdata(DATA,'AllV',AllV);
+    DATA = mysetappdata(DATA,'AllV',AllV);
     if isfield(V,'meanV')
         DATA.meanV = V.meanV(allid);
-        mysetappdata(DATA,'MeanV',DATA.meanV);
+        DATA = mysetappdata(DATA,'MeanV',DATA.meanV);
     end
+    DATA.energy = [];
+    DATA.spkvar = [];
+    DATA.energy(1,:) = sqrt(squeeze(sum(diff(AllV(DATA.probe(1),:,:),1,2).^2,2)));
+    DATA.spkvar(DATA.probe(1),:) = squeeze(std(AllV(DATA.probe(1),:,:),[],2));
+    DATA.nevents = size(AllV,3);
 
 function val = myisappdata(DATA,str)
 if DATA.interactive < 0
@@ -3949,8 +3993,8 @@ function [DataClusters, FullVData] = LoadDataClusters(DATA)
         end
     end
     id = find(useauto);
-    for j = 1:length(id)
-        fprintf('Using AutoCluster for probe %d\n',id(j));
+    if ~isempty(id)
+        fprintf('Using AutoCluster for probe%s\n',sprintf(' %d',id));
     end
     for j = 1:length(DataClusters)
         if isfield(DataClusters{j},'next') && ~iscell(DataClusters{j}.next) %old style
@@ -4059,7 +4103,7 @@ if size(Vall.V,1) == 1 && ispk == 0
     end
     newdata = 1;
 end
-if newdata == 1
+if newdata > 0
     DATA.duration = size(Vall.V,2) .* DATA.interval;
 end
 
@@ -4207,7 +4251,11 @@ function [DATA, ClusterDetails] = LoadClusterDetails(DATA, varargin)
         return;
         end
     end
-    cfile = ClusterFile(DATA.name,DATA.Expt,'details');
+    if strcmp(DATA.cutmode,'auto')
+        cfile = ClusterFile(DATA.name,DATA.Expt,'details','auto');
+    else
+        cfile = ClusterFile(DATA.name,DATA.Expt,'details');
+    end
     if exist(cfile)
         load(cfile);
         if ~isempty(ClusterDetails)
@@ -4336,9 +4384,11 @@ end
         else
             DataClusters{p}.Evec = ClusterDetails{p}.Evec;
         end
-        if ~isfield(DataClusters{p}.Evec,'chspk')
+        if ~isfield(DataClusters{p}.Evec,'chspk') 
             cprintf('blue','probe %d Evec missing chspk\n',p);
-            DataClusters{p}.Evec.chspk = DataClusters{p}.chspk;
+            if isfield(DataClusters{p},'chspk')
+                DataClusters{p}.Evec.chspk = DataClusters{p}.chspk;
+            end
         end
     end
     DATA.xy{1} = xys{p};
@@ -4386,12 +4436,15 @@ th = DATA.Trigger;
 for j = 1:size(rV,1)
     sgn(j,:) = diff(sign(diff(rV(j,:),1,2)),1,2);
 end
-id = find(sgn ~= 0)+1; %extrema
-details.skew = skewness(rV(id));
-steps = [50 40 10 1 0.1 0.01 0];
-x = prctile(rV(id),steps);
-y = prctile(rV(id),100 - steps);
-details.roc = trapz(abs(x),abs(y))./max(abs([x y])).^2;
+if DATA.auto.trigstats
+    id = find(sgn ~= 0)+1; %extrema
+    details.skew = skewness(rV(id));
+    steps = [50 40 10 1 0.1 0.01 0];
+    x = prctile(rV(id),steps);
+    y = prctile(rV(id),100 - steps);
+    details.roc = trapz(abs(x),abs(y))./max(abs([x y])).^2;
+    details.qq = cat(1,x,y);
+end
 id = [];
 if th(1) < 0
 %    id = find(sgn(1,:) > 0)+1;
@@ -4401,6 +4454,9 @@ elseif th(1) > 0
     id = find(sgn(1,:) < 0 & rV(2:end-1) > th(1))+1;
 else
     autoth = 1;
+    if DATA.setnspk <= 0
+        DATA.setnspk = DATA.spkrate .* DATA.duration;
+    end
 end
 nv = length(id);
 if isempty(id)
@@ -4478,20 +4534,50 @@ if DATA.trigdt == 3  && DATA.thsign < 2 %spk energy trigger. Not alighn to peak 
     end
 end
 
+function [res, C,D] = AutoCutOne(DATA, exname, ispk, args)
+    istart = now;
+    name = regexprep(exname, '\.p[0-9]*',sprintf('.p%d',ispk));
+    toplevel = DATA.toplevel;
+    if strcmp(DATA.autocutmode,'james')
+        [res,C,D] =  AllVPcs(name ,'nowatch',args{:},'tchan',ispk,'logfid',DATA.logfid,'automode','james','toplevel',toplevel);
+    elseif strcmp(DATA.autocutmode,'quick')
+        [res, C,D] =  AllVPcs(name ,'nowatch',args{:},'tchan',ispk,'logfid',DATA.logfid,'Expt',DATA.Expt,'quickauto','toplevel',toplevel);
+    else
+        [res, C,D] =  AllVPcs(name ,'nowatch',args{:},'tchan',ispk,'logfid',DATA.logfid,'saveautocut','toplevel',toplevel);
+    end
+    
+
 function res = AutoCutAll(ispk, toplevel, Vall,DATA, args)
     quickfollow = 0;
     maxthriter = 1;
     nolog = 0;
+    parallel = 0;
+    savearg = 0;
     j = 1;
     while j <= length(args)
         if strncmpi(args{j},'quickfollow',8)
             quickfollow = 1;
+        elseif strncmpi(args{j},'parallel',5)
+            parallel = 1;
+        elseif strncmpi(args{j},'savespikes',5)
+            savearg = j;
         elseif strncmpi(args{j},'nolog',5)
             nolog = 1;
         end
         j = j+1;
     end
+    ts = now;
     DataClusters = mygetappdata(DATA,'Clusters');
+    dname = ClusterFile(DATA.name, DATA.Expt, 'auto');
+    if exist(dname)
+        load(dname);
+    else
+        FullVData = MakeFullVInfo(Vall);
+    end
+    dname = ClusterFile(DATA.name, DATA.Expt, 'auto','details');
+    if exist(dname)
+        load(dname);
+    end
     autofit = DATA.autofit;
     if length(ispk) < 3 && 0 %what was this for
         ispk = 1:size(Vall.V,1);
@@ -4512,17 +4598,34 @@ function res = AutoCutAll(ispk, toplevel, Vall,DATA, args)
     PrintMsg(logfid,'Start on %s at %s\r\n',name,datestr(now));
     if size(Vall.V,1) == 1 && strncmp(DATA.DataType,'Grid',4)
         exname = Vall.loadname;
-        for j = 1:length(ispk)
-            istart = now;
-            name = regexprep(exname, '\.p[0-9]*',sprintf('.p%d',ispk(j)));
-            if strcmp(DATA.autocutmode,'james')
-                res.cls{j} =  AllVPcs(name ,'nowatch',args{:},'tchan',ispk(j),'logfid',logfid,'automode','james','toplevel',toplevel);
-            elseif strcmp(DATA.autocutmode,'quick')
-                res.cls{j} =  AllVPcs(name ,'nowatch',args{:},'tchan',ispk(j),'logfid',logfid,'quickauto','toplevel',toplevel);
-            else
-                res.cls{j} =  AllVPcs(name ,'nowatch',args{:},'tchan',ispk(j),'logfid',logfid,'saveautocut','toplevel',toplevel);
+        if parallel
+            DATA.logfid = -1;
+            DATA.savespikes = 3;
+        else
+            DATA.logfid = logfid;
+        end
+        if parallel
+            if savearg %don'w write clustertimes file in parallel
+                args{savearg} = 'savespikesonly';
             end
-            res.cls{j} = rmfields(res.cls{j},'pcs','t');
+            args{end+1} = 'nolog';
+            parfor j = 1:length(ispk)
+                [res, X{j}, Y{j}] =  AutoCutOne(DATA, exname, ispk(j), args);
+            end
+            for j = 1:length(ispk)
+                Clusters{ispk(j)} = X{j};
+                ClusterDetails{ispk(j)} = Y{j};
+            end
+            name = ClusterFile(DATA.name,DATA.Expt,'auto');
+            fprintf('Took %.2f. Saving Clusters to %s\n',mytoc(ts),name)
+            save(name,'Clusters','FullVData');
+            save(ClusterFile(DATA.name,DATA.Expt,'auto','details'),'ClusterDetails','FullVData');
+            res.Clusters = Clusters;
+            return;
+        else
+        for j = 1:length(ispk)
+           res =  AutoCutOne(DATA, exname, ispk(j), args);
+        end
         end
         DATA = get(toplevel,'UserData');
         DATA.logfid = -1;
@@ -4720,7 +4823,7 @@ function C = CheckForMean(DATA,C)
 function DATA = ReClassify(DATA, varargin)
     newbound = 0;
     fittemplate = 0;
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     
     j = 1; 
     while j <= length(varargin)
@@ -5073,7 +5176,7 @@ function DATA = NextPCs(DATA)
    
     DATA.hidecluster = 2;
     DATA.currentcluster = 2;
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     cid = find(DATA.clst == DATA.hidecluster);
     DATA.uid = find(DATA.clst ~= DATA.hidecluster & DATA.clst > 0);
     [C, DATA.Evec, pcs, dip, chspk, errs, DATA.pcfit] = CalcPCs(DATA,AllV,DATA.nprobepc);
@@ -5083,7 +5186,7 @@ function DATA = NextPCs(DATA)
     DATA = ReplotPCs(DATA,[]);
     
 function DATA = SetPCs(DATA, replot)
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     [C, DATA.Evec, pcs, dip, chspk, errs, DATA.pcfit] = CalcPCs(DATA, AllV,DATA.nprobepc);
     DATA.errs = {DATA.errs{:} errs{:}};
     DATA.pcs(DATA.uid,1:size(pcs,2)) = pcs;
@@ -5093,7 +5196,7 @@ function DATA = SetPCs(DATA, replot)
 
 function DATA = CalcICA(DATA,ns)    
     
-AllV = GetAllV(DATA);
+AllV = mygetappdata(DATA,'AllV');
 chspk = DATA.chspk;
 uid = DATA.uid;
 if DATA.csd 
@@ -5290,7 +5393,7 @@ end
 function OldPlotFullV(V, ispk, DATA)
 
 SetFigure('FullV');
-AllV = GetAllV(DATA);
+AllV = mygetappdata(DATA,'AllV');
 hold off;
 y = 0;
 for p = 1:length(ispk)
@@ -5817,7 +5920,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
                 savexy = 0;
             end
         end
-    elseif savexy > 0 && exist(dname,'file') %don't overwrite if missing some cells
+    elseif savexy > 0 && exist(dname,'file') && exist('ClusterDetails','var') %don't overwrite if missing some cells
         savexy = 0;
     end
     if savexy > 0 && ~exist('ClusterDetails','var')
@@ -5872,9 +5975,6 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         a(2) = 0;
     end
     DATA.savespkid = DATA.uid;
-    if DATA.savespikes == 3 %just save spikes
-        return;
-    end
     fprintf('Saving (%s)/%d Spikes (P%d) to %s\n',sprintf('%d ', a(2:end)),length(DATA.uid),p,outname);
 % ClusterDetails records all event times, and the classification (clst)
 %Clusters just has the times of the classified  events = smallest file ffor
@@ -5986,7 +6086,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         Clusters{p}.vspace = DATA.vspace;
     end
     end
-    if isfield(DATA,'jamescluster') && strcmp(DATA.cluster.automode,'james')
+    if isfield(DATA,'jamescluster') && strcmp(DATA.autocutmode,'james')
         Clusters{p}.jamescluster = DATA.jamescluster;
     end
     if DATA.checkclusters
@@ -6071,7 +6171,7 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
         id = [];
     end
     
-    if quickmode
+    if quickmode || DATA.savespikes == 3
         DataClusters{p} = Clusters{p};
     end
     Clusters{p}.savetime(2) = now;
@@ -6147,23 +6247,18 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
             FullVData = [];
         end
     else
-        f = {'submean', 'usealltrials' 'builddate' 'samper' 'missedtrials' 'blklen' 'blkstart'};
-        for j = 1:length(f)
-            if isfield(Vall,f{j})
-            FullVData.(f{j}) = Vall.(f{j});
-            end
-        end
-        f = {'highpass' 'coilnoiseratio'};
-        for j = 1:length(f)
-            if isfield(Vall,f{j})
-                FullVData.(f{j}) = Vall.(f{j});
-                Clusters{p}.(f{j}) = Vall.(f{j});
-            end
-        end
+        FullVData = MakeFullVInfo(Vall);
+        DATA.FullVData = FullVData;
     end
+    Clusters{p} = CopyFields(Clusters{p},FullVData,{'coilnoiseratio','highpass'});
     FullVData = rmfields(FullVData,'meanV'); %just in case - lots of space
-    if savexy > 0
+    if savexy > 0 && DATA.savespikes ~= 3
+        if strcmp(DATA.autocutmode,'james')
+            ClusterDetails{p} = CondenseDetails(ClusterDetails{p});
+        end
         save(dname,'ClusterDetails','FullVData');
+    else
+        DATA = mysetappdata(DATA,'ClusterDetails',ClusterDetails);
     end
     Clusters{p}.savetime(3) = now;
 
@@ -6175,6 +6270,10 @@ function [DATA, id] = SaveClusters(DATA, outname,varargin)
             end
         end
         DATA.LastClusters{p} = Clusters{p};
+    end
+    if DATA.savespikes ==3
+        DATA = mysetappdata(DATA,'Clusters',Clusters);
+        return;
     end
     if DATA.auto.backupcluster && exist(outname)
         [a,b,c] = fileparts(outname);
@@ -6280,6 +6379,9 @@ function name = SpkFileName(DATA, varargin)
         xs = 'a';
     end
     name = sprintf('%s/%s.p%dt%d%s.mat',spkdir,b,p,floor(DATA.Expt.exptno),xs);
+    if strcmp(namemode,'checkauto') && ~exist(name,'file') %onlye write to spikes if not there already
+        name = sprintf('%s/%s.p%dt%d%s.mat',spkdir,b,p,floor(DATA.Expt.exptno),xs);
+    end
         
 function probe = ProbeNumber(DATA)
 % ProbeNumber returns Real Probe number
@@ -6304,7 +6406,7 @@ function SaveSpikes(DATA, id, name)
     if isempty(id)
         return;
     end
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     a = fileparts(name);
     if ~exist(a,'dir')
         mkdir(a);
@@ -6378,53 +6480,14 @@ function [E, cluster] = CutAndSave(DATA, varargin)
         j = j+1;
     end
     if strcmp(DATA.autocutmode,'james')
-        [D, Scores, sum_fig]   = JamesAutoCut(DATA,'retrigger');
+        [DATA, D]   = JamesAutoCut(DATA,'retrigger');
         [AllV, DATA] = BuildAllV(DATA, D.spk_inds(D.uids)', D.params.spk_pts);
-        DATA.uid = 1:length(D.spike_clusts);
-        DATA.clst = D.spike_clusts;
-        Tv = mygetappdata(DATA,'TriggerV');
-        Vall = mygetappdata(DATA,'Vall');
-        DATA.rV = Tv(D.spk_inds);
-        DATA.t = Vall.t(D.spk_inds);
-        DATA.xy{1} = D.spike_xy;
-        if(1)
-            X.Vtime = Vall.t;
-            X.Fs = 40000;
-            X.V = double(Vall.V').*Vall.intscale(1)/Vall.intscale(2);
-            Spikes.V = permute(AllV,[3 2 1]);
-            Spikes.times = DATA.t;
-            Spikes.trig_vals = DATA.rV';
-            Spikes.trig_thresh = D.trig_thresh;
-            Di = rmfields(D,{'spk_inds' 'uids' 'times' 'spike_clusts' 'spike_xy'});
-            apply_clustering(X, Di, Di.params, 0, []);
-        end
-        DATA.jamescluster = Di;
-        C = DATA.cluster;
-        C.next = {};
-        C.probe = DATA.probe;
-        C.space = [10 1 2];
-        C.chspk = DATA.chspk;
         outname = ClusterFile(DATA.name,DATA.Expt,'auto','subdir',DATA.clustersubdir);
-        C.auto  = 2;
-        C.automode = DATA.autocutmode;
-        C.Trigger = D.trig_thresh;
-        C.MeanSpike = PlotMeanSpike(DATA,'recalc');
-        C.bmc = 0;
-        C.mahal(1) = D.dprime;
-        C.mahal(2) = D.iso_dists(1);
-        C.mahal(3) = D.Lratios(1);
-        C.mahal(4) = D.Lratios(1);
-        for j = 2:length(D.Lratios)
-            C.next{j-1}.mahal(3) = D.Lratios(j);
-            C.next{j-1}.mahal(2) = D.iso_dists(j);
-            C.next{j-1}.mahal(1) = D.dprime;
+        C = PlotTriggerHist(DATA,DATA.cluster);
+        if(0)
+            JamesAutoCut(DATA, 'reapply', C);
         end
-        C.cluster = 1;
-        DATA.clid = find(DATA.clst ==2);
-        C.ncut = length(DATA.clid);
-        C.nspks = length(DATA.clst);
-        C = PlotTriggerHist(DATA,C);
-        DATA.cluster = C;
+        fprintf('Auto Cut %d events\n',max(DATA.uid));
         DATA.savespikes = 1; %get the spikdi at least
         DATA =  SaveClusters(DATA, outname,'quick');
         cluster = C;
@@ -6681,7 +6744,7 @@ function [distance, obj, xy, details] = BestSpace(DATA, varargin)
     end
 %The Var/Energy plot is particularly sensitive to electdoe movement
 %artifacts, so exclude spikes after trial end when making the cut
-   AllV = GetAllV(DATA);
+   AllV = mygetappdata(DATA,'AllV');
     iid = setdiff(uid, DATA.postevents);
     xy(:,1) = DATA.energy(1,iid);
     xy(:,2) = DATA.spkvar(p,iid)./DATA.energy(1,iid);
@@ -6975,7 +7038,7 @@ function [xy, cid, details] = ProjectND(DATA, best, obj)
         if isfield(DATA,'AllV')
         S = squeeze(DATA.AllV(DATA.probe(1),DATA.vspace,:))';
         else
-        AllV = GetAllV(DATA);
+        AllV = mygetappdata(DATA,'AllV');
         S = squeeze(AllV(DATA.probe(1),DATA.vspace,:))';
         end
     elseif ismember(best, [4 7])
@@ -7047,12 +7110,17 @@ fixsign = 0;
         fprintf('GM clustering only 1 group\n');
     end
 
-function [details, spike_features, sum_fig]  = JamesAutoCut(DATA, varargin)
+function [DATA, details]  = JamesAutoCut(DATA, varargin)
 usev = 0;
 retrigger = 0;
+reapply = 0;
 j = 1;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'retrigger',5)
+    if strncmpi(varargin{j},'reapply',5)
+        reapply= 1;
+        j = j+1;
+        C = varargin{j};
+    elseif strncmpi(varargin{j},'retrigger',5)
         retrigger = 1;
     end
     j = j+1;
@@ -7065,6 +7133,7 @@ Vall.Fs = 40000;
 X.Vtime = Vall.t;
 X.Fs = 40000;
 X.V = double(Vall.V').*Vall.intscale(1)/Vall.intscale(2);
+
 clust_params.gmm_inits = 100;
 clust_params.min_Pcomp = 0.05;
 clust_params.use_ms = 0;
@@ -7072,24 +7141,89 @@ clust_params.try_features = [1 2 4];
 clust_params.max_back_comps = 2;
 clust_params.cluster_biase = 0.5;
 clust_params.target_rate = 50;
-V = mygetappdata(DATA,'AllV');
-V = V(DATA.chspk,:,:);
 if retrigger
     [details,spike_features,sum_fig] = detect_and_cluster_init(X,clust_params,DATA.chspk);
+    DATA.uid = 1:length(details.spike_clusts);
+elseif reapply
+    [details,spike_features,spike_xy,Spikes] = apply_clustering(X, C.jamescluster, C.jamescluster.params, 0, []);
+%needs to return     [cl, cluster, xy]
+    DATA.uid = 1:length(details.spike_clusts);
+    DATA.clst = details.spike_clusts;
+    DATA.xy{1} = spike_xy;
 else
+    V = mygetappdata(DATA,'AllV');
+    V = V(DATA.chspk,:,:);
     Spikes.V = permute(V,[3 2 1]);
     Spikes.times = DATA.t;
     Spikes.trig_vals = DATA.rV';
     Spikes.trig_thresh = DATA.Trigger;
     [details,spike_features,sum_fig] = detect_and_cluster_init(X,clust_params,DATA.chspk,Spikes);
+    DATA.uid = details.uids;
+    DATA.clst = zeros(size(DATA.clst));
+    spike_features(details.uids,:) = spike_features;
+    spike_features(details.artifact_ids,:) = NaN;
+    details.spike_xy(details.uids,:) = details.spike_xy;
+    details.spike_xy(details.artifact_ids,:) = NaN;
 end
 
-spike_features(details.uids,:) = spike_features;
-spike_features(details.artifact_ids,:) = NaN;
-details.spike_xy(details.uids,:) = details.spike_xy;
-details.spike_xy(details.artifact_ids,:) = NaN;
+DATA.cluster.cluster = 1;
+C = DATA.cluster;
+gid = 1:length(details.spk_inds);
+if reapply || retrigger
+    Tv = mygetappdata(DATA,'TriggerV');
+    Vall = mygetappdata(DATA,'Vall');
+    uids = setdiff(1:length(details.spk_inds),details.artifact_ids);
+    vid = details.spk_inds(uids);
+    DATA.xy{1} = details.spike_xy;
+    if DATA.usetrials
+        [gid, postid] = TimesInTrial(Vall.t(vid), DATA.Expt, DATA.preperiod, DATA.postperiod);
+        vid = vid(gid);
+        DATA.xy{1} = details.spike_xy(gid,:);
+    end
+    DATA.uid = 1:length(vid);
+    DATA.rV = Tv(vid);
+    DATA.t = Vall.t(vid);
+    DATA.jamescluster = rmfields(details,{'spk_inds' 'uids' 'times' 'spike_clusts' 'spike_xy'});
+    DATA.cluster.jamescluster = DATA.jamescluster;
+    DATA.cluster.ctime = now;
+    [AllV, DATA] = BuildAllV(DATA, vid', details.params.spk_pts);
+    DATA = SetPCs(DATA,0);
+    DATA.clst = details.spike_clusts(gid);
+    DATA.spikefeatures = cat(2,spike_features(gid,:),details.spike_xy(gid,:));
+    DATA.clid = find(DATA.clst == C.cluster+1);
+    DATA.nid = find(DATA.clst ~= C.cluster+1);
+end
+
+C = DATA.cluster;
+C.next = {};
+C.probe = DATA.probe;
+C.space = [13 1 2];
+C.chspk = DATA.chspk;
+C.auto  = 2;
+C.automode = DATA.autocutmode;
+C.Trigger = details.trig_thresh;
+C.MeanSpike = PlotMeanSpike(DATA,'recalc');
+C.bmc = 0;
+C.mahal(1) = details.dprime;
+C.mahal(2) = details.iso_dists(1);
+C.mahal(3) = details.Lratios(1);
+C.mahal(4) = details.Lratios(1);
+C.ctime = now;
+for j = 2:length(details.Lratios)
+    C.next{j-1}.mahal(3) = details.Lratios(j);
+    C.next{j-1}.mahal(2) = details.iso_dists(j);
+    C.next{j-1}.mahal(1) = details.dprime;
+end
+
+
 details.newDATA = 0;
 details.clust_params = clust_params;
+C.cluster = 1;
+C.ncut = length(DATA.clid);
+C.nspks = length(DATA.clst);
+C.automode = 'james';
+DATA.cluster = C;
+
 
 function [E, Scores, tbs, xy, details]  = AutoCut(DATA, varargin)
 usev = 0;
@@ -7116,7 +7250,7 @@ while j <= length(varargin)
 j = j+1;
 end
 E.manual = 0;
-AllV = GetAllV(DATA);
+AllV = mygetappdata(DATA,'AllV');
 ctime = now;
 if usegm
     DATA.cluster.spts = DATA.spts;
@@ -7486,7 +7620,7 @@ function [C, details] = OptimizeClusterBoundary(DATA)
     elseif space(1) == 2
         xi = space(3);
         yi = space(5);
-        AllV = GetAllV(DATA);
+        AllV = mygetappdata(DATA,'AllV');
         x = squeeze(AllV(space(2),xi,:));
         y = squeeze(AllV(space(4),yi,:));
     elseif space(1) == 3
@@ -8352,7 +8486,7 @@ function DATA = AddAxisContextMenu(DATA, ax)
 function M = CalcDistanceMatrices(DATA, nc, varargin)
 %overfit with GMs, and calculate distance Matrix
     p= DATA.probe(1);
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     uid = DATA.uid;   
     ntr = 1;
     M.errs = {};
@@ -8436,9 +8570,24 @@ function SetPlot(a,b, fcn)
     ReplotPCs(DATA,[]);
     SetFigure(DATA.tag.tmplscore, DATA);
     set(DATA.toplevel,'UserData',DATA);
+
+function GMMmenu(a,b, fcn)
+[DATA, F] = GetDataFromFig(a);
+DataClusters = mygetappdata(DATA,'Clusters');
+onoff = {'off' 'on'};
+
+if strcmp(fcn,'refit')
+    init_comp_idx = cluster.comp_idx;
+    init_comp_idx(above_thresh) = max(init_comp_idx) + 1;
+    init_cluster_labels = cluster.cluster_labels;
+    init_cluster_labels(end+1) = max(init_cluster_labels) + 1;
+    
+    [new_cluster.gmm_fit, new_cluster.dprime, new_cluster.comp_idx, new_cluster.cluster_labels, new_cluster.cluster_stats, outliers] = ...
+        GMM_fit(Spikes.V, spike_features, N_comps, cluster.params, N_comps,init_comp_idx,init_cluster_labels);
+end
+    
     
 function PCCluster(a,b, fcn)
-
 [DATA, F] = GetDataFromFig(a);
 DataClusters = mygetappdata(DATA,'Clusters');
 onoff = {'off' 'on'};
@@ -8560,7 +8709,11 @@ elseif strncmp(fcn,'savedef',7)
     end
     finish = 1;
 elseif strncmp(fcn,'plotother',7)
-    DATA.plottype = 9;
+    if strcmp(DATA.cluster.automode,'james')
+        DATA.plottype = 13;
+    else
+        DATA.plottype = 9;
+    end
     ReplotPCs(DATA,[]);
     return;
 elseif strncmp(fcn,'dvdtpc',6)
@@ -8796,10 +8949,7 @@ elseif fcn == 19  %make Automatic cut
     DATA.cboundary = E;
     PlotHistogram(DATA,E);
     else
-        [details, S] = JamesAutoCut(DATA,'retrigger');
-        DATA.spikefeatures = cat(2,S,details.spike_xy);
-        DATA.clst = zeros(size(DATA.clst));
-        DATA.clst(details.uids) = details.spike_clusts;
+        [DATA, details] = JamesAutoCut(DATA,'retrigger');
         QuickSpks(DATA,1000);
         PlotHistogram(DATA,[]);
         DATA.plottype = 13;
@@ -8942,7 +9092,7 @@ elseif sum(strcmp(fcn, {'2cells' '3cells' '4cells' 'PCtwo' 'PCthree' 'PC4'})) | 
     if DATA.gmtypes(b)
         DATA.plottype = DATA.gmtypes(b);
         DATA = ReplotPCs(DATA,E);
-    else
+    elseif DATA.plot.vare
         SetFigure(DATA.tag.vare, DATA,DATA.watcharg{:});
         subplot(1,1,1);
         PlotVarE(DATA);
@@ -9502,6 +9652,9 @@ elseif isfield(E,'space')
     pcplot = E.space(2:end);
 end
 
+if ~isfield(E,'shape') %can happen if onlye GM defined
+    return;
+end
 if E.shape(1) == 2 || E.space(1) == 6
 %    xy = DATA.xy{1};
     angle = atan(diff(E.pos([1 3]))/diff(E.pos([2 4])));
@@ -9833,7 +9986,7 @@ function [F, isnew] = SetFigure(lb, varargin)
    if DATA.interactive == 0
        [F, isnew] = GetFigure(lb,'noforce',varargin{:});
    else
-       [F, isnew] = GetFigure(lb,varargin{:});
+       [F, isnew] = GetFigure(lb,'noforce',varargin{:});
    end
 if isnew
     if strcmp(lb,toptag)
@@ -9901,6 +10054,8 @@ if isnew
         uimenu(sm,'Label','PCSpace 3 cells','Callback',{@PCCluster, 'PCthree'});
         uimenu(sm,'Label','PCSpace 4 cells','Callback',{@PCCluster, 'PC4'});
         uimenu(sm,'Label','PCSpace Multiple Cells','Callback',{@PCCluster, 'PCmultiple'});
+        sm = uimenu(hm,'Label','GMM','Tag','GMMMenu');
+        uimenu(sm,'Label','Recalc without cell','Callback',{@GMMmenu, 'refit'});
         sm = uimenu(hm,'Label','PCs','Tag','ClusterMenu');
         uimenu(sm,'Label','Recalc without cell','Callback',{@PCCluster, 33});
         uimenu(sm,'Label','csd','Callback',{@SetOption},'tag','csd');
@@ -10023,6 +10178,7 @@ if isnew
         uimenu(sm,'Label','Check for Missing clusters','Callback',{@OptionMenu, 'autoopt'},'Tag','checkcluster');
         uimenu(sm,'Label','Show XY for saved clusters','Callback',{@OptionMenu, 'autoopt'},'Tag','showxysaved');
         uimenu(sm,'Label','QuickCut new empty clsuters','Callback',{@OptionMenu, 'autoopt'},'Tag','quickcut');
+        uimenu(sm,'Label','Calc Trigger Stats','Callback',{@OptionMenu, 'autoopt'},'Tag','trigstats');
         h = uimenu(sm,'Label','Include Details in quick save','Callback',{@OptionMenu, 'autoopt'},'Tag','savexy');
 %        set(h,'checked',onoff{1+DATA.auto.savexy});
         uimenu(sm,'Label','Backup Cluster When Save','Callback',{@OptionMenu, 'autoopt'},'Tag','backupcluster');
@@ -10214,7 +10370,7 @@ function x = GetValues(DATA, name)
     tid = find(strcmp(name,DATA.TemplateLabels));
     if isempty(tid)
         if sum(strncmp(name,{'ADC', 'Cen'},3))
-            AllV = GetAllV(DATA);
+            AllV = mygetappdata(DATA,'AllV');
         end
         if strncmp(name,'PC',2)
            pc = sscanf(name,'PC%d');
@@ -10718,7 +10874,7 @@ if ~isfield(DATA,'currenttrial') %keypress before ready.
     return;
 end
 oldf = gcf;
-if isempty(DATA.spklst)
+if ~isfield(DATA,'spklist') || isempty(DATA.spklst)
     DATA.spklst = 1:100;
 end
 w = DATA.spksperview;
@@ -11751,7 +11907,7 @@ function SpoolSpikes(DATA, varargin)
     end
 DATA.stopspool = 0;
 SetTrialList(DATA);
-AllV = GetAllV(DATA);
+AllV = mygetappdata(DATA,'AllV');
 spklist = 1:DATA.spksperview;
 %only do this for probes that will be used - it can take a long time
 if DATA.plotspk.showfullv;
@@ -11837,7 +11993,7 @@ function csd = GetCSD(DATA, ndiff)
     csd = getappdata(DATA.toplevel,'AllCSD');
     currdiff = getappdata(DATA.toplevel,'plotcsd');
     if isempty(csd) || ndiff ~= currdiff
-        AllV = GetAllV(DATA);
+        AllV = mygetappdata(DATA,'AllV');
         csd = diff(AllV,3-ndiff,1);
         setappdata(DATA.toplevel,'AllCSD',csd);
     end
@@ -12056,7 +12212,7 @@ if type == 0
             hold on;
         end        
     else
-        AllV = GetAllV(DATA);
+        AllV = mygetappdata(DATA,'AllV');
         if DATA.plottype == 8
             AllV = diff(AllV,[],2);
             xstr = '(dvdt)';
@@ -12076,7 +12232,7 @@ if type == 0
     end
     title(sprintf('%d:%d vs %d:%d%s',a(1),a(2),b(1),b(2),xstr),'position',[mean(xl) yl(2)],'VerticalAlignment','Top');
 else
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
         if DATA.plottype == 8
             AllV = diff(AllV,[],2);
         end
@@ -12105,7 +12261,11 @@ function DATA = ClassifyAll(DATA, force,varargin)
     drawnow;
     end
 
-    ctimes(1) = DATA.cluster.ctime;
+    if isfield(DATA.cluster,'ctime')
+        ctimes(1) = DATA.cluster.ctime;
+    else
+        ctimes(1) = now;
+    end
     iscluster(1) = 1;
     e = DATA.cluster.exptno;
     for j = 1:length(DATA.cluster.next)
@@ -12168,6 +12328,14 @@ function DATA = ClassifyAll(DATA, force,varargin)
                     DATA.cluster.clst = cl.clst;
                     DATA = OptimizeBoundary(DATA);
                     autorefine = autorefine+1;
+                elseif strcmp(DATA.autocutmode,'james');
+                    DATA = JamesAutoCut(DATA,'reapply', DATA.cluster);
+                    cl.id = find(DATA.clst == DATA.cluster.cluster+1);
+                    cl.nid = find(DATA.clst ~= DATA.cluster.cluster+1);
+                    cl.clst = DATA.clst;
+                    cl.MeanSpike = PlotMeanSpike(DATA,'recalc');
+                    cluster = DATA.cluster;
+                    DATA.plottype = 13;
                 else
                     [cl, cluster, DATA.xy{1}] = ClassifySpikes(DATA,DATA.cluster,cargs{:},'noplot','notrig');
                     DataClusters{DATA.probe(1)}.mahal = cluster.mahal;
@@ -12184,8 +12352,10 @@ function DATA = ClassifyAll(DATA, force,varargin)
                     DATA.MeanSpike = cl.MeanSpike;
                     DATA.cluster = cluster;
                     DATA.cluster.MeanSpike = cl.MeanSpike;
-                    DATA.cluster.minspke = prctile(DATA.energy(1,DATA.clid),1) .* 0.95;
-                    DATA.cluster.minspkvar = prctile(DATA.spkvar(DATA.probe(1),DATA.clid),1) .* 0.95;
+                    if size(DATA.energy,2) >= max(DATA.clid)
+                        DATA.cluster.minspke = prctile(DATA.energy(1,DATA.clid),1) .* 0.95;
+                        DATA.cluster.minspkvar = prctile(DATA.spkvar(DATA.probe(1),DATA.clid),1) .* 0.95;
+                    end
                     DATA.cluster.ctime = now;
                 elseif length(cl.id) <= 1
                     DATA.cluster = cluster;
@@ -12613,6 +12783,11 @@ function [cl, cluster, xy] = ClassifySpikes(DATA, E, varargin)
         end
         j = j+1;
     end
+    
+    if isfield(E,'automode') && strcmp(E.automode,'james')
+%        DATA = JamesAutoCut(DATA, 'reapply', E);
+%        return;
+    end
     cl = [];
     cluster = [];
     xy = [];
@@ -12674,14 +12849,12 @@ function [cl, cluster, xy] = ClassifySpikes(DATA, E, varargin)
     if isfield(DATA.Expt,'exptno')
         cluster.exptno = DATA.Expt.exptno;
     end
+    %need to maek this exclusion not incluaion
     f = {'bestspace' 'bestd' 'auto' 'autotook' 'firstspace' 'firstbmi' 'bestll' 'gmdip' 'gmdipres' 'gmfit1d' 'gmfit' 'gmfits' 'aspectratio'...
         'next' 'pos' 'TemplateUsed' 'mumeanUsed' 'MeanSpike' 'eventrate' 'exptreadmethod'...
-        'mydip' 'mydipsize' 'manual'};
-    for j = 1:length(f)
-        if isfield(E,f{j})
-            cluster.(f{j}) = E.(f{j});
-        end
-    end
+        'mydip' 'mydipsize' 'manual' 'automode' 'trigparams'};
+    cluster = CopyFields(cluster,E,f);
+
     if ~isempty(DATA.lastcut)
         cluster.first = DATA.lastcut;
     end
@@ -12790,7 +12963,7 @@ function [cl, cluster, xy] = ClassifySpikes(DATA, E, varargin)
             xy = xyrotate(DATA.energy(1,:),y,angle);
            cluster.space = [5];
         elseif DATA.plottype == 2 %voltage pairs
-            AllV = GetAllV(DATA);
+            AllV = mygetappdata(DATA,'AllV');
             xy = xyrotate(AllV(p(1),p(2),:),AllV(p(3),p(4),:),angle);
            cluster.space = [2 p(1:4)];
         elseif ismember(DATA.plottype,[3 4 7])
@@ -12799,6 +12972,9 @@ function [cl, cluster, xy] = ClassifySpikes(DATA, E, varargin)
         elseif E.space(1) == 10
             xy = xyrotate(DATA.icas(:,p(1)),DATA.icas(:,p(2)),angle);
             cluster.space = [E.space(1) p(1:2)];
+        elseif ismember(E.space(1),[13]) %James feature space
+            xy = xyrotate(DATA.spikefeatures(DATA.uid,p(1)),DATA.spikefeatures(DATA.uid,p(2)),angle);
+            cluster.space = [13 p(1:2)];
         else
             xy = xyrotate(DATA.pcs(:,p(1)),DATA.pcs(:,p(2)),angle);
             cluster.space = [1 p(1:2)];
@@ -12875,6 +13051,10 @@ function [cl, cluster, xy] = ClassifySpikes(DATA, E, varargin)
             xy(DATA.uid,2) = DATA.spkvar(ispk,DATA.uid)./DATA.energy(1,DATA.uid);
             xy(DATA.uid,1) = DATA.energy(1,DATA.uid);
             cluster.space = [5];
+        elseif ismember(E.space(1),[13]) %James feature space
+            xy(DATA.uid,1) = DATA.spikefeatures(DATA.uid,p(1));
+            xy(DATA.uid,2) = DATA.spikefeatures(DATA.uid,p(2));
+            cluster.space = [13 p(1:2)];
         elseif ismember(E.space(1),[3 4])
             xy(DATA.uid,1) = DATA.TemplateScores(DATA.uid,p(1));
             xy(DATA.uid,2) = DATA.TemplateScores(DATA.uid,p(2));
@@ -13080,7 +13260,7 @@ function [cl, cluster, xy] = ClassifySpikes(DATA, E, varargin)
 function QuickSpks(DATA,nspk)
     step = max([1 round(length(DATA.uid)/nspk)]);
     id = 1:step:length(DATA.uid);
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     DATA.voffset = CalcVoffset(AllV,DATA.plotspk.probes,0);
     PlotSpikes(DATA,DATA.uid(id),'setcontext');
     FinishSpikePlot(DATA);
@@ -13414,7 +13594,7 @@ function [Scores, T, details] = CalcScores(DATA, MeanSpike)
  
 details.tstart = now;
 
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
 
 if isfield(MeanSpike,'ms')
     T = MeanSpike.ms;
@@ -13659,7 +13839,7 @@ function [out, TemplateUsed, DprimeUsed] = TemplatePlot(DATA, varargin)
         j = j+1;
     end
 
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
   
     DataClusters = mygetappdata(DATA,'Clusters');
     %default in case there is no template to use
@@ -14078,6 +14258,7 @@ function DATA = ReplotPCs(DATA,E, varargin)
 setids = [];
 meanpos = [];
 autospace = 0;
+forcetofront = 0;
 args = {};
 j = 1;
 while j <= length(varargin)
@@ -14091,6 +14272,8 @@ while j <= length(varargin)
         meanpos = varargin{j};
         j = j+1;
         dimpos = varargin{j};
+    elseif strncmpi(varargin{j},'tofront',5)
+        forcetofront = 1;
     end
     j = j+1;
 end
@@ -14106,7 +14289,12 @@ if isempty(E)
 else
     cluster = E;
 end
-SetFigure(DATA.tag.top, DATA);
+
+if forcetofront
+    figure(DATA.toplevel);
+else
+    SetFigure(DATA.tag.top, DATA);
+end
 clusterplot = [];
 if isfield(DATA,'dipvals')
     dipvals = DATA.dipvals;
@@ -14150,7 +14338,7 @@ if DATA.plottype == 3 || DATA.plottype ==4
 elseif DATA.plottype == 12 %Try new scores
     tpt = find(DATA.spts == 0);
     p = DATA.probe(1);
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     tvals = squeeze(AllV(p,tpt,:));
     pcs(:,1) = squeeze(AllV(p,tpt+6,:))-tvals;
     pcs(:,2) = squeeze(AllV(p,tpt+19,:))-tvals;
@@ -14221,6 +14409,8 @@ else
         clid = DATA.clid;
     end
 end
+
+
 p = DATA.probelist(DATA.probe(1));
 if DATA.clplot ==1 && DATA.plot.scaledensity
     DATA.clplot = 2;
@@ -14230,7 +14420,9 @@ args = {args{:} 'clusterdef' 0};
 for j = 1:size(plots,1)
     mysubplot(2,4,j);
     clusterplot(:,j) = GetClusterPlots(DATA,cluster,plots,j);
-    if clusterplot(DATA.currentcluster,j) == j %this is the plot defining the cluster
+    if size(clusterplot,1)  < DATA.currentcluster%currentcluster no space defined yet
+        args{end} = 0;
+    elseif clusterplot(DATA.currentcluster,j) == j %this is the plot defining the cluster
         args{end} = 1;
     else
         args{end} = 0;
@@ -14238,9 +14430,8 @@ for j = 1:size(plots,1)
     t = 0;
     if ismember(DATA.plottype, [3 4 7])
         PlotPCs(DATA.TemplateScores,plots(j,1),plots(j,2),DATA.clplot,clid,DATA.colors,C,'fixrange',args{:});
-       t =  title(sprintf('%s vs %s',...
-            DATA.TemplateLabels{plots(j,1)},...
-            DATA.TemplateLabels{plots(j,2)}));
+        tstr = sprintf('%s vs %s',DATA.TemplateLabels{plots(j,1)},DATA.TemplateLabels{plots(j,2)});
+        t =  title(tstr);
         if isfield(E,'gmfit') && E.space(1) == 6 && E.space(2) ==4 
             [a,xi] = ismember(plots(j,1),DATA.tmplspace(1,:));
             [b,yi] = ismember(plots(j,2),DATA.tmplspace(1,:));
@@ -14268,7 +14459,7 @@ for j = 1:size(plots,1)
     else
         if ismember(DATA.plottype,[11 12]) %tests
             PlotPCs(pcs,plots(j,1),plots(j,2),DATA.clplot,clid,DATA.colors, C,'fixrange',args{:});
-        elseif ismember(DATA.plottype,[13])
+        elseif ismember(DATA.plottype,[13]) %james autocut
             PlotFeatures(DATA,plots(j,1),plots(j,2),DATA.clplot,DATA.clst,DATA.colors,C, 'fixrange');
         elseif ismember(DATA.plottype,[10]) %ICA
             PlotPCs(DATA.icas,DATA.pcplots(j,1),DATA.pcplots(j,2),DATA.clplot,clid,DATA.colors, C,'fixrange',args{:});
@@ -14276,7 +14467,7 @@ for j = 1:size(plots,1)
             PlotPCs(DATA.pcs,DATA.pcplots(j,1),DATA.pcplots(j,2),DATA.clplot,clid,DATA.colors, C,'fixrange',args{:});
             t = title(Labels{j});
         end
-        set(gca,'UserData',DATA.pcplots(j,:));
+        set(gca,'UserData',plots(j,:));
         if DATA.usegmcid && sum(ismember(DATA.pcplots(j,:),[1:4])) == 2 && isfield(DATA.cluster,'gmfit')
             k = find(DATA.pcspace == DATA.pcplots(j,1));
             m = find(DATA.pcspace == DATA.pcplots(j,2));
@@ -14386,10 +14577,10 @@ if iscell
         end
     end
 end
-if isfield(DATA,'energy')
-SetFigure(DATA.tag.vare, DATA);
-subplot(1,1,1);
-PlotVarE(DATA);
+if isfield(DATA,'energy')  && DATA.plot.vare
+    SetFigure(DATA.tag.vare, DATA);
+    subplot(1,1,1);
+    PlotVarE(DATA);
 end
 
 function clusterplot = GetClusterPlots(DATA,E, plots,pt)
@@ -14483,8 +14674,12 @@ function AddMarkToPCs(pos, space, plots, varargin)
 
 function PlotVarE(DATA)
         
+if length(DATA.clst) > size(DATA.energy,2) %energy out of date
+    return;
+end
     colors = 'brgmck';
 c = DATA.probe(1);
+
 if DATA.clplot == 1
     hold off;
     DensityPlot(DATA.energy(1,DATA.nid),DATA.spkvar(c,:)./DATA.energy(1,:));
@@ -14589,7 +14784,8 @@ function ph = PlotSpikes(DATA,spkid, varargin)
 dvdt = 1;
 fixy = 0;
 colors = DATA.colors;
-scale = DATA.plotspk.muscale;
+scale = 1;
+
 yl = [];
 j = 1;
 quicktest = 1;
@@ -14617,7 +14813,7 @@ if DATA.interactive < 0
     return;
 end
 
-AllV = GetAllV(DATA);
+AllV = mygetappdata(DATA,'AllV');
 SetFigure(DATA.tag.spikes, DATA);
 if fixy
     yl = get(gca,'ylim');
@@ -14890,7 +15086,7 @@ function ShowFullV(src,b, fcn)
    SetFigure(DATA.tag.fullv,DATA);
    [V,id] = PlotFullV(DATA,t);
    [V,id] = PlotFullV(DATA,t,'addmean','hold','color','g');
-   T = getappdata(DATA.toplevel,'TriggerV');
+   T = mygetappdata(DATA,'TriggerV');
    if ~isempty(T)
        plot(V.t(id),T(id));
    end
@@ -16972,7 +17168,7 @@ function ShowTaggedProbes(DATA)
     
 function DATA = QuickAutoCut(a,b)
     DATA = GetDataFromFig(a);
-    AllV = GetAllV(DATA);
+    AllV = mygetappdata(DATA,'AllV');
     tpt(1) = find(DATA.spts == 0);
     p = DATA.probe(1);
     tpt(2) = tpt(1)+5;

@@ -42,7 +42,7 @@ if ishandle(F) & ~isfigure(F)
         c = get(get(F,'parent'),'children');
         set(c,'Checked','off')
     end
-    if nargin ==2 && tag == 0
+    if nargin ==2 && length(tag) == 0 && tag == 0
         set(F,'Checked','off');
     else
         set(F,'Checked','on');

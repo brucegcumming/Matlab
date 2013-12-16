@@ -1,5 +1,15 @@
 function D = FullV2LFP(name,varargin)
-%D = FullV2LFP(name,varargin)
+%D = FullV2LFP(name,....)
+%    if name is a directory, Builds LFP files from each FullV file
+%D = FullV2LFP(FullV,....)
+%    where FullV is a loaded FullV structure, Builds LFP files from that
+%    struct
+%...,'expts',exlist)   only makes LFP for expts in exlist (ints)
+%...,'parllel') uses parfor to loop over expts
+%...,'kernel',K) use K as the smoothing kernel to lowpass the FullV record
+%                default is a Gauassian with SD of 24 samples = 200Hz sigma
+%                for 30KHz sampling
+%...,'decimate',n) take every nth sample after smoothing (default 60);
 
 
 mkexpts = [];
@@ -7,10 +17,15 @@ G = [];
 savelist = 0;
 version = 1.0;
 parallel = 0;
+LFP.sd = 24; %24 at 30KHz = SD of 0.8ms, = SD of 200Hz in Freq
+LFP.decimate = 60;
 V = [];
 j = 1;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'expts',5)
+    if strncmpi(varargin{j},'decimate',5)
+        j = j+1;
+        LFP.decimate = varargin{j};
+    elseif strncmpi(varargin{j},'expts',5)
         j = j+1;
         mkexpts = varargin{j};
     elseif strncmpi(varargin{j},'kernel',5)
@@ -54,8 +69,7 @@ if iscell(name)
     fprintf('took %.2f sec\n',mytoc(ts));
     return;
 end
-LFP.sd = 24; %24 at 30KHz = SD of 0.8ms, = SD of 200Hz in Freq
-LFP.decimate = 60;
+
 
 if isempty(G)
     G = Gauss(LFP.sd,-100:100);
@@ -158,7 +172,9 @@ function D = MakeLFP(e, expt, d, LFP)
     LFP.samper = V.samper.*LFP.decimate; % = in sec, not silly units
     LFP.version = version;
     D.trange = minmax(LFP.t);
+    ts = now;
     outname = sprintf('%s/Expt%d.lfp.mat',LFP.name,e);
-    fprintf('Saving %d samples (max %d), to %s\n',length(rawlfp),max(LFP.rawlfp(:)),outname);
+    fprintf('Saving %d samples (max %d), to %s ',length(rawlfp),max(LFP.rawlfp(:)),outname);
     save(outname,'LFP','-v7.3');
+    fprintf('took %.2f sec\n',mytoc(ts));    
 

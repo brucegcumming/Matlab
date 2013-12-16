@@ -16,7 +16,7 @@ for j = 1:length(d)
     if verbose
         fprintf('Loading %s\n',d(j).name);
     end
-    Vs{j} = LoadFullV(d(j).name);
+    Vs{j} = LoadFullV(d(j).name,'noconvert');
     bytes = bytes + d(j).bytes;
 end
 t = mytoc(ts);

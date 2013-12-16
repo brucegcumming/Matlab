@@ -137,6 +137,8 @@ while j <= length(varargin)
         
     elseif strncmpi('quicksuffix',varargin{j},9)
             DATA.bysuffix = 1;
+            DATA.AllClusters = {};
+            DATA.currentexpt = 1;
     elseif strncmpi(varargin{j},'expand',5)
         j = j+1;
         DATA.state.bigwindow(1) = varargin{j}(1);
@@ -411,6 +413,7 @@ elseif strncmpi(name,'listexps',6)
                         csuffs = [csuffs num2str(ci) ' '];
                         if ci > length(DATA.Expts)
                             fprintf('Combined file refers to too many expts\n');
+                        elseif isfield(DATA,'AllClusters') %Don't Add Expt.Header.Cluster    
                         elseif isfield(Expt.Header,'Clusters') & length(Expt.Header.Clusters) >= j & ...
                                 (~isfield(DATA.Expts{ci},'Cluster') || isempty(DATA.Expts{ci}.Cluster))
                             DATA.Expts{ci}.Cluster = Expt.Header.Clusters{j};
@@ -695,8 +698,11 @@ elseif strncmpi(name,'setexp',6)
                 DATA.AllClusters = {};
             end
             if ~isfield(DATA,'grididx')
-            DATA.grididx = BuildGridIndex(DATA.name, DATA.Expts);
+                DATA.grididx = BuildGridIndex(DATA.nevdir, DATA.Expts);
+            elseif max(DATA.currentexpt) > max(DATA.grididx.expt) %% need to reindex
+                DATA.grididx = BuildGridIndex(DATA.nevdir, DATA.Expts,'reindex','noerrs');
             end
+            
             DATA = LoadSpikes(DATA, DATA.currentexpt(1));
             DATA = CheckClusterLoaded(DATA, DATA.currentexpt(1), DATA.probe);
         end
@@ -842,7 +848,9 @@ elseif strncmpi(name,'setexp',6)
 
         nclusters = 2;
         if isfield(DATA,'AllClusters') | isfield(DATA,'AllSpikes')
-            DATA =  PlotAllProbeXY(DATA,0);
+            if DATA.plot.showallxy
+                DATA =  PlotAllProbeXY(DATA,0);
+            end
             [DATA, ispk] = SetExptSpikes(DATA,DATA.expid(id(1)),0,'useexp');
             DATA.spklist = ispk;
             DATA.Expts{DATA.currentexpt(1)}.gui.spks = ispk;
@@ -866,6 +874,7 @@ elseif strncmpi(name,'setexp',6)
             %neve been touched
             [DATA, ispk] = SetExptSpikes(DATA,DATA.expid(id(1)),0,'useexp');
             DATA.spklist = ispk;
+            DATA = CalcClusterVars(DATA, DATA.Expts{DATA.currentexpt(1)}.gui.spks);
             GetFigure(DATA.tag.clusterxy);
             hold off;
             DATA = DrawXYPlot(DATA, ispk);
@@ -1409,9 +1418,17 @@ while j <= length(varargin)
         end
        set(DATA.toplevel,'UserData',DATA);
     elseif strncmpi(varargin{j},'loadclusters',8)
+        ts= now;
         for j = 1:length(DATA.Expts)
-            DATA = CheckClusterLoaded(DATA,j,DATA.probe);
+            fprintf('Loading Expt %d',j);
+            [DATA, D] = CheckClusterLoaded(DATA,j,DATA.probe);
+            loaddur(j) = D.loaddur(end);
+            fprintf(' took%s\n',sprintf(' %.2f',D.loaddur));
         end
+        C = DATA.AllClusters;
+        x = whos('C');
+        byterate = x.bytes/(1024 * 1024 * sum(loaddur));
+        fprintf('Took %.2f sec (%.2f in LoadClusters %.2f Mb/sec)\n',mytoc(ts),sum(loaddur),byterate);        
        set(DATA.toplevel,'UserData',DATA);
     elseif strncmpi(varargin{j},'plotargs',8)
         j = j+1;
@@ -1433,6 +1450,9 @@ end
 function layout = ReadLayout(file)   
 
     layout = [];
+    if ispc && file(1) == '/'
+        file(1) = '\';
+    end
     fid = fopen(file,'r');
     if fid > 0
         a = textscan(fid, '%s','delimiter','\n');
@@ -2060,7 +2080,7 @@ function ShowLFPPlot(DATA)
     
  function figpos = SetFigure(tag, DATA, varargin)
      
-     figpos = getappdata(DATA.toplevel,'FigPos');
+     figpos = getappdata(DATA.toplevel,'Figpos');
      j = 1;
      args = {};
      while j < length(varargin)
@@ -2851,7 +2871,11 @@ function [Expt, DATA, plotres] = CombinePlot(DATA, dlgs, varargin)
         else
             [eid, cid, clid] = FindCell(DATA, DATA.probe);
         end
+        if isfield(DATA,'CellList')
         [a, ida, idb] = intersect(DATA.expid(ids), DATA.CellDetails.exptids(eid));
+        else
+            ida = DATA.expid(ids);
+        end
         if isempty(ida)
             Expt = [];
             return;
@@ -3270,7 +3294,50 @@ function SetProbeList(DATA)
     end
     
 
-   
+function DATA = ReadFinishedDir(DATA, name, varargin)
+    
+    DataTypes = {};
+    Trialids = [];
+    [Expts, Idx] = ReadExptDir(name);
+    for nexp = 1:length(Expts)
+        Expts{nexp}.gui.classified = 0;
+        Expts{nexp}.gui.counted = 0;
+        Expts{nexp}.gui.clustertype = 0;
+        newt = [Expts{nexp}.Trials.Trial];
+        Expts{nexp}.gui.firsttrial = newt(1);
+        Expts{nexp}.errs = Idx{nexp}.errs;
+        Expts{nexp}.gui.ntrials = length(newt);
+        if isfield(Idx{nexp},'DataType')
+            DataTypes{nexp} = Idx{nexp}.DataType;
+        end
+       Trialids = [Trialids newt]; 
+    end
+    DATA.Expts = Expts;
+    if ~isempty(DataTypes)
+        DATA.DataType = DataTypes{1};
+    end
+    
+    DATA.probelist = 1:length(DATA.ArrayConfig.id);
+    for j = DATA.probelist
+        DATA.probes(j).probe = j;
+    end
+    DATA.probesource = FindProbeSources(DATA);
+    DATA = AddMultiProbeGUI(DATA);
+    if sum(DATA.probelist < 100) > 1 % count # of recording chans
+        DATA.state.includeprobename = 1;
+    end    
+    DATA = cListExpts(DATA,Expts);
+    DATA.name = name;
+    SetProbeList(DATA);
+    DATA.exabsid = 1:length(DATA.Expts);
+    DATA = CheckCellExptList(DATA);
+    DATA.state.online = 0;
+    DATA.AllData.Spikes = [];
+    DATA.AllData.Trialids = Trialids;
+    DATA.state.nospikes = 2;
+    DATA.state.somespikes = 1;
+                        
+                        
 function DATA = ReadDir(DATA, name, varargin)  %% Online Plots
 
 d = dir(name);
@@ -3289,7 +3356,7 @@ if nx > 5 %temporary - need to cherk expected number
     DATA.bysuffix = 1;
 end
 
-ts = now;
+functs = now;
 AllExpts = {};
 d = d(b);
 reindex = 0;
@@ -3313,9 +3380,13 @@ if isempty(DATA.nevdir)
     DATA.nevdir = name;
 end
 
+quicksuffix = 0;
+
 j = 1;
 while j <= nargin-2
-        if strncmpi(varargin{j},'relist',3)
+        if strncmpi(varargin{j},'quicksuffixtest',13)
+            quicksuffix = 1;
+        elseif strncmpi(varargin{j},'relist',3)
             reindex =1;
             args = {args{:} 'relist'};
         elseif strncmpi(varargin{j},'skip',3)
@@ -3361,7 +3432,13 @@ end
     nexpts = 0;
     suffixlist = [];
     suffixid = [];
+    DATA.ArrayConfig = GetArrayConfig(DATA.nevdir);
 
+    if quicksuffix
+        DATA = ReadFinishedDir(DATA, name, varargin{:});
+        fprintf('Quick Read took %.2f\n',mytoc(functs));
+        return;
+    end
 
     ts = now;
     for j = 1:length(d)
@@ -3510,6 +3587,13 @@ end
                     Spikes = All.Spikes;
                 else
                     Spikes = Spikes;
+                    if isfield(trls.Probes,'probes')
+                        nprobes(nexp) = max([trls.Probes.probe]);
+                    end
+                    if isfield(DATA,'AllClusters') %Will be loading from clustertimes
+                        DATA.state.nospikes = 2;
+                        DATA.state.somespikes = 1;
+                    end
                 end
 
                 DATA.defaults.starttrial = 1+ Expts{nexp}.Trials(end).Trial;
@@ -3529,7 +3613,6 @@ end
         end
     end
     fprintf('Loading took %.1f (%.1f)\n',mytoc(ts),sumload);
-    DATA.ArrayConfig = GetArrayConfig(DATA.nevdir);
 
     if exist('probenames','var') %can be empty for online relist
     np = 0;
@@ -3554,9 +3637,11 @@ end
             else
                 DATA.probesource = 1;
             end
-    elseif DATA.bysuffix
+    elseif DATA.bysuffix  %Get here for Spike2 Array DATA. with or without quicksuffix
         if exist('nprobes','var')
-        DATA.probelist = 1:max(nprobes);
+            DATA.probelist = 1:max(nprobes);
+        elseif isfield(DATA.ArrayConfig, 'id')
+            DATA.probelist = 1:length(DATA.ArrayConfig.id);
         else
             DATA.probelist = 1;
         end
@@ -3629,11 +3714,12 @@ end
         end
     end
     DATA.name = name;
-    if DATA.bysuffix
+    if DATA.bysuffix && isfield(DATA,'AllClusters')
         DATA.state.online = 0;
         if isfield(DATA,'CellDetails') && isfield(DATA.CellDetails,'excludetrials')
             for j = 1:length(DATA.CellDetails.exptids)
                 eid = floor(DATA.CellDetails.exptids(j));
+                if eid <= length(DATA.AllClusters)
                 for k = 1:size(DATA.CellDetails.excludetrials,2)
                     for c = 1:size(DATA.CellDetails.excludetrials,3)
                         if ~isempty(DATA.CellDetails.excludetrials{j,k,c})
@@ -3647,6 +3733,7 @@ end
                         end
                     end
                 end
+                end
             end
         end
         for j = 1:length(DATA.Expts)
@@ -3659,7 +3746,7 @@ end
                     if length(xcl)
                         for k = 1:length(DATA.AllClusters{j})
                             for c = 1:length(DATA.AllClusters{j}(k).excludetrialids)
-                            DATA.AllClusters{j}(k).excludetrialids{c} =  [DATA.AllClusters{j}(k).excludetrialids{c} xcl];
+                            DATA.AllClusters{j}(k).excludetrialids{c} =  [DATA.AllClusters{j}(k).excludetrialids{c}(:)' xcl(:)'];
                             end
                         end
                     end
@@ -3679,6 +3766,7 @@ end
     else
         DATA.state.online = 1;
     end
+    fprintf('Directory Read took %.2f\n',mytoc(functs));
     DATA.exabsid = 1:length(DATA.Expts);
     DATA = CheckCellExptList(DATA);
 
@@ -4620,7 +4708,7 @@ elseif isfield(DATA,'AllClusters')
             pid = DATA.probe;
             cid = WhichClusters(DATA.toplevel);
         end
-        DATA = CheckClusterLoaded(DATA, expid, pid);
+        [DATA, D] = CheckClusterLoaded(DATA, expid, pid);
         if length(pid) == 1
             Spks = DATA.AllClusters{expid}(pid(1));
             spikelist = cid(1);
@@ -4735,9 +4823,14 @@ DATA.Expts{expid}.gui.nclusters = nc;
 
  function [eid, cid] = FindNoCell(DATA, probe)
 %find expt/probes wiht no cell defined
+if isfield(DATA,'CellList')
     cellid = sum(DATA.CellList,3);
     [eid] = find(cellid(:,probe) == 0);
     cid = ones(size(eid)).*probe;
+else
+    eid = DATA.expid;
+    cid = DATA.probelist;
+end
 
      
 function [eid, cid, clid] = FindCell(DATA, cellid)
@@ -5184,6 +5277,10 @@ function [x,y, DATA] = GetClusterSpace(DATA, Expt)
 function DATA = DrawClusters(DATA, cluster, setfig)
 if setfig
     set(0,'CurrentFigure',DATA.xyfig);
+end
+
+if ~iscell(cluster)
+    return;
 end
 p = DATA.probe;
 for j = 1:min([size(cluster,1) 7])
@@ -8383,6 +8480,7 @@ uimenu(hm,'Label','All Expts - spkxy','Callback',@PlotAllExpts);
 uimenu(hm,'Label','All Expts and probes','Callback',@PlotAllExptsAndProbes);
 uimenu(hm,'Label','Plot Subspace','Callback',@PlotSubspace);
 uimenu(hm,'Label','LFP Plot','Callback',{@combine, 'maklfp'});
+uimenu(hm,'Label','Export Result to workspace','Callback',{@ExportPlots, 'combine'});
 
 sm = uimenu(hm,'Label','&All Expts ');
 uimenu(sm,'Label','Rates','Callback',{@PlotAllCells, 'rates'});
@@ -10542,20 +10640,24 @@ DATA.state.recount = 1;
 ids = get(DATA.elst,'value');
 if isfield(DATA,'CellDetails')
 eid = find(ismember(floor(DATA.CellDetails.exptids),DATA.expid(ids)));
+cells = unique(DATA.CellList(eid,:,:));
+cells = cells(cells > 0);
+probelist = 1:size(DATA.CellList,2);
 else
-    eid = DATA.exlist;
+    eid = DATA.expid;
+    cells = [];
+    probelist = DATA.probelist;
 end
 %eid is now a list of inices to the CellList array
 %so expt #s are CEllDetails.exptids(eid)
-cells = unique(DATA.CellList(eid,:,:));
-cells = cells(cells > 0);
 if strfind(DATA.outname,'image.ORBW')
     DATA.plot.flip = ~DATA.plot.flip;
 end
     DATA.listbycell = 1;
     domu = [];
  if makemu
-     for p = 1:size(DATA.CellList,2)
+     if isfield(DATA,'CellList')
+     for p = probelist
          nex = 0;
          for e = 1:length(eid)
          if sum(DATA.CellList(eid(e),p,:)) == 0
@@ -10565,6 +10667,9 @@ end
          if nex >= length(eid)/2 % more htan half expts no cell defined
              domu = [domu p];
          end
+     end
+     else
+         domu = probelist;
      end
  end
  
@@ -10789,7 +10894,7 @@ for j = 1:length(DATA.probelist)
     Expts{j} = Expt;
   
     if DATA.logfid
-        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s (%s)\n',datestr(now),nspk,sprintf(' %d',Expt.Header.Combineids),file,DATA>user);
+        fprintf(DATA.logfid, '%s,Saved %d spikes (Expts%s) to %s (%s)\n',datestr(now),nspk,sprintf(' %d',Expt.Header.Combineids),file,DATA.user);
     end
 end
 DATA.Expt = Expt;
@@ -10875,7 +10980,7 @@ function str = vec2str(x)
 function SpikeUIMenu(a,b);
 DATA = GetDataFromFig(a);
 tag = get(a,'Tag');
-SetMenuCheck(a,'exclusive');
+SetMenuCheck(a,'exclusive',1);
 
 if strcmp(tag,'ns5')
     DATA.state.usensx = 1;
@@ -10906,15 +11011,20 @@ if ~isempty(cntrl_box)
 end
 
 Figpos = getappdata(DATA.toplevel,'Figpos');
-nf = strmatch(tag,fields(Figpos));
-if isempty(nf)
-   bp = get(DATA.toplevel,'Position');    
-   nf = length(DATA.figpos)+1;
-   Figpos.(tag) =  [bp(1)+bp(3) bp(2) w*wsc(1) h*wsc(2)];
-   setappdata(DATA.toplevel,'Figpos',Figpos);
+bp = get(DATA.toplevel,'Position');
+wpos =  [bp(1)+bp(3) bp(2) w*wsc(1) h*wsc(2)];
+if ~isempty(Figpos)
+    nf = strmatch(tag,fields(Figpos));
+    if isempty(nf)
+        nf = length(DATA.figpos)+1;
+        Figpos.(tag) =  [bp(1)+bp(3) bp(2) w*wsc(1) h*wsc(2)];
+        setappdata(DATA.toplevel,'Figpos',Figpos);
+    else
+        wpos = Figpos.(tag);
+    end
 end
 dat.parentfigtag = DATA.tag.top;
-cntrl_box = figure('Position', Figpos.(tag) , 'Menubar', 'none',...
+cntrl_box = figure('Position', wpos , 'Menubar', 'none',...
     'NumberTitle', 'off', 'Tag',tag,'Name','Options','UserData',dat);
 set(cntrl_box,'DefaultUIControlFontSize',DATA.gui.FontSize);
 hm=uimenu(cntrl_box,'label','Spikes');
@@ -11479,7 +11589,10 @@ if isfield(DATA,'AllClusters')
     ts = now;
     probe = GetProbe(DATA, DATA.currentexpt(1), DATA.probe);
     if probe > 0
-        DATA = CheckClusterLoaded(DATA, DATA.currentexpt(1), probe);
+        [DATA, D] = CheckClusterLoaded(DATA, DATA.currentexpt(1), probe);
+        if sum(D.loaddur) > 0
+            fprintf('(Loading%s)',sprintf(' %.2f',D.loaddur));
+        end
         if iscell(DATA.AllClusters)
             C  = DATA.AllClusters{DATA.currentexpt(1)}(probe);
             DATA.Spikes.cx = DATA.AllClusters{DATA.currentexpt(1)}(probe).cx;
@@ -11529,13 +11642,16 @@ if isfield(DATA,'toplevel') & DATA.state.autoplotnewprobe & length(DATA.probelis
 end
 NotBusy(DATA);
 
-function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
+function [DATA, D] = CheckClusterLoaded(DATA, eid, pid, varargin)
     needcx = 0;
+    D.loaddur = [0 0 0];
     j = 1;
 
     if DATA.listbycell == 2
         needcx = 1;
     end
+    
+    
     if DATA.state.somespikes == 2 || DATA.state.usensx == 2
 %if usenex == 2 it means reading spikes from NEV files. For now, can read these every time
         if (length(DATA.AllClusters) < eid || length(DATA.AllClusters{eid}) < pid)...
@@ -11548,30 +11664,30 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
             || isempty(DATA.AllClusters{eid}(pid).times) ...
             || (isempty(DATA.AllClusters{eid}(pid).cx) && needcx)
         if eid > DATA.appendexptid
-            Clusters = LoadCluster(DATA.appenddir{1},eid-DATA.appendexptid(1)+1,'getxy');
+            [Clusters, F, D] = LoadCluster(DATA.appenddir{1},eid-DATA.appendexptid(1)+1,'getxy','noauto');
         else
-            Clusters = LoadCluster(DATA.datadir,eid,'getxy');
+            [Clusters, F, D] = LoadCluster(DATA.datadir,eid,'getxy','noauto');
         end
         for j = length(Clusters):-1:1
             
             if isfield(Clusters{j},'xy')
-            DATA.AllClusters{eid}(j).cx = Clusters{j}.xy(:,1);
-            DATA.AllClusters{eid}(j).cy = Clusters{j}.xy(:,2);
-            DATA.AllClusters{eid}(j).times = Clusters{j}.t' .*10000;
-            DATA.AllClusters{eid}(j).codes= Clusters{j}.clst-1;
-            DATA.AllClusters{eid}(j).suffix = eid;
-            DATA.AllClusters{eid}(j).dips = GetDips(Clusters{j});
-            DATA.AllClusters{eid}(j).dropi = Clusters{j}.dropi(3);
-            if isfield(Clusters{j},'excludetrialids')
-                DATA.AllClusters{eid}(j).excludetrialids{1} = Clusters{j}.excludetrialids;
-            else
-                DATA.AllClusters{eid}(j).excludetrialids{1} = [];
-            end
-            if isfield(Clusters{j},'missingtrials')
-                DATA.AllClusters{eid}(j).missingtrials = Clusters{j}.missingtrials;
-            else
-                DATA.AllClusters{eid}(j).missingtrials = [];
-            end
+                DATA.AllClusters{eid}(j).cx = Clusters{j}.xy(:,1);
+                DATA.AllClusters{eid}(j).cy = Clusters{j}.xy(:,2);
+                DATA.AllClusters{eid}(j).times = Clusters{j}.t' .*10000;
+                DATA.AllClusters{eid}(j).codes= Clusters{j}.clst-1;
+                DATA.AllClusters{eid}(j).suffix = eid;
+                DATA.AllClusters{eid}(j).dips = GetDips(Clusters{j});
+                DATA.AllClusters{eid}(j).dropi = Clusters{j}.dropi(3);
+                if isfield(Clusters{j},'excludetrialids')
+                    DATA.AllClusters{eid}(j).excludetrialids{1} = Clusters{j}.excludetrialids;
+                else
+                    DATA.AllClusters{eid}(j).excludetrialids{1} = [];
+                end
+                if isfield(Clusters{j},'missingtrials')
+                    DATA.AllClusters{eid}(j).missingtrials = Clusters{j}.missingtrials;
+                else
+                    DATA.AllClusters{eid}(j).missingtrials = [];
+                end
             else
                 DATA.AllClusters{eid}(j).cx = [];
                 DATA.AllClusters{eid}(j).cy = [];
@@ -11584,7 +11700,7 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
                 DATA.AllClusters{eid}(j).user = Clusters{j}.user;
             end
             DATA.AllClusters{eid}(j).savetime = Clusters{j}.savetime(end);
-                
+            
             if isfield(Clusters{j},'next')
                 for k = 1:length(Clusters{j}.next)
                     if isfield(Clusters{j}.next{k},'dropi') %don't read empties
@@ -11592,6 +11708,9 @@ function DATA = CheckClusterLoaded(DATA, eid, pid, varargin)
                         DATA.AllClusters{eid}(j).next{k}.dropi = Clusters{j}.next{k}.dropi(3);
                     end
                 end
+            end
+            if isfield(Clusters{j},'mahal')
+                DATA.Expts{eid}.Cluster{j}.mahal = Clusters{j}.mahal;
             end
         end
         if isempty(Clusters)
@@ -11617,6 +11736,8 @@ function dips = GetDips(C)
     end
     if isfield(C,'mydip')
         dips(4) = C.mydip(3);
+    else
+        fprintf('Missing Mydip in C%d\n',C.probe(1));
     end
     if isfield(C,'hdip') %hartigans
         dips(5) = C.hdip;

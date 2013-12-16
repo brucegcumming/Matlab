@@ -53,7 +53,7 @@ fid = fopen(file,'w');
                 val = DATA.(f{1}).(sf{j});
                 if isempty(val)
                     fprintf(fid,'DATA.%s.%s=[];\n',f{1},sf{j});
-                elseif isnumeric(val)
+                elseif isnumeric(val) || islogical(val)
                     fprintf(fid,'DATA.%s.%s=[%s];\n',f{1},sf{j},num2str(val));
                 elseif ischar(val)
                     fprintf(fid,'DATA.%s.%s=''%s'';\n',f{1},sf{j},val);

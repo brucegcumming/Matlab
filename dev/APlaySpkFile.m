@@ -10,9 +10,10 @@ function [Expt, Expts, AllData, Raw] = APlaySpkFile(name, varargin)
 % APlaySpkFile(name, 'usealltrials') includes bad fix trials too
 % APlaySpkFile(name, 'expts') Just loads Expts file if available
 %
-%Error Fixing A file nameAdd.txt (i.e. jbeG044.mat -> jbeG044Add.txt)
+%Errors:  Can add txt lines post hoc in a file nameAdd.txt (i.e. jbeG044.mat -> jbeG044Add.txt)
 %If it exists is read in and adds lines to the text stream.
-
+%A file nameStimon.mat  can be used to replace missing stimon/off pulses
+%
 SpkDefs;
 playspikes = 0;
 defaults.fz = 96;
@@ -67,7 +68,7 @@ state.resort = 0; %generate expt liat again. Else read from disk if there
 errs = {};
 
 mkidx =0;  %%need this up here so taht relist works
-
+unsavedexpts = 0;
 
 if isdir(name)
     [Expts, Expt] = ReadExptDir(name, varargin{:});
@@ -140,13 +141,10 @@ if ischar(name)
         return;
     end
     
+    
     outname = strrep(name,'.mat','Expts.mat');
     if exptsonly && exist(outname);
-        if exist(outname)
-            load(outname);
-        end
-        Expt.state.nospikes = 1;
-        Expt = CopyFields(Expt,Tidx);
+        [Expt, Expts] = LoadExptsFile(outname);
         return;
     end
     
@@ -680,9 +678,9 @@ if ischar(name)
             end
             clear a;
             spkch = 'Chspk';
-                else %state.nospikes > 0
-        [a,b] = splitpath(name);
-        d = dir([b '/*ClusterTimes.mat']);
+        else %state.nospikes > 0
+            [a,b] = splitpath(name);
+            d = dir([b '/*ClusterTimes.mat']);
         end
 
     end
@@ -840,6 +838,11 @@ if ischar(name)
                     else
                         Spks{j}.dips = [NaN NaN NaN];
                     end
+                    if isfield(Clusters{j},'mydip')
+                        Spks{j}.dips(4) = Clusters{j}.mydip(3);
+                    else
+                        fprintf('Missing mydip in %d\n',j);
+                    end
                     if isfield(Clusters{j},'dropi')
                         Spks{j}.dropi = Clusters{j}.dropi(3);
                     end
@@ -910,8 +913,8 @@ if isstruct(name)
 end
 
 
-stimlvl = AddStimsFromFile(strrep(name,'.mat','.Stimon'),stimlvl);
 
+stimlvl = AddStimsFromFile(strrep(name,'.mat','.Stimon'),stimlvl);
 forcefix = 0;
 argon = {};
 j = 1;
@@ -1115,6 +1118,9 @@ if ~mkidx
        
     AllData.Events = Events;
     Expt.Probes = probes;
+    if isfield(probes,'probe')
+        Expt.Header.nprobes = max([probes.probe]);
+    end
     if Expt.Header.Spike2Version < 1.23
         Expt = FixExpt(Expt,'ed');
     end
@@ -1209,7 +1215,7 @@ estimes = [];
 if exist(framechname,'var')
     if isfield(framech,'level')
         id = find(framech.level == 1);
-        frametimes = framech.times(id) .* 10000
+        frametimes = framech.times(id) .* 10000;
     else
     frametimes = eval([framechname '.times * 10000']);
     end
@@ -1230,6 +1236,7 @@ end
 if fixup(1) && stimlvl.level(end) == 1 && stimlvl.level(1) == 0
     stimlvl.times = stimlvl.times(1:end-1);
     stimlvl.level = stimlvl.level(1:end-1);
+    cprintf('errors','Deleting Last Stimlevel as it is ON\n');
 end
 
 if exist(stimch,'var') & isfield(stimlvl,'level') & length(stimlvl.times) > 1
@@ -1424,8 +1431,10 @@ Trials.id(1:ntrials) = 0;
 Trials.FalseStart(1:ntrials) = 0;
 end
 
-%remove stimON going to off at start of trial. 
-if estimes(1) < bstimes(1) && length(estimes) == length(bstimes)+1
+%estimes = estimes(estimes > 0);
+%bstimes = bstimes(estimes > 0);
+%remove stimON going to off at start of file 
+if estimes(1) <= bstimes(1) && length(estimes) == length(bstimes)+1
     estimes = estimes(2:end);
 elseif length(bstimes) == length(estimes)+1 %crash can leave trailing start e.g. ruf1914
     bstimes = bstimes(1:end-1);
@@ -1507,6 +1516,25 @@ esstimes = aText.times(id);
 %Only find expts where storage was on at expt start. But any endexpt event
 %will end, even if storage is off. E.G. a binoc crash. when binoc restarts
 %can send EndExpt before setting storage on
+exendid = find((Events.codes(:,1) == ENDEXPT | Events.codes(:,1) == CANCELEXPT));
+et = Events.times(exendid);
+allstartid = find(Events.codes(:,1) == STARTEXPT);
+for j = 1:length(allstartid)
+    if j < length(allstartid)
+    id = find(et > Events.times(allstartid(j) ) & et < Events.times(allstartid(j+1)));
+    else
+    id = find(et > Events.times(allstartid(j)));
+    end
+    if ~isempty(id)
+        eid = exendid(id(1));
+        nsaved = sum(bsstimes > Events.times(allstartid(j)) & bsstimes < Events.times(eid));
+        if nsaved > 2 && Events.store(allstartid(j)) == 0
+           cprintf('blue','Storage Turned on Mid expt %.2f-%.2f\n',Events.times(allstartid),Events.times(eid));
+            Events.store(allstartid(j)) = 1;
+        end
+    end
+end
+unsavedexpts = sum(Events.codes(:,1) == STARTEXPT & Events.store == 0);
 exstartid = find(Events.codes(:,1) == STARTEXPT & Events.store > 0);
 exendid = find((Events.codes(:,1) == ENDEXPT | Events.codes(:,1) == CANCELEXPT));
 %exendid = find((Events.codes(:,1) == ENDEXPT | Events.codes(:,1) == CANCELEXPT) & Events.store > 0);
@@ -1544,7 +1572,7 @@ ExptStart = Events.times(exstartid);
 exendid = exendid(exendid > exstartid(1));
 ExptEnd = Events.times(exendid);
 if isempty(ExptEnd) %% sometimes .mat file is missing EndExpt Marker. But best to fix .smr
-    Expt = AddError(Expt, 'No EndExpt Marker', Expt);
+    Expt = AddError(Expt, 'No EndExpt Marker Expt');
     ExptEnd = Events.times(end);
     exendid = length(Events.times)+1;
     Events.codes(exendid,1) = ENDEXPT;
@@ -1612,7 +1640,7 @@ for j = 1:length(exstartid)
         Result.bsdelay = Events.times(id(fsid)) - bstimes(bid);
     else
         fprintf('Length Mismatch for Stimlevel (%d) and FrameSignal (%d) Last gap %.1f\n',length(bid),length(fsid),td);
-        FindMissingTimes(Events, Text, bstimes, estimes,bid,fsid,ts,te);
+        FindMissingTimes(Events, Text, bstimes, estimes,bid,id(fsid),ts,te);
         Result.bsdelay = [];
     end
     end
@@ -2192,11 +2220,12 @@ codes = zeros(1,length(aText.text));
 findstrs = {'puA' 'puF' 'USd' 'USp' 'USf' 'nph' 'ijump' 'mixac' 'baddir' ...
     'e1max' 'backMov' 'FakeSig' 'pBlack' 'aOp' 'aPp' 'seof' 'serange' ...
     'nimplaces' 'usenewdirs' 'choicedur' 'cha' 'imi' 'choicedur' 'ePr' ...
-    'coarsemm' 'psyv' 'imi' 'nbars' 'imY' 'imX'};
+    'coarsemm' 'psyv' 'imi' 'nbars' 'imY' 'imX' 'bjv'};
 charstrs = {'Covariate'  'hxtype' 'cx' 'adapter' 'exp' 'et' 'e2' 'e3' 'explabel' 'exptvars'};
 extrastrs = {'StartDepth' 'Electrode' 'Write' ' Electrode' 'Experiment' 'Off at' 'CLOOP' 'cm=' ...
     'mt' 'fx' 'fy' 'rw' 'st' 'fl+' 'Nf' 'dx:' 'EndExpt' 'sonull' 'NewConnect' 'BGCS Version' 'rptframes' ...
-    'seof' '/local' 'imve' 'Sa:' 'op' 'annTyp' 'uf' 'lo' 'vve' 'testflag' 'Hemishpere' 'Reopened' 'monitor'};
+    'expname' 'immode'  ...
+    'seof' '/local' 'imve' 'Sa:' 'op' 'annTyp' 'uf' 'lo' 'vve' 'testflag' 'Hemisphere' 'Reopened' 'monitor' 'RightHemi'};
 findstrs = [findstrs charstrs extrastrs];
 for j = 1:length(findstrs)
     f = findstrs{j};
@@ -2278,6 +2307,7 @@ nfpj=0;
 bsctr = 0;
 waitloop = round(length(aText.text)/20); %update waitbar 20 times
 E.explabel = '';
+electrodestrs = {};
 
 for j = 1:length(aText.text)
 %    aText.text{j} =  deblank(aText.text{j});
@@ -2324,6 +2354,9 @@ for j = 1:length(aText.text)
                 if (isfield(a,'electrode') && ~strcmp(a.electrode,'default')) || ~isfield(Peninfo,'electrode')
                     Peninfo = CopyFields(Peninfo, a);
                     Peninfo.trode = txt;
+                end
+                if isfield(a,'electrode')
+                    electrodestrs{end+1} = a.electrode;
                 end
                 id = strfind(txt,'Contact');
                 if length(id)
@@ -2587,7 +2620,9 @@ for j = 1:length(aText.text)
             elseif strncmp(txt,'cm=rf',5)
                 a = sscanf(txt,'cm=rf%f,%f:%fx%f,%fdeg pe%f %f,%f fx=%f,fy=%f');
                 Stimulus.rf = a;
-            end
+            elseif strncmp(txt,'expname',5)
+                Stimulus.explabel = val;
+            end %end of 'X'
         elseif aText.codes(j,4) == 2  % this was FROM spike 3
             if acode == 3 && instim == 1 %end stim
                 instim = 2;
@@ -2713,7 +2748,7 @@ for j = 1:length(aText.text)
                     else
                         StimTypes.char.(ss) = 1;
                         Stimulus.(ss) = val;
-                        fprintf('Adding %s as char\n',ss);
+                        fprintf('Adding %s as char (%s)\n',ss,val);
                     end            
                 else
                     Stimulus.(ss) = val;
@@ -2877,7 +2912,11 @@ if isfield(Trials,'ve') && iscellstr(Trials.ve)
     end
 end
 
-if isempty(Expts(end).et) && length(Expts) > 1
+if length(unique(electrodestrs)) > 1
+    Peninfo.electrodestrs = unique(electrodestrs);
+end
+
+if  length(Expts) > 1 && isempty(Expts(end).et)
     Expts(end).et = Expts(end-1).et;
     Expts(end).e2 = Expts(end-1).e2;
     Expts(end).e3 = Expts(end-1).e3;
@@ -3126,6 +3165,10 @@ if isfield(Expts,'firsttrial')
     end
 [Expts, Expt] = SortExpts(Expts, Trials, Header, thecluster, Expt, state);
 Expts = AddComments(Expts,Expt);
+if isempty(Expts)
+    nc = sum([Expt.ExptList.result]==19);
+    cprintf('blue','No Expts. %d were cancelled. %d not saved\n',nc,unsavedexpts);
+end
 end
 
 if mkidx == 1
@@ -3147,6 +3190,9 @@ WriteErrors(idxfile, Expt);
 
 
 function  StimCh = AddStimsFromFile(AddTxtFile, StimCh)
+%Add Stim On/Off events in pairs: format
+%timeon timeoff
+
 fid = fopen(AddTxtFile,'r');
 if fid > 0
     a = textscan(fid,'%f %f','delimiter','\n'); %ON, Off
@@ -3158,6 +3204,7 @@ if fid > 0
         StimCh.level = lvl;
         StimCh.times = t;
     end
+    fclose(fid);
 end
 
 function Trials = AddStimValsFromFile(name, Trials)
@@ -3183,6 +3230,19 @@ if fid > 0
         end
     end
 end
+
+function [Expt, Expts] = LoadExptsFile(name)
+    if exist(name)
+        load(name);
+        Expt.state.nospikes = 1;
+        Expt = CopyFields(Expt,Tidx);
+        for j = 1:length(Expts)
+            Expts{j}.Header.loadname = strrep(name,'Expts.mat','.mat');
+        end
+    else
+        Expt = [];
+        Expts= {};
+    end
 
 function SaveExpts(name, Expts)
 %make separate files for each expt on disk so that can access in parallel
@@ -3317,7 +3377,7 @@ if fid > 0
             if strncmp(s{j},'cm=rf',5)
                 id = find(strncmp('cm=rf',aText.text,5));
                 for k = 1:length(id)
-                    aText.text(id,:) = s(j);
+                    aText.text(id(k)) = s(j);
                 end
             end
         elseif t(j) == -1000  %put these at the end
@@ -3605,6 +3665,7 @@ ids = [ids find(strcmp('bsdelay',fn))];
 ids = [ids find(strcmp('stimname',fn))];
 ids = [ids find(strcmp('explabel',fn))];
 ids = [ids find(strcmp('exptvars',fn))];
+ids = [ids find(strcmp('Trw',fn))];
 ids = [ids find(strcmp('uf',fn))];
 %ids = [ids strmatch('imver',fn)];
 %ids = [ids strmatch('imse',fn)];
@@ -3630,6 +3691,9 @@ for j = 1:length(seqstrs)
     end
 end
 
+    if isfield(AllTrials,'uStimt') && length(AllTrials.uStimt) < length(AllTrials.Start)
+                    AllTrials.uStimt{length(AllTrials.Start)} = [];
+    end
 
 fn = fn(setdiff([1:length(fn)],ids));
 for nf = 1:length(fn)
@@ -3654,8 +3718,10 @@ end
 
 if isfield(AllTrials,'Phaseseq')
     for j = 1:length(AllTrials.Phaseseq)
-        id = find(AllTrials.Phaseseq{j} == 0);
-        AllTrials.Phaseseq{j}  = 1;
+        if ~isempty(AllTrials.Phaseseq{j})
+            id = find(AllTrials.Phaseseq{j} == 0);
+            AllTrials.Phaseseq{j}  = 1;
+        end
     end
 end
 if ~isfield(AllTrials,'Events') || length(AllTrials.Events) < length(AllTrials.Start)
@@ -4257,7 +4323,8 @@ for nx = 1:length(AllExpts)
     end
     %if Expt.Stimvals.x2 is set, it means it was manually set via AddTxt
     if ~isfield(Expt.Stimvals,'x2') || Expt.Stimvals.x2 == 0
-        if timesexpt > nt/2
+        xid = strcmp(checkoptions,'+x2');
+        if optioncounts(xid) > nt/2
             Expt.Stimvals.x2 = 1;
         else
             Expt.Stimvals.x2 = 0;
@@ -4588,15 +4655,44 @@ bid = strmatch('bss',Text.text);
 bsstimes = Text.times(bid);
 tid = find(bsstimes >  ts & bsstimes < te);
 eid = find(bstimes > ts & bstimes < te);
+if length(bstimes) >= length(bsstimes)
 x = bsstimes-bstimes(1:length(bsstimes));
 hold off;
 plot(bsstimes,x,'o');
 hold on;
-x = bsstimes(tid)-bstimes(eid(1:length(tid)));
-plot(bsstimes(tid),x,'ro');
+end
+if length(tid) <= length(eid)
+    x = bsstimes(tid)-bstimes(eid(1:length(tid)));
+    plot(bsstimes(tid),x,'ro');
+else
+    x = bsstimes(tid(1:length(eid)))-bstimes(eid);
+    plot(bsstimes(tid(1:length(eid))),x,'ro');
+end
 plot([ts ts],get(gca,'ylim'));
 plot([te te],get(gca,'ylim'));
-
+if length(fsid)  > length(bsid)
+for j = 1:length(bsid)
+    adiffs(j) = bstimes(bsid(j)) - Events.times(fsid(j));
+    bdiffs(j) = bstimes(bsid(j)) - Events.times(fsid(j+1));
+end
+cdiff = abs(adiffs) > abs(bdiffs);
+%if adiffs is small at first, then it changes so that bdiffs is small
+%thats the missing trial
+id = 1+find(diff(cdiff) > 0);
+if length(id) == 1
+    cprintf('red','MissingStimon For Trial %d at %.3f\n',id, Events.times(fsid(id)));
+    cprintf('red','Create .Stimon File to fix\n');
+end
+plot(adiffs,bdiffs);
+end
+if length(bsid) > length(fsid)
+    for j = 1:length(fsid)
+        adiffs(j) = bstimes(bsid(j)) - Events.times(fsid(j));
+        bdiffs(j) = bstimes(bsid(j+1)) - Events.times(fsid(j));
+    end
+    cdiff = abs(adiffs) > abs(bdiffs);
+end
+    
 
 function name = BuildName(name)
 if isempty([strfind(name,'/') strfind(name,'\')])

@@ -1,0 +1,1 @@
+function val = mygetappdata(DATA, str)        if DATA.interactive < 0            if isfield(DATA,'appdata') && isfield(DATA.appdata,str)                val = DATA.appdata.(str);            else                val = [];            end        else            val = getappdata(DATA.toplevel,str);        end        

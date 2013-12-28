@@ -1,0 +1,1 @@
+function DATA = ResetDataForNewProbe(DATA)    DATA.xy = {[]};    DATA.clst = [];    DATA.plotspk.probes = [];  %so that its reset    DATA.restricttimerange = [];    DATA.excludetrialids = [];    DATA.usestdtemplates = 0;    DATA.trigdt = 0;

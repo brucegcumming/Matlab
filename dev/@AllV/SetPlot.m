@@ -1,0 +1,1 @@
+function SetPlot(a,b, fcn)    [DATA, F] = GetDataFromFig(a);    if strcmp(fcn,'testscore')        DATA.plottype = 12;    elseif strcmp(fcn,'allspace')        DATA.plottype = 11;    end    AllV.ReplotPCs(DATA,[]);    AllV.SetFigure(DATA.tag.tmplscore, DATA);    set(DATA.toplevel,'UserData',DATA);

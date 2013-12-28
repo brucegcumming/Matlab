@@ -1,0 +1,1 @@
+function r = CalcRadius(E,xy)        rx = E.xyr(3);    ry = E.xyr(4);    xys = xyrotate(xy(:,1)-E.xyr(1),xy(:,2)-E.xyr(2),E.angle);    r = ((xys(:,1))./rx).^2 + ((xys(:,2))./ry).^2;

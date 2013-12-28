@@ -1,0 +1,1 @@
+function QuickSpks(DATA,nspk)    step = max([1 round(length(DATA.uid)/nspk)]);    id = 1:step:length(DATA.uid);    AllVoltages = AllV.mygetappdata(DATA,'AllVoltages');    DATA.voffset = CalcVoffset(AllVoltages,DATA.plotspk.probes,0);    AllV.PlotSpikes(DATA,DATA.uid(id),'setcontext');    AllV.FinishSpikePlot(DATA);

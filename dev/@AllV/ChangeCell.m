@@ -1,0 +1,1 @@
+function ChangeCell(a,b,p)    DATA = GetDataFromFig(a);    if isfield(DATA,'CellDetails');        eid = find(DATA.CellDetails.exptids == DATA.exptno);    else        eid = DATA.exptno;    end    ecells = squeeze(DATA.CellList(eid,:,:));    [x,y] = find(ecells == p);    AllV.ChangeProbe(a,b,x);    

@@ -1,0 +1,1 @@
+function val = myisappdata(DATA,str)if DATA.interactive < 0    if ~isfield(DATA,'appdata')        val = 0;    elseif isfield(DATA.appdata,str)        val = 1;    else        val = 0;    endelse    val = isappdata(DATA.toplevel,str);end        

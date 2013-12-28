@@ -1,0 +1,1 @@
+function tcut = IsTemplateCut(E)       tcut = 0;   if isfield(E,'space') && E.space(1) ==6 && ismember(E.space(2), [4 7])       tcut = 1;   elseif E.plottype == 3       tcut = 1;   end    

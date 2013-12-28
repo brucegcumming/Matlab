@@ -1,0 +1,1 @@
+function Labels = PCLabels(DATA, usestd)    for j = 1:length(DATA.pcplots)        Labels{j} = sprintf('%dvs%d',DATA.pcplots(j,1),DATA.pcplots(j,2));    end

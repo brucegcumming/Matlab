@@ -1,0 +1,1 @@
+function C = CheckClusterFields(C)    if ~isfield(C,'auto')        C.auto = 0;    end    if ~isfield(C,'manual')        C.manual = 0;    end    

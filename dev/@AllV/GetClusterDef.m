@@ -1,0 +1,1 @@
+function C = GetClusterDef(cluster, n)%return relevant member of teh clsuter struc    C = [];    if n == 1        C = cluster;    elseif n-1 <= length(cluster.next)        C = cluster.next{n-1};    else         C = cluster;    end        

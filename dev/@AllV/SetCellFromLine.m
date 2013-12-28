@@ -1,0 +1,1 @@
+function SetCellFromLine(a,b, cluster, cell)    DATA = GetDataFromFig(a);    DATA = AllV.SetCellEntry(DATA, DATA.cluster, DATA.exptno,DATA.probe(1),cluster, cell);    if max(cell) > length(DATA.comparecell)        DATA.comparecell(1+length(DATA.comparecell):cell) = 0;    end    set(DATA.toplevel,'UserData',DATA);    AllV.PlotCellList(DATA,'showfig');        

@@ -1,0 +1,1 @@
+function DATA = CloseLog(DATA)    if DATA.interactive < 0         if DATA.logfid > 0            try                 fclose(DATA.logfid);                 fprintf('Closed log (fid%d)\n',DATA.logfid);            catch                fprintf('Error Closing log (fid%d)\n',DATA.logfid);            end            DATA.logfid = -1;        end    end

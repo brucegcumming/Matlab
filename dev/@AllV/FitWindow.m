@@ -1,0 +1,1 @@
+function FitWindow(F)c = get(F,'children');set(c,'units','pixels');b = get(c,'position'); x = cat(1,b{:}); w = max(x(:,1)+x(:,3)); h = max(x(:,2)+x(:,4)); b  = get(F,'position'); set(F,'position',[b(1) b(2) w+min(x(1,:)) h+min(x(1,:))]);set(c,'units','normalized');  

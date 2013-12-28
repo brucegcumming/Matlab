@@ -1,0 +1,1 @@
+function FinishSpikePlot(DATA)    AllV.AddCellMean(DATA,find(DATA.comparecell));

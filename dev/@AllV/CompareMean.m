@@ -1,0 +1,1 @@
+function CompareMean(a,b, p)    DATA = getDataFromFig(a);    DATA.plot.comparemean = p;    AllV.PlotMeanSpike(DATA);    set(DATA.toplevel,'UserData',DATA);    

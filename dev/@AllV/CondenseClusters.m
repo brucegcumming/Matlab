@@ -1,0 +1,1 @@
+function C= CondenseClusters(C, go, varargin)allfields = {};for j = 1:length(C)    if ~isempty(C{j})    f = fields(C{j});    allfields = unique({allfields{:} f{:}});    endendfor j = 1:length(C)    if ~isempty(C{j})    f = fields(C{j});        for k = 1:length(f)            CC(j).(f{k}) = C{j}.(f{k});        end    endendif go == 0    return;endC = CC;    

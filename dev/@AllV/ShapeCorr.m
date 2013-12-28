@@ -1,0 +1,1 @@
+function xc = ShapeCorr(P,Q)    xc = corrcoef(P.MeanSpike.ms(:),Q.MeanSpike.ms(:));    xc = xc(1,2);

@@ -45,6 +45,10 @@ if ~isfield(C,'auto')
     errs{nerr} = 'missingauto';
     C.auto = 0;
 end
+if ~isfield(C,'automode')
+    C.automode = 'mahal';
+end
+
 if ~isfield(C,'savetime')
     C.savetime = [0 0];
 end

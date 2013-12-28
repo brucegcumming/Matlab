@@ -6,7 +6,7 @@ DATA.layout.top = [];
     DATA.layout.lfp = [];
     DATA.layout.combineplot = [];
     DATA.layout.options = [];
-    DATA.prefsdir = '/bgc/group/matlab/preferences/Combine/';
+    DATA.prefsdir = [GetFilePath('preferences') '/Combine/'];
     DATA.layoutfile = [DATA.prefsdir 'default.config.mat'];
     DATA.bysuffix = 0;
     if ~isempty(layout)

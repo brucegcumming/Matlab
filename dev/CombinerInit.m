@@ -10,7 +10,7 @@ end
     DATA.layout.lfp = [];
     DATA.layout.combineplot = [];
     DATA.layout.options = [];
-    DATA.gui.prefsdir = '/bgc/group/matlab/preferences/Combine/';
+    DATA.gui.prefsdir = [GetFilePath('preferences') '/Combine/'];
     DATA.defaultconfig = [DATA.gui.prefsdir '/' gethostname '.' GetUserName '.config'];
     DATA.defaultlayout = [DATA.gui.prefsdir '/' gethostname '.' GetUserName '.layout.mat'];
     if ~isfield(DATA,'configfile') || isempty(DATA.configfile)

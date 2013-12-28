@@ -1,5 +1,7 @@
 function [res, details] = TreeSummary(path, varargin)
-%[res, details] = TreeSummary(path, varargin)
+%[res, details] = TreeSummary(path, varargin) Summarize disk usage
+%if path is a cell array of strings, searches each direcory then combines
+%Call with its own results ot replot: TreeSummary(res, details);
 res = [];
 details = [];
 plottype = 1;
@@ -79,7 +81,7 @@ end
 
 
 function [T, details] = FixData(T, varargin)
-filetypes = { '.smr' '.ns5' 'FullV.mat'};
+filetypes = { '.smr' '.ns5' 'FullV.mat' 'spkblk.*.mat|rawp.*.mat'};
 
 j = 1;
 while j <= length(varargin)
@@ -166,6 +168,7 @@ oldname = get(gcf,'name');
 set(gcf,'name','Busy......');
 drawnow;
 nlvl = double(D.nlvl);
+startlevel = double(startlevel);
 dids = D.dids;
 plot(D.levels,D.sizes,'o');
 for k = startlevel:nlvl

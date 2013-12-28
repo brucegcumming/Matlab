@@ -918,13 +918,14 @@ end
 if GetEval(Expt,'st') == 10 & isfield(Expt.Trials,'st')
     id = find([Expt.Trials.st] == 3)
     sfs = unique([Expt.Trials(id).sf]);
-    
+    if ~isempty(id)
     ida = find([Expt.Trials(id).sf] == sfs(1));
     idb = find([Expt.Trials(id).sf] == sfs(2));
     bvals = [bvals -1001];
     [Expt.Trials(id(ida)).(btype)] = deal(-1001);
     bvals = [bvals -1002];
     [Expt.Trials(id(idb)).(btype)] = deal(-1002);
+    end
 end
 
 if exist('ctype','var')

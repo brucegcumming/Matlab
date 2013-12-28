@@ -1,6 +1,9 @@
 function fits = BuildRFFits(dirname, varargin)
+%fits = BuildRFFits(dirname, varargin)
 %find OP/PP expts and fit x,Y, positions
 %currently crashed on M009
+%if dirname is a cell array, fits is a cell array of fits
+%See also PlotRFFits, CombineRFData
 savefits = 0;
 refit = 0;
 parallel = 0;
@@ -33,17 +36,19 @@ if iscellstr(dirname)
         parfor j = 1:length(dirname)
             fprintf('Worker %d Doing %s\n',mygetCurrentTask('number'),dirname{j})
             try
-            fits{j} =BuildRFFits(dirname{j}, varargin{:});
+                fits{j} =BuildRFFits(dirname{j}, varargin{:});
             catch ME
                 cprintf('red','Error in %s\n',dirname{j});
                 fits{j}.dirname = dirname{j};
+                [a,b,c, fits{j}.name] = GetMonkeyName(dirname{j});
                 fits{j}.errstate = ME;                
             end
         end
+        CheckExceptions(fits);
     else
-    for j = 1:length(dirname)
-        fits{j} =BuildRFFits(dirname{j}, varargin{:});
-    end
+        for j = 1:length(dirname)
+            fits{j} =BuildRFFits(dirname{j}, varargin{:});
+        end
     end
     return;
 elseif isfield(dirname,'fits') && iscell(dirname.fits)
@@ -59,18 +64,28 @@ end
     outname = [dirname  '/rffits.mat'];
     if exist(outname) && ~refit
         load(outname);
+        if ~isfield(fits,'spacing')
+            Array = GetArrayConfig(dirname);
+            if isfield(Array,'spacing') && Array.spacing > 0
+                fits.spacing = Array.spacing;
+                save(outname,'fits');
+            end
+        end
         return;
     end
-    suffixes = {'/*PP.mat' '/*PP.cell*.mat' '/*OP.mat' '/*OPRC.mat' '/*OP.cell*.mat' '/*PPRC.mat' ...
-        '/*OPRC.cell*mat' '/*PPRC.cell*mat'};
+    [a,b,c, name] = GetMonkeyName(outname);
+    suffixes = {'/*PP.mat' '/*PP.cell*.mat' '/*PP.mu*.mat' '/*OP.mat' '/*OPRC*.mat' '/*OP.cell*.mat' '/*OP.mu*.mat' '/*PPRC.mat' ...
+        '/*OPRC.cell*mat' '/*PPRC.cell*mat' '.*OPPP.mat'};
+    suffixes = {'PP' 'OP' 'PPRC' 'OPRC' 'OPPP' 'XO' 'YO'};
     fits = {};
     for j = 1:length(suffixes)
-        d = mydir([dirname suffixes{j}]);
+        d = mydir({[dirname '/*' suffixes{j} '.mat'] [dirname '/*' suffixes{j} '.cell*.mat'] [dirname '/*' suffixes{j} '.mu*.mat']});
         a = FitExpts(d);
         fits = {fits{:} a{:}};
     end
     if isempty(fits)
         fits.dirname = dirname;
+        fits.name = name;
         fits.nfits = 0;
         return;
     end
@@ -94,6 +109,7 @@ end
         
     X.dirname = dirname;
     X.nfits = length(X.fits);
+    X.name = name;
     fits = CombineFits(X);
 if savefits && ~isempty(fits.fits)
     save(outname, 'fits');
@@ -125,6 +141,9 @@ for j = 1:length(fits)
             exptype(j) = 1;
         elseif strfind(expts{j},'Op')
             exptype(j) = 2;
+        elseif strfind(expts{j},'sOXor') && ~isempty(fits{j}.RFpos)
+            rfpos(j,:) = fits{j}.RFpos;
+            exptype(j) = 3;
         else
             exptype(j) = 0;
         end
@@ -147,8 +166,8 @@ if ~isempty(probe)
     probes = unique(probe);
     nrf = 0;
     for j = 1:length(probes)
-        pid = find(probe == probes(j) & exptype == 1 & pvar > 0.5 & fitamp > 0);
-        oid = find(probe == probes(j) & exptype == 2 & pvar > 0.5 & fitamp > 0);
+        pid = find(probe == probes(j) & ismember(exptype,[1 3]) & pvar > 0.5 & fitamp > 0);
+        oid = find(probe == probes(j) & ismember(exptype,[2 3]) & pvar > 0.5 & fitamp > 0);
         a = depth([oid pid]);
         meandepth = mean(a(~isnan(a)));
         if isempty(meandepth)
@@ -157,6 +176,7 @@ if ~isempty(probe)
             a(isnan(a)) = meandepth;
         end
         depth([oid pid]) = a;
+        bothexp = find(exptype ==3);
         if ~isempty(oid) && ~isempty(pid)
             d = sort(depth([oid pid]));
             bid = find(diff((d)) > 0.5); %500uM break in position
@@ -170,7 +190,12 @@ if ~isempty(probe)
                     if ~isempty(doid) & ~isempty(dpid)
                         ppos = mean(meanpos(dpid));
                         opos = mean(meanpos(doid));
-                        rf = op2xy([opos ppos],ro(o));
+                        id = intersect(dpid,bothexp);
+                        if isempty(id)  %use separate O,P estimates
+                            rf = op2xy([opos ppos],ro(o));
+                        else %use data from OPPP expts
+                            rf = mean(rfpos(id,:));
+                        end
                         rf(3) = mean(meansd(doid));
                         rf(4) = mean(meansd(dpid));
                         rf(5) = ro(o);

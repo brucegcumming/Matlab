@@ -2,7 +2,9 @@ function fit = FitExpt(dat, varargin)
 %FitExpt(Expt....)
 %vanilla fits for RF measures
 %Expt is a result output from PlotExpt, not a standard expt structure. 
-
+%...'vonmises')   uses wrapped Gaussian for orientation tuning 
+%for OPPP expts (multiple oris and apsect ratios) returns a 2-element
+%struct. f(1).RFpos has combined estimate of X,Y of RF.
 fit = [];
 showplot = 0;
 fitargs = {};
@@ -28,7 +30,7 @@ if isempty(dat)
 end
 
 if ~isfield(dat,'x')
-    cprintf('red','No X in %s\n',dat.name);
+    cprintf('red','FitExpt: No X in %s\n',dat.name);
     return;
 end
     if ~isfield(dat,'handles')

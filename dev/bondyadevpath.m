@@ -1,36 +1,23 @@
+root='/b/'; 
+home='bondya/matlab/dev';
 if ispc
-    home='Z:/bondya/matlab/dev';
-    cd(home)
-    path('Z:/group/matlab',path);
-    path('Z:/bgc/matlab/BlackRock',path);
-    path('Z:/bgc/matlab',path);
-    path('Z:/bgc/anal/orbw/',path);
-    devpath
-    path('Z:/bondya/matlab',path);
-    path(home,path);
-elseif ismac
-    home='/sc/bgc/bondya/matlab/dev';
-    if isdir(home)
-        cd(home)
-        path('/sc/bgc/group/matlab',path);
-        path('/sc/bgc/bgc/matlab/BlackRock',path);
-        path('/sc/bgc/bgc/matlab',path);
-        path('/sc/bgc/bgc/anal/orbw',path);
-        devpath;
-        path('/sc/bgc/bondya/matlab',path);
-        path(home,path);
-    else
-        home='/Volumes/bgc/bondya/matlab/dev';
-        if isdir(home)
-            path('/Volumes/bgc/group/matlab',path);
-            path('/Volumes/bgc/bgc/matlab/BlackRock',path);
-            path('/Volumes/bgc/bgc/matlab',path);
-            path('/Volumes/bgc/bgc/anal/orbw',path);
-            path('/Volumes/bgc/bgc/matlab/dev',path);
-            path('/Volumes/bgc/bondya/matlab',path);
-            path(home,path);
-        end
-    end
-            
+    cd Y:/
 end
-fprintf(['Hi Adrian.  Path is set.  Working directory is',' ',home,'\n']);
+if isdir(root)
+    if isdir([root,home])
+        cd([root,home]);
+        path([root,'group/matlab'],path);
+        path([root,'bgc/matlab/BlackRock'],path);
+        path([root,'bgc/matlab'],path);
+        path([root,'bgc/anal/orbw'],path);
+        path([root,'bgc/matlab/dev'],path);
+        path([root,'bondya/matlab/ralf'],path);        
+        path([root,'bondya/matlab'],path);
+        path([root,home],path);
+        fprintf(['Hi Adrian.  Path is set.  Working directory is',' ',root,home,'\n']);
+    else
+        PrintMsg(0,'Could not set path. %s does not exist.',home);
+    end      
+else
+    PrintMsg(0,'Could not set path. %s does not exist.',root);
+end

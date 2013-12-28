@@ -1549,7 +1549,7 @@ function DATA = ReadGridFile(DATA)
    plotsummary = 2;
    [a,b,c,d] = fileparts(DATA.name);
    if isempty(strfind(path,'BlackRock'))
-       path(path,'/bgc/matlab/BlackRock');
+       path(path,[GetFilePath('bgcmatlab') '/BlackRock');
    end
    if DATA.state.online
        id = strfind(DATA.name,'/');
@@ -1614,7 +1614,7 @@ end
         end
     else
         ts = now;
-        [Trials, Expts, All] = APlaySpkFile(name, 'expts', args{:});
+        [Trials, Expts, All] = APlaySpkFile(name, args{:});
         fprintf('APlaySpkFile Took %.2f\n',mytoc(ts));
         if isfield(Trials,'DataType')
             DATA.filetype = Trials.DataType;
@@ -2993,7 +2993,7 @@ function [Expt, DATA, plotres] = CombinePlot(DATA, dlgs, varargin)
         if isfield(DATA,'AllClusters')
             Clusters{nb} = SmallCluster(DATA.AllClusters,DATA.expid(j),cellprobes(ij));
             if isfield(Clusters{nb},'excludetrialids')
-                excludeids = cat(2,excludeids,Clusters{nb}.excludetrialids{1});
+                excludeids = cat(1,excludeids(:),Clusters{nb}.excludetrialids{1}(:));
             end
         elseif isfield(DATA.Expts{DATA.expid(j)},'Cluster')
                 Clusters{nb} = DATA.Expts{DATA.expid(j)}.Cluster;
@@ -3305,7 +3305,11 @@ function DATA = ReadFinishedDir(DATA, name, varargin)
         Expts{nexp}.gui.clustertype = 0;
         newt = [Expts{nexp}.Trials.Trial];
         Expts{nexp}.gui.firsttrial = newt(1);
-        Expts{nexp}.errs = Idx{nexp}.errs;
+        if isfield(Idx{nexp},'errs')
+            Expts{nexp}.errs = Idx{nexp}.errs;
+        elseif isempty(Idx{nexp})
+            cprintf('red','Empty Idx for Expt %d, may have alignement errors\n',nexp);
+        end
         Expts{nexp}.gui.ntrials = length(newt);
         if isfield(Idx{nexp},'DataType')
             DataTypes{nexp} = Idx{nexp}.DataType;
@@ -3683,9 +3687,11 @@ end
                 DATA.probe = DATA.probelist(1);
             end
 
+            if isfield(DATA.ArrayConfig,'id')
         for j = 1:length(DATA.ArrayConfig.id)
             DATA.probenames{j} = sprintf('%d(E%d %d,%d)',j,DATA.ArrayConfig.id(j),DATA.ArrayConfig.X(j),DATA.ArrayConfig.Y(j));
         end
+            end
         if np > 1
                 DATA = AddMultiProbeGUI(DATA);
         end
@@ -10583,13 +10589,16 @@ DATA.state.recount = 1;
 %(e.g.  grating.sf1OXM instead of grating.OXM), then find the modifier part
 %and keep it. 
     modifier = '';
-    id = regexp(DATA.outname,'\.');
-    if length(id) > 3
-        expname = DATA.outname(id(3)+1:id(4)-1);
+    file = CombinedName(DATA,DATA.extype,1);
+
+    id = regexp(file,'\.');
+    ndot = 2; %Needs to be 2 e.g. lemM214/ ? 3 at othe rtimes?
+    if length(id) > ndot
+        expname =file(id(ndot)+1:id(ndot+1)-1);
     end
     id = regexp(outname,'\.');
-    if length(id) > 3
-        bexpname = outname(id(3)+1:id(4)-1);
+    if length(id) > ndot
+        bexpname = outname(id(ndot)+1:id(ndot+1)-1);
         id = strfind(bexpname,expname);
         if ~strcmp(bexpname,expname) && ~isempty(id)
             modifier = bexpname(1:id-1);
@@ -11666,7 +11675,7 @@ function [DATA, D] = CheckClusterLoaded(DATA, eid, pid, varargin)
         if eid > DATA.appendexptid
             [Clusters, F, D] = LoadCluster(DATA.appenddir{1},eid-DATA.appendexptid(1)+1,'getxy','noauto');
         else
-            [Clusters, F, D] = LoadCluster(DATA.datadir,eid,'getxy','noauto');
+            [Clusters, F, D] = LoadCluster(DATA.datadir,eid,'getxy');
         end
         for j = length(Clusters):-1:1
             
@@ -11865,7 +11874,7 @@ function DATA = GetNS5Spikes(DATA, eid, probe);
     end
     highpass = 100;
     if isempty(strfind(path,'BlackRock'))
-        path(path,'/bgc/bgc/matlab/BlackRock');
+               path(path,[GetFilePath('bgcmatlab') '/BlackRock');
     end
     set(DATA.toplevel,'name','Loading Spikes from ns5');
     drawnow;

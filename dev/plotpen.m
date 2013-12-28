@@ -60,8 +60,18 @@ if type == RF
                 set(h,'color',c);
             end
             rfsize = sqrt(map.rf(id,3)^2 + map.rf(id,4)^2);
-            fprintf('%s %d %d %s %s %.2f %.2f %.0f sz=%.2f\n',map.cellname{idx(j)},...
-                map.pen(idx(j,1)),map.area(idx(j)),areanames{map.area(idx(j))},map.datestr{idx(j)},rfs(j,1),rfs(j,2),map.depth(idx(j)),rfsize);
+            c = '';
+            if size(rfs,2) > 9
+                rfxy = [rfs(j,1)-rfs(j,9) rfs(j,2)-rfs(j,10)];
+                if sum(abs(rfs(j,9:10))) > 0.5
+                    c = '*';
+                end
+            else
+                rfxy = [rfs(j,1) rfs(j,2)];
+            end
+            d = map.depth(idx(j));
+            fprintf('%s %d %d %s %s %.2f %.2f%c %.3f sz=%.2f\n',map.cellname{idx(j)},...
+                map.pen(idx(j,1)),map.area(idx(j)),areanames{map.area(idx(j))},map.datestr{idx(j)},rfxy,c,map.depth(idx(j)),rfsize);
 
         end
     end

@@ -151,6 +151,9 @@ if ischar(name)
     if strfind(name,'idx.mat')
         argon = {};
         load(name);
+        if ~isfield(Expt,'state') 
+            Expt.state.nospikes = 0;
+        end
         Expt.Header.loadname = strrep(name,'idx.mat','.mat');
         state.tt = TimeMark(state.tt,'Loaded');
         [Expts, Expt, state] = SortExpts(Expts, Expt.Trials, Expt.Header, thecluster, Expt, state, argon{:});
@@ -2220,26 +2223,31 @@ codes = zeros(1,length(aText.text));
 findstrs = {'puA' 'puF' 'USd' 'USp' 'USf' 'nph' 'ijump' 'mixac' 'baddir' ...
     'e1max' 'backMov' 'FakeSig' 'pBlack' 'aOp' 'aPp' 'seof' 'serange' ...
     'nimplaces' 'usenewdirs' 'choicedur' 'cha' 'imi' 'choicedur' 'ePr' ...
-    'coarsemm' 'psyv' 'imi' 'nbars' 'imY' 'imX' 'bjv'};
-charstrs = {'Covariate'  'hxtype' 'cx' 'adapter' 'exp' 'et' 'e2' 'e3' 'explabel' 'exptvars'};
+    'coarsemm' 'psyv' 'imi' 'nbars' 'imY' 'imX' 'bjv' 'imx'  'imy'};
+charstrs = {'Covariate'  'hxtype' 'cx' 'adapter' 'exp' 'et' 'e2' 'e3' 'explabel' 'exptvars' 'imprefix' 'stimtag'};
 extrastrs = {'StartDepth' 'Electrode' 'Write' ' Electrode' 'Experiment' 'Off at' 'CLOOP' 'cm=' ...
     'mt' 'fx' 'fy' 'rw' 'st' 'fl+' 'Nf' 'dx:' 'EndExpt' 'sonull' 'NewConnect' 'BGCS Version' 'rptframes' ...
-    'expname' 'immode'  ...
+    'expname' 'immode' ...
     'seof' '/local' 'imve' 'Sa:' 'op' 'annTyp' 'uf' 'lo' 'vve' 'testflag' 'Hemisphere' 'Reopened' 'monitor' 'RightHemi'};
+%really need to order these ny length, logest last, so that long matches
+%take preceendnce
+vartypes(1:length(findstrs)) = 'N';
+vartypes((1+length(findstrs)):(length(findstrs)+length(charstrs))) = 'C';
+vartypes((1+length(vartypes)):(length(vartypes)+length(extrastrs))) = 'X';
 findstrs = [findstrs charstrs extrastrs];
+for j = 1:length(findstrs)
+    lens(j) = length(findstrs{j});
+end
+[a,b] = sort(lens);
+findstrs = findstrs(b);
+vartypes = vartypes(b);
 for j = 1:length(findstrs)
     f = findstrs{j};
     slens(j) = length(f);
     id = find(strncmp(f,aText.text,length(f)));
     codes(id) = j;
-    if sum(strcmp(f, charstrs))
-        vartypes(j) = 'C';
-    elseif sum(strcmp(f, extrastrs))
-        vartypes(j) = 'X';
-    else
-        vartypes(j) = 'N';
-    end
 end
+
 j = j+1;
 id = find(strncmp('sb',aText.text,2));
 codes(id) = j;
@@ -2621,7 +2629,11 @@ for j = 1:length(aText.text)
                 a = sscanf(txt,'cm=rf%f,%f:%fx%f,%fdeg pe%f %f,%f fx=%f,fy=%f');
                 Stimulus.rf = a;
             elseif strncmp(txt,'expname',5)
-                Stimulus.explabel = val;
+                if strcmp(val,'NotSet')
+                    Stimulus.explabel = '';
+                else
+                    Stimulus.explabel = val;
+                end
             end %end of 'X'
         elseif aText.codes(j,4) == 2  % this was FROM spike 3
             if acode == 3 && instim == 1 %end stim
@@ -3600,8 +3612,8 @@ end
 
 outname = strrep(Header.loadname,'.mat','Expts.mat');
 if exist(outname) && state.resort == 0
-    load(outname,'ExptState');
-    if ExptState.alltrials == state.alltrials %otherwise need to reload
+    X = load(outname,'ExptState');
+    if isfield(X,'ExptState') && X.ExptState.alltrials == state.alltrials %otherwise need to reload
         fprintf('Using Expts saved in %s\n',outname);
         load(outname);
         return;
@@ -3665,6 +3677,8 @@ ids = [ids find(strcmp('bsdelay',fn))];
 ids = [ids find(strcmp('stimname',fn))];
 ids = [ids find(strcmp('explabel',fn))];
 ids = [ids find(strcmp('exptvars',fn))];
+ids = [ids find(strcmp('imprefix',fn))];
+
 ids = [ids find(strcmp('Trw',fn))];
 ids = [ids find(strcmp('uf',fn))];
 %ids = [ids strmatch('imver',fn)];
@@ -3758,14 +3772,17 @@ for nx = 1:length(AllExpts)
         Header.usebadtrials = 1;
         igood = 1:length(a);
         fn = {fn{:} 'Result'};
+        ngood = sum(AllTrials.Result(a) > 0)
     else
         igood = find(AllTrials.Result(a) > 0);
+        ngood = length(igood);
     end
     nt = length(igood);
     igood = a(igood);
     nu = 0; %number of ustim pulses
-    if nt <= 3 && AllExpts(nx).result ~= CANCELEXPT && state.showerrs
-        err = sprintf('%s Expt %d only %d good trials',Header.Name,nx,nt);
+    % even when using all trials, don't include expts that have no good ones
+    if ngood <= 3 && AllExpts(nx).result ~= CANCELEXPT && state.showerrs
+        err = sprintf('%s Expt %d only %d/%d good trials',Header.Name,nx,ngood,nt);
         Idx = AddError(err, Idx, 0);
     end
     if ~isfield(AllExpts,'result')
@@ -3774,7 +3791,7 @@ for nx = 1:length(AllExpts)
     if ~isfield(AllExpts,'e3')
         AllExpts(1).e3 = 'e0';
     end
-    if nt> 3 & igood(1) < length(AllTrials.Start) & ismember(AllExpts(nx).result,[2 0])
+    if ngood> 3 & igood(1) < length(AllTrials.Start) & ismember(AllExpts(nx).result,[2 0])
        spkids = [];
        needfields = {};
        if isempty(AllExpts(nx).e3)

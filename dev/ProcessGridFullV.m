@@ -662,11 +662,13 @@ if refcut && (~isempty(Clusters) || exist(cfile,'file'))
     cutres{1} = [];
     V = ver('MATLAB');
     mver = sscanf(V.Version,'%f');
-    if parallel && mver > 7.5
+    if parallel && length(gotexpts) == 1
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(1),probes,1);
+    elseif parallel && mver > 7.5
         parfor (j = 1:length(gotexpts))
             fprintf('####Expt%d is Lab %d of %d\n',gotexpts(j),labindex,numlabs);
             try
-            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes);
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes,0);
             catch ME
                 cutres{j} = ME;
             end
@@ -675,7 +677,7 @@ if refcut && (~isempty(Clusters) || exist(cfile,'file'))
         parfor (j = 1:length(gotexpts))
             fprintf('####Expt%d is Lab %d of %d\n',gotexpts(j),labindex,numlabs);
             try
-            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes);
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes,0);
             catch ME
                 fprintf('!!!!!!Error E%d %s\n',gotexpts(j),errstr(ME));
                 cutres{j} = [];
@@ -683,7 +685,7 @@ if refcut && (~isempty(Clusters) || exist(cfile,'file'))
         end        
     else
         for (j = 1:length(gotexpts))
-            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes);
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes,0);
         end
     end
     DATA.cutres = cutres;
@@ -697,10 +699,16 @@ if autocut
     else
         autotype = 'autocutall';
     end
+    if length(gotexpts) == 1 && parallel
+        e = gotexpts(1);
+        outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p1FullV.mat'];
+        AllVPcs(outfile,'tchan',probes,'GridData','nocheck','savespikes',autotype,'parallel');
+    else
     parfor (j = 1:length(gotexpts))
         e = gotexpts(j);
         outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p1FullV.mat'];
         AllVPcs(outfile,'tchan',probes,'GridData','nocheck','savespikes',autotype);
+    end
     end
 end
 
@@ -723,7 +731,7 @@ function s =errstr(err)
    s = sprintf('%s at line %d, m-file %s)\n',err.message,err.stack(1).line,err.stack(1).name);
 
 
-function res = MakeCut(DATA, Clusters, e, probes)
+function res = MakeCut(DATA, Clusters, e, probes, parallel)
 
 res = [];
 tag = sprintf('Expt%d',e);
@@ -731,7 +739,19 @@ if isfield(DATA,'Expts') && length(DATA.Expts) >= e
     Expt = DATA.Expts{e};
     DATA.allvargs = {DATA.allvargs{:} 'Expt' Expt};
 end
-    
+   
+if parallel
+    res = {};
+    parfor p = probes
+        outfile = [DATA.idx.datdir '/Expt' sprintf('%d.p%dFullV.mat',e,p)];
+        if isfield(Clusters{p},'shape')
+            res{p} = AllVPcs(outfile,'tchan',p,'GridData','reapply',Clusters{p},DATA.allvargs{:},'savespikesonly','noninteractive','nolog');
+        end
+    end
+    for j = 1:length(res)
+        Clusters{j} = res{j}.Cluster;
+    end
+else
 for p = probes;
     outfile = [DATA.idx.datdir '/Expt' sprintf('%d.p%dFullV.mat',e,p)];
     if isfield(Clusters{p},'shape')
@@ -747,7 +767,7 @@ end
 if res.toplevel
 close(res.toplevel);
 end
-
+end
 function took = SaveFullV(name, FullV)
 
 tic;

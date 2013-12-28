@@ -46,12 +46,17 @@ end
 sid = b(a> 0);
 
 
+nex = 1;
 for j = 1:length(sid)
     fprintf('Reading %s\n',d(sid(j)).name);
-    [Ex{j}, Expts] = APlaySpkFile(d(sid(j)).name,'nospikes','noerrs', varargin{:});
+    [Ex{nex}, Expts] = APlaySpkFile(d(sid(j)).name,'nospikes','noerrs', varargin{:});
     if ~isempty(Expts)
         AllExpts = {AllExpts{:} Expts{:}};
     end
+    if length(Expts) > 1
+        fprintf('%d Expts in %s\n',length(Expts),d(sid(j)).name);
+    end
+    nex = length(AllExpts)+1; %so that it lines up with Expts,
 end
 
 for j = 1:length(Ex)

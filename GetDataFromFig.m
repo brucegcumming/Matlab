@@ -12,7 +12,7 @@ javaobj = 0;
         a = get(a,'uipanel');
         javaobj = 1;
     end
-    b = GetFigure(a);
+    b = GetFigure(a,'noforce');
     if isappdata(b,'ParentFigure')
         b = getappdata(b,'ParentFigure');
         DATA = get(b,'UserData');

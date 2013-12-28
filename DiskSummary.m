@@ -1,5 +1,7 @@
 function result = DiskSummary(path)
-
+%result = DiskSummary(path)
+%searches path and summarized disk useage
+%See also TreeSummary, which plots itself
 
 [a,b,c,d] = TreeFind(path);
 result.names = a;

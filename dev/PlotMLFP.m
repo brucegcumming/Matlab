@@ -198,7 +198,11 @@ for j = 1:length(extypes)
             fprintf('No Field %s in Trials\n',extypes{j});
             return;
         end
+        if ischar(Expt.Trials(1).(extypes{j}))
+            vals{j} = {Expt.Trials.(extypes{j})};
+        else
         vals{j} = [Expt.Trials.(extypes{j})];
+        end
         uvals{j} = unique(vals{j});
         env(j) = length(uvals{j});
     end
@@ -296,32 +300,36 @@ allids = {};
 if length(env) == 1
     env(2) = 1;
 end
-for ii = 1:prod(env(2:end))
+for ii = 1:prod(env(1:end))
     [cx{:}] = ind2sub(env,ii);
-    for j = 1:length(xvals)
-        idx = find(xiv == xvals(j));
-        for k = 2:length(cx)
-            id = find(vals{k} == uvals{k}(cx{k}));
-            idx = intersect(idx,id);
-        end
-        n = sum(ismember(idx,cat(2,allids{:})));
-        if n == 0
-            if isempty(idx)
-                idx = [];
-            end
-            allids{ii,j} = idx;
-        elseif n < length(idx)
-            idx = [];
+    idx = 1:length(vals{1});
+    for k = 1:length(cx)
+        if iscellstr(vals{k})
+            id = find(strcmp(uvals{k}{cx{k}},vals{k}));
         else
+            id = find(vals{k} == uvals{k}(cx{k}));
+        end
+        idx = intersect(idx,id);
+    end
+    j = cx{1};
+    [j,k] = ind2sub([env(1) prod(env(2:end))],ii);
+    n = sum(ismember(idx,cat(2,allids{:})));
+    if n == 0
+        if isempty(idx)
             idx = [];
         end
-        alln(ii,j) = length(idx);
-        if ~isempty(idx)
-            %    for k = 1:size(LFP,2);
-            lfpm(ii,j,:,:) = squeeze(mean(LFP(:,:,idx),3))';
-            lfpft(ii, j,:,:) = squeeze(mean(abs(PWR(:,:,idx)),3))';
-            %    end
-        end
+        allids{ii,j} = idx;
+    elseif n < length(idx)
+        idx = [];
+    else
+        idx = [];
+    end
+    alln(k,j) = length(idx);
+    if ~isempty(idx)
+        %    for k = 1:size(LFP,2);
+        lfpm(k,j,:,:) = squeeze(mean(LFP(:,:,idx),3))';
+        lfpft(k, j,:,:) = squeeze(mean(abs(PWR(:,:,idx)),3))';
+        %    end
     end
 end
 
@@ -434,32 +442,48 @@ elseif plottype ==  9 % plot power vs expt var
         colors = mycolors;
         hold off;
         nl = 0;
-        for j = 1:size(lfpft,1)
+
+        for ii = 1:prod(env(1:end))
+            [cx{:}] = ind2sub(env,ii);
+            idx = 1:length(vals{1});
+            for k = 1:length(cx)
+                if iscellstr(vals{k})
+                    id = find(strcmp(uvals{k}{cx{k}},vals{k}));
+                else
+                    id = find(vals{k} == uvals{k}(cx{k}));
+                end
+                idx = intersect(idx,id);
+            end
+            j = cx{1};
+            [j,k] = ind2sub([env(1) prod(env(2:end))],ii);
             sc = styles{1+mod(j-1,4)};
-            for k = 1:size(lfpft,2)
-                [cx{:}] = ind2sub(env,(j-1)*env(2)+k);
-                if alln(j,k) > 0
-                    nl = nl+1;
-                    result.(extypes{1})(nl) = uvals{1}(cx{1});
-                    labels{nl} = sprintf('%s=%.2f',et,xvals(k));
-                    for m = 2:length(cx)
-                        result.(extypes{m})(nl) = uvals{m}(cx{m});
+            if alln(k,j) > 0
+                nl = nl+1;
+                result.(extypes{1})(nl) = uvals{1}(cx{1});
+                labels{nl} = sprintf('%s=%.2f',et,xvals(j));
+                for m = 2:length(cx)
+                    result.(extypes{m})(nl) = uvals{m}(cx{m});
+                    if iscellstr(uvals{m})
+                        labels{nl} = [labels{nl} sprintf(',%s',uvals{m}{cx{m}})];
+                    else
                         labels{nl} = [labels{nl} sprintf(',%s=%.2f',extypes{m},uvals{m}(cx{m}))];
                     end
-                    labels{nl} = [labels{nl} sprintf(',n=%d',alln(j,k))];
-                    result.resps(:,:,nl) = squeeze(mean(lfpft(j,k,probes,freqs),3));
-                    result.n(nl) = alln(j,k);
-                    result.sid(nl) = j;
-                    if length(xvals) == 1
-                        plot(result.freqs,squeeze(mean(lfpft(j,k,probes,freqs),3)),'-','color',colors{j});
-                    else
-                        plot(result.freqs,squeeze(mean(lfpft(j,k,probes,freqs),3)),'color',colors{k},'linestyle',sc);
-                    end
-                    hold on;
                 end
+                labels{nl} = [labels{nl} sprintf(',n=%d',alln(k,j))];
+                result.resps(:,:,nl) = squeeze(mean(lfpft(k,j,probes,freqs),3));
+                result.n(nl) = alln(k,j);
+                result.sid(nl) = j;
+                ylines = find(sum(alln') >0);
+                yl = find(k ==ylines);
+                if length(xvals) == 1
+                    plot(result.freqs,squeeze(mean(lfpft(k,j,probes,freqs),3)),'-','color',colors{j});
+                else
+                    plot(result.freqs,squeeze(mean(lfpft(k,j,probes,freqs),3)),'color',colors{yl},'linestyle',sc);
+                end
+                hold on;
             end
-        end
-        legend(labels);
+    end
+    legend(labels);
         set(gca,'yscale','log');
         axis('tight');
     else

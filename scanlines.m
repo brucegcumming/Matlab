@@ -1,7 +1,8 @@
 function txt = scanlines(name,varargin)
 %txt = scanlines(name)  retunrs a cell array of strings corresponding
 %to the lines in text file name.  Wrapper for textscan+fopen
-
+% ...,'silent', suppresses error message (Usually prints in red if file
+% doen not exist)
 silent = 0;
 j = 1;
 argon = {};

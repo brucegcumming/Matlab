@@ -282,7 +282,7 @@ if init & isempty(toplevel)
     bp(1) = bp(1) + bp(3)+ HSPACE;
     uicontrol(gcf,'Style', 'pushbutton','String','Plot','Callback',['PlotMap(' top ',''plot'');'],'Position', bp);
     bp(1) = bp(1)+bp(3)+HSPACE;
-    uicontrol(gcf,'style','pop','string','Map|Grid|GridVar|GridDepth|Contour|Xpcolor|Ypcolor|dZdX|Arrows|MeanArrow|GMdepth|GMsmooth', ...
+    uicontrol(gcf,'style','pop','string','Map|Grid|GridVar|GridDepth|Contour|Xpcolor|Ypcolor|dZdX|Arrows|MeanArrow|GMdepth|GMsmooth|Scatter', ...
            'Callback', [' PlotMap(' top ',''plottype'');'], 'Tag','plottype',...
         'position',bp,'value',1); bp(1) = bp(1)+bp(3)+HSPACE;
     uicontrol(gcf,'Style', 'text','String','Monkey','Position', bp);
@@ -367,14 +367,15 @@ end
 
 function map = rflist2map(DATA, R)
 MapDefs;
-name2area = [1 1 2 1 10];
+name2area = [1 1 2 1 10 10 10 10]; %currently all unknown* cases are V1c
+readpenlogs = 0;
 
 for j = 1:length(R)
     map.rf(j,:) = R{j}.rf;
     map.cellname{j} = R{j}.name;
     map.area(j) = 1;
     if isfield(R{j},'area')
-        a = find(strcmp(R{j}.area,{'V1' 'Vd' 'V2' 'unknown' 'Vc'}));
+        a = find(strcmp(R{j}.area,{'V1' 'Vd' 'V2' 'unknown' 'Vc' 'unknown*' 'Vd*' 'V1*'}));
         if ~isempty(a)
             map.area(j) = name2area(a);
         end
@@ -382,6 +383,7 @@ for j = 1:length(R)
     map.hemisphere(j) = 0;
     if isfield(R{j},'date')
         map.datestr{j} = datestr(R{j}.date);
+        map.age(j) = now-R{j}.date;
     else
         map.datestr{j} = 'unknown';
     end
@@ -397,6 +399,7 @@ end
 [c,d] = max(a);
 map.monkey = b{d};
 map.monkeyname = b{d};
+if readpenlogs
 txt = scanlines(['/bgc/anal/' map.monkey '/pens.err']);
 for j = 1:length(txt)
     a = sscanf(txt{j},'%f');
@@ -406,7 +409,7 @@ for j = 1:length(txt)
         map.rf(id,8) = a(3);
     end
 end
-   
+end
 map.monkey = find(strcmp(map.monkeyname, DATA.monkeynames));
 map.pen = map.rf(:,6:8);
 
@@ -569,10 +572,12 @@ elseif DATA.plot.type == 12
 elseif DATA.plot.type == 4
     PlotGridDepths(DATA);
     return;
-elseif ismember(DATA.plot.type, [5 6 7]) %contour/pcolor plot
+elseif ismember(DATA.plot.type, [5 6 7 13]) %contour/pcolor plot
     PlotRFContour(DATA, DATA.plot.type);
 elseif DATA.plot.type == 8
     PlotZX(DATA);
+elseif DATA.plot.type == 13
+    PlotRFScatter(DATA)
 else
     PlotRFMap(DATA, gridlines);
     offset = range(DATA.xc)/60;
@@ -757,8 +762,8 @@ end
 tic;
 
 for j = idx;
-    xpos(j) = map.rf(j,1);
-    ypos(j) = map.rf(j,2);
+    xpos(j) = map.rf(j,1)-map.rf(j,9);
+    ypos(j) = map.rf(j,2)-map.rf(j,10);
     if map.pen(j,2) > -99 & DATA.selected(j)
         all.px(j) = map.pen(j,2);
         all.py(j) = map.pen(j,3);
@@ -900,15 +905,33 @@ RePlot(DATA);
 
 function PlotRFContour(DATA, type)
 [X,Y] =meshgrid(floor(min(DATA.px)):ceil(max(DATA.px)),floor(min(DATA.py)):ceil(max(DATA.py)));
+rfxy(1,:) = DATA.map.rf(:,1)-DATA.map.rf(:,9);
+rfxy(2,:) = DATA.map.rf(:,2)-DATA.map.rf(:,10);
+rfxy(3,:) = DATA.map.rf(:,7);
+rfxy(4,:) = DATA.map.rf(:,8);
 for j = 1:size(X,1)
     for k = 1:size(X,2)
         id = find(abs(DATA.px - X(j,k)) < 0.7 & abs(DATA.py - Y(j,k)) < 0.7);
+        px = DATA.px(id);
+        py = DATA.py(id);
         if ~isempty(id)
             Z(j,k) = mean(DATA.xc(id));
             ZY(j,k) = mean(DATA.yc(id));
         else
             Z(j,k) = NaN;
             ZY(j,k) = NaN;
+        end
+        if type == 13 && ~isempty(id)
+            idx = find(abs(rfxy(3,:)-px) < 0.5 & abs(rfxy(4,:)-py) < 0.5 & DATA.selected);
+            if length(idx) > 1
+                r = abs((rfxy(1,idx)-DATA.xc(j)) + i .* (rfxy(2,idx)-DATA.yc(j)));
+                ZY(j,k) = std(r);
+                if ZY(j,k) > 1
+                    n = length(r);
+                end
+            else
+                ZY(j,k) = NaN;
+            end
         end
     end
 end
@@ -936,6 +959,13 @@ elseif type == 7
     h = pcolor(X,Y,Z);
     set(h,'buttondownfcn',@HitImage);
     colorbar;
+elseif type == 13
+    GetFigure('RFscatter',DATA.top);
+    hold off; 
+    [X,Y,Z] = fillpmesh(X,Y,ZY)
+    h = pcolor(X,Y,Z);
+    set(h,'buttondownfcn',@HitImage);
+    colorbar;
 end
 
 function HitImage(a,b)
@@ -946,6 +976,22 @@ px = floor(c(1));
 py = floor(c(1,2));
 fprintf('At %d,%d Pos = %.1f\n',px,py,c(1,3));
 plotpen(DATA,px,py);
+
+
+function PlotRFScatter(DATA)
+
+map = DATA.map
+pens = map.pen;
+rfxy(1,:) = map.rf(:,1)-map.rf(:,9);
+rfxy(2,:) = map.rf(:,2)-map.rf(:,10);
+for j = 1:length(DATA.xc)
+ px = DATA.px(j);
+ py = DATA.py(j);
+    idx = find(abs(pens(:,2) - px) < 0.6 & abs(pens(:,3) - py) < 0.6);
+
+    if length(idx) >  1
+    end
+end
 
 function PlotRFMap(DATA,gridlines)
 
@@ -1341,6 +1387,7 @@ while j <= length(varargin)
 end
 
 penfile = sprintf('/bgc/bgc/anal/%s/pens/pendata.mat',monkey);
+penfile = CheckNameBug(penfile);
 if exist(penfile,'file') && ~reload
     load(penfile);
     map.pens = pens;

@@ -58,7 +58,9 @@ for j = 1:length(eid)
     end
         
     if exist(aname,'file') && getauto >= 0
+        tic;
         load(aname);
+        details{j}.loaddur = toc;
         AutoClusters = Clusters;
         for p = 1:length(AutoClusters)
             AutoClusters{p}.auto = 1;

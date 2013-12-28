@@ -131,8 +131,14 @@ for j = 1:length(sfiles)
         end
         res.srcstate(gid(j)) = 1;
         if go(1)
-            fprintf('Copying %s to %s\n',[src '/' sfiles{j}],[tgt '/' sfiles{j}]);
-            copyfile([src '/' sfiles{j}],[tgt '/' sfiles{j}]);
+            tgtfile = [tgt '/' sfiles{j}];
+            tgtdir = fileparts(tgtfile);
+            if ~exist(tgtdir,'dir')
+                fprintf('Making Dir %s\n',tgtdir);
+                mkdir(tgtdir);
+            end
+            fprintf('Copying %s to %s\n',[src '/' sfiles{j}],tgtfile);
+            copyfile([src '/' sfiles{j}],tgtfile);
         end
     else
         if sdates(j) > tdates(ti) +mindiff

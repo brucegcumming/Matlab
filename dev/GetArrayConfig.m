@@ -237,7 +237,7 @@ Array = [];
     end
     penid = mode(allpen);
     allpen = unique(allpen);
-    pentxt = sprintf('/bgc/bgc/anal/%s/pens/pen%d.log', GetMonkeyName(name),penid);
+    pentxt = sprintf('%s/%s/pens/pen%d.log', GetFilePath('anal'),GetMonkeyName(name),penid);
     txt = scanlines(pentxt);
     id = find(strncmp('Electr',txt,6));
     if ~isempty(id)
@@ -275,11 +275,7 @@ Array = [];
 labels = {};
 match = [];
 Arrays = {};
-if ispc %for 2013b bug
-    d = mydir('\bgc/group/arrays/*.mat');
-else
-    d = mydir('/bgc/group/arrays/*.mat');
-end
+d = mydir([GetFilePath('group') '/arrays/*.mat']);
 for j = 1:length(d)
     try
         load(d(j).name);

@@ -1,12 +1,12 @@
 
 os = computer;
 if strmatch(os,{'MAC' 'MACI' 'MACI64'})
-    path(path,'/bgc/group/matlab');
-    path('/Volumes/bgc/bondya/matlab',path);
-    path('/Volumes/bgc/bondya/matlab/dev',path);
-    path('/Volumes/bgc/bgc/matlab',path);
-    path('/Volumes/bgc/bgc/matlab/dev',path);
-    cd /Volumes/bgc/bgc/matlab/dev
+    path(path,'/b/group/matlab');
+    path('/b/bondya/matlab',path);
+    path('/b/bondya/matlab/dev',path);
+    path('/b/bgc/matlab',path);
+    path('/b/bgc/matlab/dev',path);
+    cd /b/bgc/matlab/dev
 elseif strmatch(os,'GLNXA64')
     path(path,'/sc/bgc/group/matlab');
     path('/sc/bgc/bgc/matlab',path);

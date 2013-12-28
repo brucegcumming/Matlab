@@ -30,6 +30,7 @@ Comments = [];
 ExptsList = [];
 for j = 1:length(d)
     load(d(j).name);
+    Expt.Header.builddate = double(d(j).datenum);
     for k = 1:length(Expt.Comments.text)
         if strncmp(Expt.Comments.text{k},' Electrode',7)
         elseif strncmp(Expt.Comments.text{k},'Electrode',7)
@@ -93,7 +94,12 @@ end
 function truet = ConvertTime(Expt, t)
 %t in seconds
 
+t = double(t);
+if isfield(Expt.Header,'CreationDate')
 truet = Expt.Header.CreationDate + t ./(24 .* 60 .* 60 .* 1000);
+else
+truet = Expt.Header.builddate + t ./(24 .* 60 .* 60 .* 1000);
+end
 
 function d = FindElectrodeDepth(Expt, t)
 

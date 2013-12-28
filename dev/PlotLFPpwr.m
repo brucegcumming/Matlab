@@ -23,10 +23,12 @@ j =1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'calcresp',5)
         calcresp = 1;
-        if length(varargin) > j && ischar(varargin{j+1}) && isfield(X,varargin{j+1})
+        if length(varargin) > j && ischar(varargin{j+1}) 
             j = j+1;
-            explot = varargin{j};
-            expts = 1;
+            if (isfield(X,varargin{j}) || iscell(X))
+                explot = varargin{j};
+                expts = 1;
+            end
         elseif iscell(varargin{j+1});
             j = j+1;
             expts = varargin{j};
@@ -61,10 +63,13 @@ end
 if iscell(X)
     allf = {'n'};
     All = X{1};
-    if isfield(All,'exptypes')
-        for j = 1:length(X)
-            allf = union(allf,X{j}.extypes);
+    if isfield(All,'extypes')
+        allf = All.extypes;
+        for j = 2:length(X)
+            allf = union(allf,[X{j}.extypes]);
         end
+    else
+        allf = {'n'};
     end
     for j = 1:length(X)
         for k = 1:length(allf)

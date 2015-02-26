@@ -47,6 +47,8 @@ makeV = 0;
 prefix = [];
 lastblk = 0;
 checkblocks = 1;
+useall = 0;
+Expt = [];
 
 while j <= length(varargin)
     if isstruct(varargin{j})
@@ -61,6 +63,9 @@ while j <= length(varargin)
             j =j+1;
             clusterprops = varargin{j};
         end
+    elseif strncmpi(varargin{j},'Expt',4)
+        j = j+1;
+        Expt = varargin{j};
     elseif strncmpi(varargin{j},'submean',7)
         checkrw = 2;
     elseif strncmpi(varargin{j},'checkrw',7)
@@ -109,27 +114,40 @@ samper=1./40000;
 avg = [];
 maxpts = 200000000; %made v big July 2012
 res.errmsg = {};
+res.errdata = [];
 
 if length(spk) > 1 && sumv
     if isempty(C)
         return;
     end
+
     if isstruct(C) %given a list of "probes" structs
     [chspk, lens, starts, offsets, f, X] = CountProbeChans(C, spk);
     else
     [chspk, lens, starts, offsets, f, X] = CountChans(C, spk);
     end
-    
+     if isfield(X,'errs')
+         res.errmsg = {res.errmsg{:}, X.errs{:}};
+     end
+     if isfield(X,'errdata')
+         res.errdata = {res.errdata X.errdata};
+     end
+    if useall
+            np = max(chspk);
+            V(np,npts) = 0; % preallocate
+            res.samper = X.samper;
+    end
     probelist = unique(chspk);
     id = find(X.nchans < length(probelist));
     if length(id)
         fprintf('Some Blocks are missing channels:  %s\n', sprintf(' %d',id));
+%These blocks are NOT included in the FullV
         sumt = 0;
         badid = id;
         badblk = [];
         for j = 1:length(id)
             bid = find(X.blks == id(j));
-            msg = sprintf('%s %d Chans at %.1f-%.1f',X.names{X.ix(bid(1))},...
+            msg = sprintf('%s %d Chans at %.1f-%.1f. Excluded Time Range',X.names{X.ix(bid(1))},...
                 X.nchans(id(j)),X.blkstart(id(j)),X.blkstart(id(j))+X.blklen(id(j)).*X.samper);
             fprintf('%s\n',msg);
             res.errmsg = {res.errmsg{:} msg};
@@ -137,13 +155,13 @@ if length(spk) > 1 && sumv
             badblk = [badblk bid];
         end
         res.error = 0;
-
+        res.badblk = badblk;
         res.nchans = X.nchans;
         res.probelist = probelist;
         res.sumerrtime = sumt;
         if sumt > 10
-        res.error = 1;
-            fprintf('%s Seconds of missing channels - Aborting write\n');
+            res.error = 1;
+            fprintf('%.1f Seconds of missing channels - Aborting write\n',sumt);
             return;
         end
         id = setdiff(1:length(X.blks),badblk);
@@ -216,6 +234,12 @@ if length(spk) > 1 && sumv
         return;
     end
     np = max(chspk);
+    if isempty(np) || npts == 0
+        suffs = unique([C.suffix]);
+        res = AddError(res,'No Data available for Expt %d',suffs(1));
+        res.error = 1; %won't be saved
+        return;
+    end
     V(np,npts) = 0; % preallocate
     res.samper = X.samper;
     if isstruct(C) && ~isempty(prefix)
@@ -267,10 +291,13 @@ if length(spk) > 1 && sumv
     res.chspk = sort(unique(chspk));
     sumv = mean(V);
     if checkrw == 2
+        %mx = sumv * sumv';
         g = V * sumv';
+%mean(g) is the same as sumv * sumv' because sumv is the mean of V;        
         g = g./mean(g);
+        res.meangain = g;
         for j = 1:length(g)
-%            gV(j,:) = V(j,:) -sumv .*g(j);
+%            gV(V(j,:) -sumv .*g(j);
         end
         for j = 1:size(V,1) %use less memory
             V(j,:) = V(j,:) - sumv .* g(j);
@@ -852,7 +879,7 @@ function [chspk, lens, starts, offsets, chnames, X] = CountChans(C, spk);
 samper=1./40000;
 ns = 1;
 names = {};
-MAXOVERLAP=0.001;
+MAXOVERLAP=0.0015;
 for p = 1:length(C)
     f = fields(C{p});
     if isfield(C{p},'name');
@@ -992,10 +1019,24 @@ for j = unique(chspk)
 
     id = find(starts(chid(order(2:end))) < ends(chid(order(1:end-1)))-MAXOVERLAP);
     bzid = find(starts(chid(order(2:end))) < ends(chid(order(1:end-1))));
-    if length(bzid)
-        fprintf('CH%d %d blocks end(n) > start(n+1). %d by > 2ms  (%s)\n',chspk(j),length(bzid),length(id), sprintf('%.1f ',starts(chid(order(bzid+1)))));
+    if ~isempty(id)
+        X = AddError(X,'CH%d %d blocks end(n) > start(n+1). %d by > %.0fms  (Starts %s) (Ends %s)\n',...
+            chspk(j),length(bzid),length(id), MAXOVERLAP,...
+            sprintf('%.4f ',starts(chid(order(id+1)))),sprintf('%.4f ',ends(chid(order(id)))));
+        
+    elseif ~isempty(bzid)
+        fprintf('CH%d %d blocks end(n) > start(n+1). But all < 2ms  (Starts %s) (Ends %s)\n',chspk(j),length(bzid), ...
+            sprintf('%.4f ',starts(chid(order(bzid+1)))),sprintf('%.4f ',ends(chid(order(bzid)))));
     end
-    good(chid(order(id))) = 0;
+    for k = 1:length(id)
+        a = chid(order(id(k)));
+        b = chid(order(id(k)+1));
+        if (ends(a)-starts(a)) > (ends(b)-starts(b))
+            good(b) = 0;
+        else
+            good(a) = 0;
+        end
+    end
 end
 bad = find(good ==0);
 good = find(good);

@@ -1,0 +1,1 @@
+function DATA = DeleteCell(DATA, e, p, cl)if cl > 0     oldcell = DATA.CellList(e,p,cl);    DATA.CellList(e,p,cl) = 0;    DATA.CellChanges = cat(1,DATA.CellChanges,[e p 0 cl now oldcell]);    if isfield(DATA,'muCellList')        DATA.muCellList(e,p,cl) = 0;    endendPC.SaveCellList(DATA);              

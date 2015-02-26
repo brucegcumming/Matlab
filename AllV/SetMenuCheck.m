@@ -1,5 +1,10 @@
 function SetMenuCheck(F, tag, value, varargin)
-% SetMenuCheck(F, tag, value)
+% Turns on/off checked proerty in menu itesm
+% SetMenuCheck(F, tag, value) finds by tag
+% SetMenuCheck(handle, value) Just sets one item
+% SetMenuCheck(handle, 'exclusive' value) or
+% SetMenuCheck(F, tag, value,'exclusive') 
+%           unsets other members of the same menu
 % Find a menu belonging to figure F, set it checked/unchecked according to value.
 % SetMenu(F, tag, value,'exclusive') turns off other items in the same
 % menu, if value > 0
@@ -22,23 +27,28 @@ onoff = {'off' 'on'}; %in case value > 1
 %would be nice to have second check type
 %or could have value = value > 0?? 
 if ischar(F) %tag for a figure  
-    F = findobj('type','figure','tag',F);
+    F = findobj(get(0,'children'),'flat','type','figure','tag',F);
     if isempty(F);
         return;
     end
 end
 
-if ishandle(F) && ~isfigure(F)
+if ishandle(F) & ~isfigure(F)
     
     if nargin > 1 && strncmp(tag,'exclusive',5)
         exclusive = 1;
+        tag = 1; 
     end
     if exclusive
         c = get(get(F,'parent'),'children');
         set(c,'Checked','off')
     end
-    set(F,'Checked','on');
-elseif ischar(tag)
+    if nargin ==2 && (length(tag) == 0 || tag == 0)
+        set(F,'Checked','off');
+    else
+        set(F,'Checked','on');
+    end
+elseif ischar(tag) %Oftern called by SetGUI...
     it = findobj(F,'Tag',tag);
     if length(it) == 1
         if exclusive

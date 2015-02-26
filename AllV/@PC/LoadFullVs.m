@@ -1,0 +1,1 @@
+function DATA = LoadFullVs(a,b, type, varargin)        DATA = GetDataFromFig(a);    AllFullV = LoadAllFullV(DATA.name,'verbose');    setappdata(DATA.toplevel,'AllFullV',AllFullV);    DATA.allvpcsmode = 'reapply';    set(DATA.toplevel,'UserData',DATA);    

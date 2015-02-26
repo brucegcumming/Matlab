@@ -1,0 +1,1 @@
+function SelectProbe(a,b,p)it = findobj(gca,'Tag','ProbeLabel');if ~isempty(it)    set(it,'color','m');endDATA = GetDataFromFig(a);if p < 1 && ~isempty(b)    p = get(b.NewValue,'UserData');endAllV.ChangeProbe(DATA,[],p);

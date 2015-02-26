@@ -1,0 +1,1 @@
+function ms = MeanSpike(DATA, id, a)    for j = 1:length(id)        ms(:,:,j) = Clusters{id(j)}{a}.MeanSpike.ms;    end    ms = squeeze(mean(ms,3));

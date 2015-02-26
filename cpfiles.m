@@ -8,7 +8,12 @@ function res = cpfiles(src, tgt, varargin)
 %
 %cpfiles (srcdir, tgtdir,'hidenewer')
 %lists new files, but not newer
-
+%
+%cpfiles(...., 'exclude', pattern)  excludes files matching pattern
+%
+% by default, cpfiles does NOT create missing directories, but
+% throws an error if a target directory does not exist. Use
+%%cpfiles(...., 'mkdir', to force making of target directories
 go = [0 0 0];
 show = [1 1 0];
 fargs = {};
@@ -18,6 +23,9 @@ includes = {};
 tgts = {};
 mindiff = 1./24;  %1 hour by defauls
 recurse = 1;
+interactive = 0;
+mkdirs = 0;
+
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'copynewer',8)
@@ -30,6 +38,10 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'include',7)
         j = j+1;
         includes = {includes{:} varargin{j}};
+    elseif strncmpi(varargin{j},'interactive',7)
+        interactive = 1;
+    elseif strncmpi(varargin{j},'mkdir',4)
+        mkdirs = 1;
     elseif strncmpi(varargin{j},'smrdir',6) %defaults for syncing an SMR data directory
 %        excludes = {excludes{:} '\.smr' '\.S2R' '\.[0-9]*\.mat' '\.lfp\.mat'};
         excludes = {excludes{:} '\.smr' '\.S2R' '\.lfp\.mat'};
@@ -97,6 +109,7 @@ if length(includes)
     end
     sfiles = sfiles(gid);
     sdates = sdates(gid);
+    ssz = ssz(gid);
 end
 exclid = [];
 for j = 1:length(sfiles)
@@ -117,6 +130,7 @@ if length(exclid)
     gid = setdiff(1:length(sfiles),exclid);
     sfiles = sfiles(gid);
     sdates = sdates(gid);
+    ssz = ssz(gid);
 end
 
 
@@ -128,8 +142,18 @@ for j = 1:length(sfiles)
             fprintf('%s is new\n',sfiles{j});
         end
         if go(1)
-            fprintf('Copying %s to %s\n',[src '/' sfiles{j}],[tgt '/' sfiles{j}]);
-            copyfile([src '/' sfiles{j}],[tgt '/' sfiles{j}]);
+            tgtfile = [tgt '/' sfiles{j}];
+            if ~isdir(fileparts(tgtfile))
+                if mkdirs
+                    cprintf('blue','Making direcory %s\n',fileparts(tgtfile));
+                    mkdir(fileparts(tgtfile));
+                else
+                    cprintf('red','Cannot copy %s - dir does not exist\n',tgtfile);
+                end
+            else
+                fprintf('Copying %s to %s\n',[src '/' sfiles{j}],tgtfile);
+            end
+                copyfile([src '/' sfiles{j}],[tgt '/' sfiles{j}]);
         end
     else
         if sdates(j) > tdates(ti) +mindiff
@@ -137,9 +161,26 @@ for j = 1:length(sfiles)
                 fprintf('%s is newer (%s vs %s)\n',sfiles{j},datestr(sdates(j)),datestr(tdates(ti)));
             end
             if go(2)
-                fprintf('Copying %s to %s\n',[src '/' sfiles{j}],[tgt '/' sfiles{j}]);
-                copyfile([src '/' sfiles{j}],[tgt '/' sfiles{j}]);
+                if interactive
+                    if ssz(j) == tsz(ti)
+                        fprintf('Size is the same\n');
+                        yn = 'no';
+                    else
+                        yn = input(sprintf('Copy %s to %s\n',[src '/' sfiles{j}],[tgt '/' sfiles{j}]),'s');
+                    end
+                else
+                    fprintf('Copying %s to %s\n',[src '/' sfiles{j}],[tgt '/' sfiles{j}]);
+                    yn = 'yes';
+                end
+                if yn(1) == 'y'
+                    try
+                        copyfile([src '/' sfiles{j}],[tgt '/' sfiles{j}], 'f');
+                    end
+                end
             end
+        elseif sdates(j) > tdates(ti)
+            t = (sdates(j)-tdates(ti)) * 24 * 60;
+            fprintf('%s is only %.3f mins newer than %s. Consider cpfiles(...,''minidff'',0)\n',sfiles{j},t,tfiles{ti});
         elseif sdates(j) <= tdates(ti) && show(3)
             fprintf('%s is older/same\n',sfiles{j});
         end

@@ -11,6 +11,9 @@ function out = PsychMon(varargin)
 %  Adds name to figure tags, so that you can monitor more than one
 %  animal/file
 %
+% if filename is a cell array of strings, PsychMon shows the first, but
+% creates buttons that allow you to step through the files
+%
 % binoc writes a file summarizing psych in a textscan friendly format
 %
 % R%d xx=%f yy=%f time trialdur rwsize
@@ -20,7 +23,16 @@ function out = PsychMon(varargin)
 % R = 0 = WRONG, 1 = CORRECT, 2 = FOUL Choice 3 = BAD-FIX
 % R = 100 or 101 are 0,1 but in a correction loop
 % 50,51 means saccade was not required
-% R=4 means start of expt, xx = Covary Xpos, yy = target ratio 
+% R=109 indicates start of expt
+% R9 Expt Start for Human Psych 
+% R4 stimulus properties at start of expt, 
+% R5 other stimulus properties
+% R7 stimulus properties not in strict format - don't send these lines to
+%                         textscan
+% R27 Cancel Exp
+% R10 = Expt End
+% R8 = Expt Finished by verg
+
 name = 'PsychMon';
 fname = 'PsychMon';
 %
@@ -32,6 +44,7 @@ strings = {};
 
 tag = [name 'Panel']; %need to change these.
 init = 0;
+setdata = 0;
 
 j = 1;
 while j <= length(varargin)
@@ -83,7 +96,7 @@ else
     end
     DATA.figtag = [name 'Online'];
     DATA.plot.noplot = 0;
-    DATA.online = 1;
+    DATA.online = 0; %set to 1 to force copying of today -> today.txt if have blocking issues
 end
 
 
@@ -91,9 +104,13 @@ if nargin
     if ishandle(varargin{1})
         varargin{1} = varargin{3}; %temp kludge for new callback syntax
     end
-    if strncmpi(varargin{1},'update',5)
+    if iscell(varargin{1})
+        init = 1;
+        %alrady done above for first time. ? allow calling again with this
+    elseif strncmpi(varargin{1},'update',5)
         update(DATA);
     elseif strncmpi(varargin{1},'close',5)
+        CloseChildren(DATA.toplevel);
         CloseTag(DATA.figtag);
         CloseTag(tag);
         stop(DATA.timerobj);
@@ -129,6 +146,11 @@ if nargin
         ReadFile(DATA, DATA.fstrings{DATA.current});
     elseif strncmpi(varargin{1},'setplot',5)
         ReadFile(DATA, DATA.filename);
+    elseif exist(varargin{1},'file') && ~isempty(toplevel)
+        DATA.filename = varargin{1};
+        DATA = ReadFile(DATA, DATA.filename);
+        setdata = 1;
+        set(DATA.gui.filename,'string',DATA.filename);
     else
         j = 1;
         init = 1;
@@ -136,36 +158,36 @@ if nargin
             if(strncmpi(varargin{j},'name',3))
                 j = j+1;
                 name = varargin{j};
-    elseif strncmpi(varargin{j},'getexpts',8)
-          DATA.name = name;
-          DATA.online = 0;
-
-        DATA = SetDefaults(DATA);
-        DATA.plot.noplot = 1;
-        DATA = ReadFile(DATA,DATA.filename);
-        out = MakeAllExpts(DATA,varargin{j+1:length(varargin)});
-        return;
-    elseif strncmpi(varargin{j},'getexpt',4)
-        DATA.online = 0;
-          DATA.name = name;
-
-        DATA = SetDefaults(DATA);
-        DATA.plot.noplot = 1;
-          DATA = ReadFile(DATA,DATA.filename);
-          if ~isempty(DATA.score)
-          out = MakeExpt(DATA,varargin{j:end});
-          else
-              out = [];
-          end
-        return;
-    elseif strncmpi(varargin{j},'mintrials',5)
-        j = j + 1;
-        DATA.plot.mintrials = varargin{j};
-    elseif strncmpi(varargin{j},'nmin',4)
-        j = j+1;
-        DATA.plot.nmin = varargin{j};
-        elseif strncmpi(varargin{j},'noplot',5)
-            DATA.plot.noplot = 1;
+            elseif strncmpi(varargin{j},'getexpts',8)
+                DATA.name = name;
+                DATA.online = 0;
+                
+                DATA = SetDefaults(DATA);
+                DATA.plot.noplot = 1;
+                DATA = ReadFile(DATA,DATA.filename);
+                out = MakeAllExpts(DATA,varargin{j+1:length(varargin)});
+                return;
+            elseif strncmpi(varargin{j},'getexpt',4)
+                DATA.online = 0;
+                DATA.name = name;
+                
+                DATA = SetDefaults(DATA);
+                DATA.plot.noplot = 1;
+                DATA = ReadFile(DATA,DATA.filename);
+                if ~isempty(DATA.score)
+                    out = MakeExpt(DATA,varargin{j:end});
+                else
+                    out = [];
+                end
+                return;
+            elseif strncmpi(varargin{j},'mintrials',5)
+                j = j + 1;
+                DATA.plot.mintrials = varargin{j};
+            elseif strncmpi(varargin{j},'nmin',4)
+                j = j+1;
+                DATA.plot.nmin = varargin{j};
+            elseif strncmpi(varargin{j},'noplot',5)
+                DATA.plot.noplot = 1;
             end
             j = j+1;
         end
@@ -178,14 +200,17 @@ if init & isempty(findobj('Tag',tag))
     DATA.tag = tag;
     DATA.name = name;
     DATA = SetDefaults(DATA);
-  if DATA.plot.noplot == 0
-      DATA.fcn =  'PsychMon';
-  DATA = InitInterface(DATA);
-     DATA.timerobj = timer('timerfcn',{@updateplot, DATA.tag},'period',2,'executionmode','fixedspacing');
-     start(DATA.timerobj);
-  end
-  DATA = ReadFile(DATA,DATA.filename);
-  out = DATA;
+    if DATA.plot.noplot == 0
+        DATA.fcn =  'PsychMon';
+        DATA = InitInterface(DATA);
+        DATA.timerobj = timer('timerfcn',{@updateplot, DATA.tag},'period',2,'executionmode','fixedspacing');
+        start(DATA.timerobj);
+    end
+    DATA = ReadFile(DATA,DATA.filename);
+    SetData(DATA);
+    out = DATA;
+elseif setdata
+    SetData(DATA);
 end
 
 
@@ -199,8 +224,13 @@ function DATA = SetDefaults(DATA)
   DATA.plot.shown = 1;
   DATA.plot.rwtype = 1;  
   DATA.plot.alttype = 1;
+  DATA.options.SplitExpts = 0;
+  
   DATA.current = 1;
   DATA.verbose = 0;
+  DATA.showblocks = [];
+  DATA.plotstr = 'PSF';
+  
   if ~isfield(DATA.plot,'nmin')
   DATA.plot.nmin = 5;
   end
@@ -230,51 +260,108 @@ Expts = {};
 if ~isfield(DATA,'score')
     return;
 end
-id = find(ismember(DATA.score(2:end),[0 1 2 3 7 100 101 102 103]) & ismember(DATA.score(1:end-1),[4 5])); %block starts.
-eid = find(ismember(DATA.score(1:end-1),[0 1 2 3 7 100 101 102 103]) & ismember(DATA.score(2:end),[4 5])); %block end.
-sid = find(DATA.score == 5);
-if isempty(id)
-    id(1) = 1;
-    eid(1) = length(DATA.score)-1;
+if DATA.binocversion(1) > 1 || DATA.binocversion(2) > 300
+    id = find(ismember(DATA.score,[9 109]));  %block starts.
+    eid = find(ismember(DATA.score,[10 8 108])); %block end.
+    sid = id;
+    if eid(1) < id(1)
+        eid = eid(2:end);
+    end
+    if length(eid) < length(id)
+        badstart = find(id(2:1+length(eid)) < eid);
+        if isempty(badstart)
+            %must mean that final block lacks end marker
+            %usually has more lines after last trial, so read to eid(j)+1 below
+            %so, if last line is a trial, leave one space
+            eid(length(id)) = length(DATA.score)-1;
+        end
+        while ~isempty(badstart)
+            id(badstart(1)) = [];
+            if length(id) == length(eid)
+                badstart = find(id(2:end) < eid(1:end-1)); %for me to check
+                if ~isempty(badstart)                    
+                    cprintf('Some Block Starts precede previos ends! Lines %s\n',sprintf('%d',id(badstart)));
+                    badstart = [];
+                end
+            else
+                badstart = find(id(2:1+length(eid)) < eid);
+            end
+        end
+
+    end
+    if length(eid) < length(id)
+        eid(length(id)) = length(DATA.score)-1;
+    end
 else
-eid(length(id)) = length(DATA.score)-1;
+%a block start always has R5 or R4 followed by a trial result - 0 1 2 3 7 100 101 103 103 51 53    
+    id = find(ismember(DATA.score(2:end),[0 1 2 3 7 51 53 100 101 102 103]) & ismember(DATA.score(1:end-1),[4 5])); %block starts.
+    eid = find(ismember(DATA.score(1:end-1),[0 1 2 3 7 51 53 100 101 102 103]) & ismember(DATA.score(2:end),[4 5])); %block end.
+    if eid(1) < id(1)
+        eid = eid(2:end);
+    end
+    sid = find(DATA.score == 5);
+    if isempty(id)
+        id(1) = 1;
+        eid(1) = length(DATA.score)-1;
+    else
+        eid(length(id)) = length(DATA.score)-1;
+    end
 end
-nx = 1;
+
+
+% make sure eid and id have the same lengths, and eid-id are all positive
 if length(eid) > length(id) && eid(1) < id(1)
     eid = eid(2:end);
 end
-for j = 1:length(id);
-    Expt = [];
-tmp = DATA;
-ids = union([id(j):eid(j)+1],sid);
-tmp.score = DATA.score(ids);
-if isfield(DATA,'trialvals')
-tmp.trialvals = DATA.trialvals(ids);
-end
-tmp.x = DATA.x(ids);
-tmp.y = DATA.y(ids);
-tmp.xtype = DATA.xtype(ids);
-tmp.ytype = DATA.ytype(ids);
-tmp.sign = DATA.sign(ids);
-tmp.times = DATA.times(ids);
-tmp.rwszs = DATA.rwszs(ids);
-tmp.rwsum = DATA.rwsum(ids);
-tmp.DURS = DATA.DURS(ids);
-Expt = MakeExpt(tmp, varargin{:});
-f = fields(DATA.Block);
-n = (j * 2)-1;
-if isfield(Expt,'Trials') && length(Expt.Trials) > DATA.plot.mintrials
-    for k = 1:length(f)
-        bid = find(DATA.Blockid.(f{k}) <= id(j));
-        if length(bid) & bid(end) <= length(DATA.Block.(f{k}))
-        Expt.Stimvals.(f{k}) = DATA.Block.(f{k})(bid(end));
-        else
-            Expt.Stimvals.(f{k}) = NaN;
+
+
+while length(eid) > length(id)
+    nl = length(eid);
+    for j = 1:length(id)
+        if eid(j) < id(j)
+            cprintf('red','More Expt ends than starts. Deleting block end at line %d\n',eid(j));
+            eid(j) = [];
+            nl = length(eid);
+            break;
         end
     end
-    Expts{nx} = Expt;
-    nx = nx+1;
+    if length(eid) > length(id) && eid(end-1) > id(end)
+        eid(end-1) = [];
+    end
 end
+nx = 1;
+for j = 1:length(id);
+    Expt = [];
+    tmp = DATA;
+    ids = union([id(j):eid(j)+1],sid);
+    tmp.score = DATA.score(ids);
+    if isfield(DATA,'trialvals')
+        tmp.trialvals = DATA.trialvals(ids);
+    end
+    tmp.x = DATA.x(ids);
+    tmp.y = DATA.y(ids);
+    tmp.xtype = DATA.xtype(ids);
+    tmp.ytype = DATA.ytype(ids);
+    tmp.sign = DATA.sign(ids);
+    tmp.times = DATA.times(ids);
+    tmp.rwszs = DATA.rwszs(ids);
+    tmp.rwsum = DATA.rwsum(ids);
+    tmp.DURS = DATA.DURS(ids);
+    Expt = MakeExpt(tmp, varargin{:});
+    f = fields(DATA.Block);
+    n = (j * 2)-1;
+    if isfield(Expt,'Trials') && length(Expt.Trials) > DATA.plot.mintrials
+        for k = 1:length(f)
+            bid = find(DATA.Blockid.(f{k}) <= id(j));
+            if length(bid) & bid(end) <= length(DATA.Block.(f{k}))
+                Expt.Stimvals.(f{k}) = DATA.Block.(f{k})(bid(end));
+            else
+                Expt.Stimvals.(f{k}) = NaN;
+            end
+        end
+        Expts{nx} = Expt;
+        nx = nx+1;
+    end
 end
 if DATA.verbose
     fprintf('%d Expts Made\n',nx);
@@ -357,12 +444,19 @@ end
       if ~strcmp(Expt.Stimvals.e2,'e0')
           Expt.Trials(j).(e2) = DATA.y(id(j));
       end
+      
+      if abs(rem(DATA.sign(id(j)),1)) > 0.05
+          Expt.Trials(j).flipdir = 1;
+      else
+          Expt.Trials(j).flipdir = 0;
+      end
           
-      Expt.Trials(j).rwdir = DATA.sign(id(j));
+      trialsign = sign(DATA.sign(id(j)));
+      Expt.Trials(j).rwdir = trialsign;
       if DATA.score(id(j)) == 1
-          Expt.Trials(j).RespDir = DATA.sign(id(j));
+          Expt.Trials(j).RespDir = trialsign;
       elseif DATA.score(id(j)) == 0
-          Expt.Trials(j).RespDir = -DATA.sign(id(j));
+          Expt.Trials(j).RespDir = -trialsign;
       else
           Expt.Trials(j).RespDir = 0;
           Expt.Trials(j).rwdir = 0;
@@ -414,14 +508,19 @@ if DATA.verbose
     fprintf('Plotting DATA...');
 end
 if ~DATA.plot.noplot
-h = GetFigure(DATA.figtag);
-figure(h);
-hold off;
-it = findobj('Tag','plottype','Parent',DATA.toplevel);
-plottype = get(it,'value');
+    h = GetFigure(DATA.figtag);
+    figure(h);
+    hold off;
+    it = findobj('Tag','plottype','Parent',DATA.toplevel);
+    plottype = get(it,'value');
+    strs = get(it,'string');
+    plotstr = deblank(strs(plottype,:));
 else
     plottype = 0;
+    plotstr = 'default';
 end
+
+DATA.plotstr = plotstr;
 
 if DATA.plot.timerange(1) > 0
     tid = find(DATA.times >= DATA.plot.timerange(1));
@@ -448,8 +547,11 @@ PLOT.times = DATA.times(tid);
 PLOT.sign = DATA.sign(tid);
 PLOT.rwszs = DATA.rwszs(tid);
 PLOT.dur = DATA.DURS(tid);
-sids = find(DATA.score == 4); %% Start of Expt
-eids = find(DATA.score == 5); %% End of Expt
+sids = find(ismember(DATA.score, [4 9 109])); %% Start of Expt
+eids = find(DATA.score == 8); %% End of Expt
+if isempty(eids)
+    eids = find(DATA.score == 5); %% End of Expt
+end
 stime = DATA.DURS(sids(end));
 stime = floor(stime) + mod(stime,1)/60; % Expt start time in hours
 stime = stime - DATA.times(sids(end))/(60 * 60); % time = 0 in hours
@@ -599,9 +701,14 @@ elseif plottype == 6  %cumulative reward
     
     plot([PLOT.times(ids)' PLOT.times(end)],[rwt' rwt(end)]); %make sure last time is plotted, even if not rewarded
     hold on;
-    cid = find(PLOT.score > 99); %correction loops
-    rws = interp1(PLOT.times(ids), rwt, PLOT.times(cid));
+    cid = find(ismember(PLOT.score,[100 101])); %correction loops
+    [~, xid] = unique(PLOT.times(ids));
+    rws = interp1(PLOT.times(ids(xid)), rwt(xid), PLOT.times(cid));
     plot(PLOT.times(cid),rws,'r.');
+    cid = find(ismember(PLOT.score,[27 10 8])); %Ebd Expt
+    [~, xid] = unique(PLOT.times(ids));
+    rws = interp1(PLOT.times(ids(xid)), rwt(xid), PLOT.times(cid));
+    plot(PLOT.times(cid),rws,'g.');
     fprintf('Max %d vs %d',ids(end), length(PLOT.times));
 
     if DATA.score(end) == 5
@@ -846,19 +953,27 @@ elseif plottype == 108   %Check 0 Bias
     [x,y] = xysmooth(ids, respdir(ids),DATA.plot.smooth);
     hold on;
     plot(x,y,'r','linewidth',2);
-elseif plottype == 9   %Check 0 Bias
+elseif sum(strcmp(plotstr,{'Expt' 'SumExpts' 'AllExpts'}))
     fprintf('Making Expt...');
     Expts = MakeAllExpts(DATA);
+    setappdata(DATA.toplevel,'Expts',Expts);
     fprintf('plotting Expt   ');
     epargs = {};
     if DATA.plot.byrw
         epargs = {epargs{:} 'byrw'};
     end
-    ExptPsych(Expts{end},'verbose','shown',epargs{:});
+    if strcmp(plotstr,'SumExpts')
+        ExptPsych(Expts,'sum','verbose','shown',epargs{:});
+    elseif strcmp(plotstr,'AllExpts')
+        ExptPsych(Expts,'verbose','shown',epargs{:});
+    else
+        ExptPsych(Expts{end},'verbose','shown',epargs{:});
+    end
     t = get(gca,'title');
-    title(sprintf('%s %s',t,perfstr));
+    title(sprintf('%s %s',get(t,'string'),perfstr));
     fprintf('\n%s Done at %s\n',perfstr,datestr(now));
-elseif plottype == 10   %plot eye pos
+    BuildExptMenu(DATA);
+elseif strcmp(plotstr,'EMpos')   %plot eye pos
     for j = 1:length(DATA.trialvals)
         if isempty(DATA.trialvals(j).lv)
             good(j) = 0;
@@ -934,6 +1049,30 @@ else
     set(gca,'color','w');
 end    
 
+function t = GetTrialCounts(DATA)
+
+sids = find(ismember(DATA.score, [4 9 109])); %% Start of Expt
+eids = find(DATA.score == 8); %% End of Expt
+
+t(4) = DATA.rwszs(sids(end));
+
+t(3) = sum(DATA.score(sids(end):end) < 2); %number finised in current expt
+ids = find(ismember(DATA.score,[0 1 2 3 7 100 101 102 103]));
+t(5) = sum(DATA.rwszs(find(ismember(DATA.score,[1 51]))));
+t(1) = sum(ismember(DATA.score,[1 51]));
+t(2) = sum(ismember(DATA.score,[1 51 0]));
+
+
+function txt = FixLines(txt)
+%fix line errors caused by binoc formats
+
+    bid = find(strncmp('R4 ',txt,3));
+    for j = 1:length(bid)
+        if strfind(txt{bid(j)},':.')
+            txt{bid(j)} = regexprep(txt{bid(j)}, '[0-9]+:[0-9,.]+:', '0');
+        end
+    end
+
 function DATA = ReadFile(DATA,fname)
 %File format
 % R%d  0 = wrong
@@ -945,46 +1084,108 @@ function DATA = ReadFile(DATA,fname)
 
 startday = 0;
 
-if ~exist(fname,'file')
-    fprintf('Can''t read %s\n',fname);
-    DATA = [];
-    return;
-end
-oname = fname;
-if DATA.online
-fname = [oname '.txt'];
-delete(fname);
-try
-copyfile(oname, fname);
-catch
-    fname = oname;
-end
-end
 
-fid = fopen(fname,'r');
-if fid > 0
-    a = fgetl(fid);
-    id = strfind(a,' ');
-    frewind(fid);
+if iscellstr(fname)
+    txt = fname;
+else
+    if ~exist(fname,'file')
+        fprintf('Can''t read %s\n',fname);
+        DATA = [];
+        return;
+    end
+    oname = fname;
+    if DATA.online
+        fname = [oname '.txt'];
+        delete(fname);
+        try
+            copyfile(oname, fname);
+        catch
+            fname = oname;
+        end
+    end
+    
+    %fid = fopen(fname,'r');
+    txt = scanlines(fname);
+end
+ok = find(~strncmp('testflag',txt,8));
+txt = txt(ok);
+txt = FixLines(txt);
+r7lines = strncmp('R7',txt,2);
+gid = find(~r7lines);
+rlines = gid;
+xid = find(r7lines);
+DATA.binocversion = [0 0];
+fliplines = [];
+if ~isempty(xid)
+    for j = 1:length(xid)
+        a = find(gid > xid(j),1);
+        if ~isempty(a)
+            xlines(j) = a;
+        else
+            xlines(j) = NaN;
+        end
+    end
+    
+    
+    vstr = 've=';
+    ids = strfind(txt(xid),vstr);
+    gotve = find(CellToMat(ids));
+    
+    if isempty(gotve)
+        vstr = 'binoclean=';
+        ids = strfind(txt(xid),vstr);
+        gotve = find(CellToMat(ids));
+    end
+    if isempty(gotve)
+        vstr = 've=';
+        ids = strfind(txt,vstr);
+        gotve = find(CellToMat(ids));
+        if ~isempty(gotve)
+            ve = sscanf(txt{gotve(1)}(ids{gotve(1)}(1):end),[vstr '%f.%f']);
+        end
+    else
+        ve = sscanf(txt{xid(gotve(1))}(ids{gotve(1)}(1):end),[vstr '%f.%f']);
+    end
+    DATA.binocversion(1) = ve(1);
+    if length(ve) > 1
+        DATA.binocversion(2)= ve(2);
+    end
+    opstr = 'op=';
+    ids = strfind(txt(xid),opstr);
+    gotid = find(CellToMat(ids));
+    flips = CellToMat(strfind(txt(xid(gotid)),'+ff'));
+    fliplines = xlines(gotid);
+end
+if ~isempty(txt);
+    id = strfind(txt{gid(1)},' ');
     if length(id) <= 7
-        a = textscan(fid,'R%f %[^=]=%f %2s=%f %2s=%f %f %f %f','bufsize',2048);
+        a = textscan(char(txt(gid))','R%f %[^=]=%f %2s=%f %2s=%f %f %f %f','bufsize',2048);
         nxval = 0;
     elseif ismember(length(id),[8 9]) %later version, gives seed or id
-        a = textscan(fid,'R%f %[^=]=%f %[^=]=%f %[^=]=%f %f %f %f %[^=]=%f %[^=]=%f');
+        a = textscan(char(txt(gid))','R%f %[^=]=%f %[^=]=%f %[^=]=%f %f %f %f %[^=]=%f %[^=]=%f');
         nxval = 2;
-    elseif ismember(length(id),[12 13]) %later version, gives seed or id
-        a = textscan(fid,'R%f %[^=]=%f %[^=]=%f %[^=]=%f %f %f %f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f');
+    elseif ismember(length(id),[12 13 14]) %later version, gives seed or id
+        a = textscan(char(txt(gid))','R%f %[^=]=%f %[^=]=%f %[^=]=%f %f %f %f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f');
+        a{2} = strrep(a{2},'S ','');
         nxval = 6;
     end
-    fclose(fid);
+    if length(a{1}) < length(gid)
+        r7lines = find(strncmp('R5',txt,2));
+        xid = [xid(:)' r7lines(:)'];
+        gid = setdiff(1:length(txt),xid);
+        a = textscan(char(txt(gid))','R%f %[^=]=%f %[^=]=%f %[^=]=%f %f %f %f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f %[^=]=%f');
+        nxval = 6;        
+    end
 else
     fprintf('Cant Read %s\n',fname);
     DATA.score = [];
     return;
 end
+if ischar(DATA.filename)
 id = regexp(DATA.filename,'[0-9][0-9][A-Z]');
 if length(id)
     startday = datenum(DATA.filename(id(1):id(1)+8));
+end
 end
 if DATA.verbose
     fprintf('\n%d lines,', length(a{1}));
@@ -1066,6 +1267,28 @@ end
 DATA.rwszs = a{10};
 DATA.DURS = a{9};
 DATA.readtime = now;
+tlines = find(ismember(DATA.score,[0 1 2 3 7 100 101 102 103]));
+tid = find(ismember(DATA.score,[9 109]));  %block starts.
+eid = find(ismember(DATA.score,[10 27])); %Expt End or Cancel
+if isempty(tid)
+    tid = find(DATA.score == 4); %start expts
+end
+
+for j = 1:length(tid)
+    b = find(tlines > tid(j),1);
+    if isempty(b)
+        firsttrial(j) = NaN;
+    else
+        firsttrial(j) = tlines(b);
+    end
+end
+for j = 1:length(fliplines)
+    b = find(firsttrial > fliplines(j),1);
+    if ~isempty(b)
+        DATA.Block.flip(b) = flips(j);
+        DATA.Blockid.flip(b) = fliplines(j);
+    end    
+end
 
 tid = find(DATA.score == 4); %start expts
 oid = strmatch('tr',a{4}(tid));
@@ -1073,6 +1296,7 @@ trs = a{5}(tid(oid));
 DATA.Blockid.tr = tid(oid);
 DATA.Block.tr = trs;
 DATA.Stimvals.tr = median(trs);  
+
 
   
 tid = find(DATA.score == 5); %stim values
@@ -1118,30 +1342,37 @@ end
 DATA.Stimvals.wi = round(DATA.Stimvals.sz * 10)/10;
 DATA.Stimvals.hi = round(DATA.Stimvals.sz * 10)/10;
 
-oid = strmatch('ve',a{2}(tid));
-stid = tid(oid);
+    oid = strmatch('ve',a{2}(tid));
+    stid = tid(oid);
 
-if DATA.verbose
-    fprintf('%d ves,', length(oid));
-end
-if length(oid)
-ves = a{3}(tid(oid));
-DATA.Blockid.ve = tid(oid);
-DATA.Block.ve = ves;
-DATA.Stimvals.ve = mean(ves);  
+    if DATA.verbose
+        fprintf('%d ves,', length(oid));
+    end
+    if length(oid)
+        ves = a{3}(tid(oid));
+        DATA.Blockid.ve = tid(oid);
+        DATA.Block.ve = ves;
+        DATA.Stimvals.ve = mean(ves);  
+    else
+        DATA.Stimvals.ve = DATA.binocversion(1)
+    end
 
-bos = a{9}(tid(oid));
-DATA.Blockid.bo = tid(oid);
-DATA.Block.bo = bos;
-DATA.Stimvals.bo = mean(bos);  
-bcs = a{14}(tid(oid));
-DATA.Blockid.Bc = tid(oid);
-DATA.Block.Bc = bcs;
-DATA.Stimvals.bc = mean(bcs);  
+    oid = strmatch('Bc',a{13}(tid));
+    stid = tid(oid);
 
-bhs = a{10}(tid(oid));
-DATA.Blockid.bh = tid(oid);
-DATA.Block.bh = bhs;DATA.Stimvals.bh = mean(bhs);  
+    if length(oid)
+    bos = a{9}(tid(oid));
+    DATA.Blockid.bo = tid(oid);
+    DATA.Block.bo = bos;
+    DATA.Stimvals.bo = mean(bos);  
+    bcs = a{14}(tid(oid));
+    DATA.Blockid.Bc = tid(oid);
+    DATA.Block.Bc = bcs;
+    DATA.Stimvals.bc = mean(bcs);  
+
+    bhs = a{10}(tid(oid));
+    DATA.Blockid.bh = tid(oid);
+    DATA.Block.bh = bhs;DATA.Stimvals.bh = mean(bhs);  
 end
 
 
@@ -1292,13 +1523,14 @@ function DATA = InitInterface(DATA)
     bp(1) = HSPACE; bp(3) = 10*cw; bp(2) = size(2)-ch; bp(4) = 22;
     uicontrol(gcf,'Style', 'pushbutton', 'Callback', [fname '(''reload'',''Tag'',''' DATA.tag ''')'],...
         'String', 'reload', 'Position', bp);
+    if isfield(DATA,'fstrings')
     bp(1) = bp(1) + bp(3) + HSPACE;
     uicontrol(gcf,'Style', 'pushbutton', 'Callback', [fname '(''next'',''Tag'',''' DATA.tag ''')'],...
         'String', '>>', 'Position', bp);
     bp(1) = bp(1) + bp(3) + HSPACE;
     uicontrol(gcf,'Style', 'pushbutton', 'Callback', [fname '(''prev'',''Tag'',''' DATA.tag ''')'],...
         'String', '<<', 'Position', bp);
-    
+    end
  %New row
     bp(1) = HSPACE;
     bp(2) = bp(2) - ch;
@@ -1313,12 +1545,15 @@ function DATA = InitInterface(DATA)
     bp(1) = bp(1)+bp(3)+HSPACE;
     uicontrol(gcf,'Style', 'checkbox','String', 'byrw', 'Tag', 'byrw', 'Callback', [fname '(''update'',''Tag'',''' DATA.tag ''')'],...
         'Position', bp);
+    bp(1) = bp(1)+bp(3)+HSPACE;
+    uicontrol(gcf,'Style', 'checkbox','String', 'Split Expts', 'Tag', 'SplitExpts', 'Callback', @SetOption,...
+        'Position', bp);
 
     bp(2) = bp(2) - ch;
     bp(3) = 5 * cw * wsc;
     uicontrol(gcf,'Style', 'text','String','Plot','Position', bp);
     bp(1) = bp(1)+bp(3)+HSPACE;
-    uicontrol(gcf,'style','pop','string','PSF|ITI|Rewards|%Correct|Types|Total Reward|Trials|Bias|Expt|EMpos', ...
+    uicontrol(gcf,'style','pop','string','PSF|ITI|Rewards|%Correct|Types|Total Reward|Trials|Bias|Expt|AllExpts|SumExpts|EMpos', ...
         'Callback', [fname '(''setplot'',''Tag'',''' DATA.tag ''')'], 'Tag','plottype',...
         'position',bp,'value',1);
     
@@ -1445,10 +1680,137 @@ if ~isempty(it)
 end
 
   
+function SetOption(a,b)
+
+DATA = GetDataFromFig(a);
+
+tag = get(a,'tag');
+DATA.options.(tag) = get(a,'value');
+SetData(DATA);
+if strcmp(tag,'SplitExpts')
+    PlotBlocks(a,b);
+end
+
 function [counts, u] = xcounts(x)
 
 u = unique(x);
 for j = 1:length(u)
     counts(j) = sum(x == u(j));
 end
+
+function BuildExptMenu(DATA)
+%add a menu selecting blocks
+it = findobj(DATA.toplevel,'type','uimenu','tag','ExptList');
+if isempty(it)
+    it = uimenu(DATA.toplevel,'label','Expts','tag','ExptList');
+else
+    delete(get(it,'children'));
+end
+h = uimenu(it,'label','List','callback',{@ChooseExpts, 'popup'});
+
+Expts = getappdata(DATA.toplevel,'Expts')
+for j = 1:length(Expts)
+    if isfield(Expts{j}.Trials,'RespDir')
+        nt = sum(abs([Expts{j}.Trials.RespDir]));
+    else
+        nt = 0;
+    end
+    str = sprintf('%d: %d Trials %s',j,nt,Expt2Name(Expts{j}));
+    h = uimenu(it,'label',str,'callback',{@PlotBlocks, j});
+    if j <= length(DATA.showblocks) && DATA.showblocks(j)
+        set(h,'checked','on');
+    end
+end
+
+
+function ChooseExpts(a,b, fcn)
+DATA = GetDataFromFig(a);
+Expts = getappdata(DATA.toplevel,'Expts');
+
+
+if strcmp(fcn,'popup')
+    
+    nc = 4;
+    nr = ceil(length(Expts)/nc);
+    bw = 1./nc;
+    bh = 1./nr;
+    [F, isnew] = GetFigure('ExptList','parentfigure',DATA.toplevel);
+    if isnew
+        set(F,'menubar','none');
+        sm = uimenu(F,'label','Set');
+        uimenu(sm,'label','All On', 'callback', {@ChooseExpts, 'allon'});
+        uimenu(sm,'label','All Off', 'callback', {@ChooseExpts, 'alloff'});
+    end
+    it = findobj(allchild(F),'flat','type','uicontrol');
+    delete(it);
+    for j = 1:length(Expts)
+        if isfield(Expts{j}.Trials,'RespDir')
+            nt = sum(abs([Expts{j}.Trials.RespDir]));
+        else
+            nt = 0;
+        end
+        str = sprintf('%d: %d Trials %s',j,nt,Expt2Name(Expts{j}));
+        col = floor((j-1)./nr);
+        row = mod(j-1,nr);
+        bp = [col * bw 1 - bh - row * bh bw bh];
+        h = uicontrol(F,'style','checkbox','string',str,'callback',{@ChooseExpts, j},'units','normalized','position',bp);
+        if j <= length(DATA.showblocks) && DATA.showblocks(j)
+            set(h,'value',1);
+        end
+    end
+elseif strcmp(fcn,'allon')
+    [F, isnew] = GetFigure('ExptList');
+    it = findobj(allchild(F),'flat','type','uicontrol','style','checkbox');
+    DATA.showblocks(1:length(Expts)) = 1;
+    set(it,'value',1);
+    SetData(DATA);
+    
+elseif strcmp(fcn,'alloff')
+    [F, isnew] = GetFigure('ExptList');
+    it = findobj(allchild(F),'flat','type','uicontrol','style','checkbox');
+    DATA.showblocks(1:length(Expts)) = 0;
+    set(it,'value',0);
+    SetData(DATA);
+elseif isnumeric(fcn)
+    DATA.showblocks(fcn) = get(a,'value');
+    SetData(DATA);
+    ExptPlot(DATA);
+end
+
+function PlotBlocks(a,b,block)
+
+DATA = GetDataFromFig(a);
+onoff = {'off' 'on'};
+if nargin > 2
+    if block > length(DATA.showblocks)
+        DATA.showblocks(block) = 1;
+    else
+        DATA.showblocks(block) = ~DATA.showblocks(block);
+    end
+    SetMenuCheck(a,DATA.showblocks(block));
+end
+SetData(DATA);
+
+ExptPlot(DATA);
+
+function ExptPlot(DATA)
+
+Expts = getappdata(DATA.toplevel,'Expts');
+eid = find(DATA.showblocks);
+
+
+
+GetFigure(DATA.figtag);
+hold off;
+counts = GetTrialCounts(DATA);
+str = sprintf('%d/%d Trials, %d/%d Expt, rw%.1f',counts);
+if DATA.options.SplitExpts
+    ExptPsych(Expts(eid),'verbose','shown');
+else
+    ExptPsych(Expts(eid),'sum','verbose','shown');
+end
+t = get(gca,'title');
+s = get(t,'string');
+set(t,'string',[s ' ' str]);
+
 

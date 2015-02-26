@@ -1,9 +1,10 @@
-function [Comments, ExptList] = BuildExptComments(path, varargin)
+function [Comments, ExptList, CellInfo] = BuildExptComments(path, varargin)
 %BuildExptComments(path, varargin) Extracts comment lines from
 % Spike2.mat files and puts them in path/ExptComments.mat
 % By default does nothing in ExptComments.mat exists.
 rebuild = 0;
 showcomments = 0;
+CellInfo = [];
 j = 1;
 while j <=length(varargin)
     if strncmpi(varargin{j},'rebuild',4)
@@ -28,8 +29,12 @@ nc = 1;
 ne = 1;
 Comments = [];
 ExptsList = [];
+pes = [];
+allxy = [];
 for j = 1:length(d)
+    clear Expt;
     load(d(j).name);
+    if exist('Expt','var') && isfield(Expt,'Comments')
     Expt.Header.builddate = double(d(j).datenum);
     for k = 1:length(Expt.Comments.text)
         if strncmp(Expt.Comments.text{k},' Electrode',7)
@@ -45,23 +50,42 @@ for j = 1:length(d)
             nc = nc+1;
         end
     end
+    if ~exist('ExptList','var') && isfield(Expt,'ExptList')
+        Expts = ReadExptDir(path);
+        for k = 1:length(Expts)
+            ExptList(k).expname = Expt2Name(Expts{k});
+            ExptList(k).start = Expts{k}.Header.trange(1);
+            ExptList(k).end = Expts{k}.Header.trange(2);
+        end
+    end
     for k = 1:length(ExptList)
         ExptsList(ne).name = ExptList(k).expname;
         ExptsList(ne).start =  ConvertTime(Expt, ExptList(k).start);
         ExptsList(ne).end =  ConvertTime(Expt, ExptList(k).end);
         ExptsList(ne).depth(1) =  FindElectrodeDepth(Expt, ExptList(k).start);
         ExptsList(ne).depth(2) =  FindElectrodeDepth(Expt, ExptList(k).end);
+        ExptsList(ne).suffix =  GetExptNumber(Expt);
         ExptsList(ne).ntrials =  CountTrials(Expt, [ExptList(k).start ExptList(k).end]);
         ne = ne+1;
     end
     if isfield(Expt.Trials,'rf') && size(Expt.Trials.rf,2) > 5
         pes(j) = median(Expt.Trials.rf(:,6));
+        if size(Expt.Trials.rf,2) > 7
+            allxy(j,1) = median(Expt.Trials.rf(:,7));
+            allxy(j,2) = median(Expt.Trials.rf(:,8));
+        end
+    end
     end
 end
 
+if ~isempty(pes)
 pe = median(pes);
-logfile = sprintf('/bgc/bgc/anal/%s/pens/pen%d.log',GetMonkeyName(path),pe);
+penxy = median(allxy);
+logfile = sprintf('/b/bgc/anal/%s/pens/pen%d.log',GetMonkeyName(path),pe);
 pen = ReadPen(logfile,'noplot');
+else
+    pen = [];
+end
 if isempty(Comments)
     exptcomments = {};
 else
@@ -87,7 +111,8 @@ if ~isempty(ExptList)
 [a, b] = sort([ExptList.start]);
 ExptList = ExptList(b);
 end
-save(outname,'Comments','ExptList');
+CellInfo.pen =[pe penxy];
+save(outname,'Comments','ExptList','CellInfo');
 end
 
 
@@ -96,9 +121,9 @@ function truet = ConvertTime(Expt, t)
 
 t = double(t);
 if isfield(Expt.Header,'CreationDate')
-truet = Expt.Header.CreationDate + t ./(24 .* 60 .* 60 .* 1000);
+truet = Expt.Header.CreationDate + t ./(24 .* 60 .* 60 .* 10000);
 else
-truet = Expt.Header.builddate + t ./(24 .* 60 .* 60 .* 1000);
+truet = Expt.Header.builddate + t ./(24 .* 60 .* 60 .* 10000);
 end
 
 function d = FindElectrodeDepth(Expt, t)

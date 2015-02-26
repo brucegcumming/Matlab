@@ -29,8 +29,9 @@ end
 
 
 pens = map.pen;
-idx = find(pens(:,2) == x & pens(:,3) == y);
+idx = find(abs(pens(:,2) - x) < 0.6 & abs(pens(:,3) - y) < 0.6);
 
+idx = find(abs(map.rf(:,7) - x) < 0.6 & abs(map.rf(:,8) - y) < 0.6);
 if isempty(idx)
   fprintf('There are no cells at %.1f, %.1f\n',x,y);
   return;
@@ -60,10 +61,25 @@ if type == RF
                 set(h,'color',c);
             end
             rfsize = sqrt(map.rf(id,3)^2 + map.rf(id,4)^2);
-            fprintf('%s %d %d %s %s %.2f %.2f %.0f sz=%.2f\n',map.cellname{idx(j)},...
-                map.pen(idx(j,1)),map.area(idx(j)),areanames{map.area(idx(j))},map.datestr{idx(j)},rfs(j,1),rfs(j,2),map.depth(idx(j)),rfsize);
+            c = '';
+            if size(rfs,2) > 9
+                rfxy(j,:) = [rfs(j,1)-rfs(j,9) rfs(j,2)-rfs(j,10)];
+                if sum(abs(rfs(j,9:10))) > 0.5
+                    c = '*';
+                end
+            else
+                rfxy(j,:) = [rfs(j,1) rfs(j,2)];
+            end
+            d = map.depth(idx(j));
+            fprintf('%s %d %d %s %s %.2f %.2f%c %.3f sz=%.2f\n',map.cellname{idx(j)},...
+                map.pen(idx(j,1)),map.area(idx(j)),areanames{map.area(idx(j))},map.datestr{idx(j)},rfxy(j,:),c,map.depth(idx(j)),rfsize);
 
         end
+    end
+    mean(rfxy);
+    zs = zscore(rfxy);
+    if max(abs(zs(:)) > 2)
+        fprintf('Max Zscore %.2f\n',max(abs(zs(:))));
     end
 elseif type == GRID
     fprintf('Pen at %.1f %.1f\n',x,y);

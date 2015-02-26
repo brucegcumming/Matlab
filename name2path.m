@@ -1,6 +1,10 @@
 function [path, dirpath] = name2path(name,varargin)
+%[path, dirpath] = name2path(name,...) Generate full path from name
+%uses default prefix '/b/data/'
+%   ....,'check')
+%   ....,'prefix',P) Force prefix to P
 
-prefix = '/bgc/data/';
+prefix = '/b/data/';
 global bgcfileprefix
 checkreal = 0;
 j = 1;
@@ -15,6 +19,10 @@ while j <= length(varargin)
     end
     j = j+1;
 end
+id = strfind(name,'/');
+if ~isempty(id)
+    name = name(id(end)+1:end);
+end
 if strncmpi(name,'duf',3)
     monkey = 'dufus';
     dir = strrep(name,'duf','');
@@ -24,6 +32,17 @@ elseif strncmpi(name,'ruf',3)
 elseif strncmpi(name,'lem',3)
     monkey = 'lem';
     dir = strrep(name,'lem','');
+    if regexp(dir,'^[S,0-9]')
+    dir = ['SE/' dir];
+    end
+elseif strncmpi(name,'jbe',3)
+    monkey = 'jbe';
+    dir = strrep(name,'jbe','');
+    if regexp(dir,'^[S,0-9]')
+    dir = ['SE/' dir];
+    end
+else
+    dir = fileparts(name);
 end
 dots = strfind(dir,'.');
 if isempty(dots)

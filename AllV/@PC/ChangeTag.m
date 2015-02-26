@@ -1,0 +1,1 @@
+function ChangeTag(a,b,fcn)    DATA = GetDataFromFig(a);    x = get(a,'parent');    while ~isfigure(x)        x = get(x,'parent');    end    set(x,'tag',[fcn 'expt' num2str(DATA.currentpoint(1))],'name',[fcn 'expt' num2str(DATA.currentpoint(1))]);        

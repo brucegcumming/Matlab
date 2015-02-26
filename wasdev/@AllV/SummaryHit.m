@@ -1,0 +1,1 @@
+function SummaryHit(a,b, p)    DATA = GetDataFromFig(a);    AllV.AllVPcs(DATA.toplevel,'tchannew',p,'usecluster');    figure(DATA.toplevel);    

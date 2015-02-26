@@ -1,6 +1,6 @@
 function [smoothed, x] = smhist(dat, varargin)
 %
-% [smoothed, x] = smhist(dat, ...)
+% [smoothed, x] = smhist(dat, ...) make smoothed histogram
 %
 % returns a smoothed density histogram for a set of values.
 % x returns the values of dat associated with each density value.

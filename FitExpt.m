@@ -11,12 +11,15 @@ fitargs = {};
 fitted = [];
 vonmises = 0;
 specialfit = 1;
+verbose = 0;
 j = 1;
 while j <= length(varargin)
     if strncmpi(varargin{j},'plotfit',6)
         showplot = 2;
     elseif strncmpi(varargin{j},'plot',4)
         showplot = 1;
+    elseif strncmpi(varargin{j},'verbose',4)
+        verbose = 1;
     elseif strncmpi(varargin{j},'vonmises',4)
         vonmises = 1;
     else
@@ -27,6 +30,29 @@ end
 
 if isempty(dat) 
     return;
+end
+
+if iscellstr(dat)
+    for j = 1:length(dat)
+        fit{j} = FitExpt(dat{j},'verbose');
+    end        
+    return;
+elseif ischar(dat)
+    filename = dat;
+    x = load(filename);
+    if verbose
+        fprintf('Loading %s\n',filename');
+    end
+    if isfield(x,'Expt');
+        dat = PlotExpt(x.Expt);
+    else
+        cprintf('red','FitExpt: No Expt in %s\n',filename);
+        return;        
+    end
+    if isempty(dat)
+        cprintf('red','FitExpt: Empty data in %s\n',filename);
+        return;
+    end
 end
 
 if ~isfield(dat,'x')
@@ -340,6 +366,9 @@ elseif strmatch(dat.type{1},{'or'})  %%nned period 360 or 180
     else
         period = 180;
     end
+    if length(x) < 3
+        return;
+    end
     bl = strmatch('Blank',dat.extras.label);
     if bl && dat.extras.n(bl) > 0
         x = [x Inf];
@@ -365,6 +394,26 @@ elseif strmatch(dat.type{1},{'or'})  %%nned period 360 or 180
         fit.peak = PeakFit(fit);
         fit.resp = y;
    
+elseif strmatch(dat.type{1},{'sf'})
+    clear fit;
+    fitargs = {fitargs{:} 'posbase'};
+    for j = 1:size(dat.y,2)
+        x = dat.x(:,j);
+        y = dat.means(:,j);
+        np = dat.n(:,j);
+        F = FitGauss(x,y,'nreps',np,fitargs{:});
+        F.x = x;
+        F.resp = y;
+        F.xv = linspace(min(F.x),max(F.x));
+        F.fitcurve = FitGauss(F.xv,F.params,fitargs{:},'eval');
+        F.state.sds = dat.sd(:,j);
+        if strcmp(dat.type{2},'me')
+            F.me = mean(dat.y(:,j));
+        end
+        F.xo = GetEval(dat.Data,'xo');
+        F.yo = GetEval(dat.Data,'yo');
+        fit(j) = F;    
+    end
 elseif strmatch(dat.type{1},{'dx'})
     for j = 1:length(dat.x)
         x(j) = dat.x(j);

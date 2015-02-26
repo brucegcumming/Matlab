@@ -1,0 +1,1 @@
+function [xc, synci, allxc] = meanccf(DATA, id, a,b)    expts = unique(DATA.allexpt(id));    if b > a        c = a;        a = b;        b = c;    end    for j = 1:length(expts)        xc(j,:) = DATA.synci{expts(j)}.ccf{a,b};        synci(j,:) = PC.SyncIndices(xc(j,:));    end    allxc = xc;    xc = mean(xc,1);

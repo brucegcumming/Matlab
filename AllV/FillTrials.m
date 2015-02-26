@@ -60,6 +60,9 @@ end
 
 function Expt = FillField(Expt, code)
 
+if ~isfield(Expt.Stimvals,'od')
+    Expt.Stimvals.od = 0;
+end
 if strcmp(code,'sO') %fill this even if it exists already
 %        if isfield(Expt.Trials,'yo') && isfield(Expt.Trials,'xo') && isfield(Expt.Trials,'or') && isfield(Expt.Trials,'wi') && isfield(Expt.Trials,'hi')
         Expt = FillField(Expt,'ar');
@@ -73,7 +76,11 @@ if strcmp(code,'sO') %fill this even if it exists already
             end
         end
         if isfield(Expt.Trials,'yo') && isfield(Expt.Trials,'xo') && isfield(Expt.Trials,'or')
+            if isfield(Expt.Stimvals,'rf')
             rf = Expt.Stimvals.rf;
+            else
+                rf = [0 0]; 
+            end
             [a,b] = Counts([Expt.Trials.or]);
             [c,d] = sort(a);
             ors = b(d);
@@ -176,8 +183,10 @@ elseif ~isfield(Expt.Trials(1),code)
                 Expt.Trials(idx(j)).ar = Expt.Stimvals.ar;
             elseif isfield(Expt.Trials,'wi')
                 Expt.Trials(idx(j)).ar = Expt.Trials(idx(j)).wi./Expt.Trials(idx(j)).hi;
-            else
+            elseif isfield(Expt.Stimvals,'wi')
                 Expt.Trials(idx(j)).ar = Expt.Stimvals.wi./Expt.Stimvals.hi;
+            else
+                Expt.Trials(idx(j)).ar = NaN;
             end
         end
     elseif strmatch(code,'rd') %relative disp
@@ -195,9 +204,21 @@ elseif ~isfield(Expt.Trials(1),code)
         eval(['[Expt.Trials(idx).' code '] = deal(Expt.Stimvals.' code ');']);
     elseif strcmp(code,'dO')
         if isfield(Expt.Trials,'dy')
+            for j = 1:length(Expt.Trials)
+                op = hv2op([Expt.Trials(j).dx Expt.Trials(j).dy],Expt.Stimvals.Ro);
+
+                Expt.Trials(j).dO = op(1);
+            end
         else
             for j = 1:length(Expt.Trials)
                 Expt.Trials(j).dO = Expt.Trials(j).dx;
+            end
+        end
+    elseif strcmp(code,'dP')
+        if isfield(Expt.Trials,'dy')
+            for j = 1:length(Expt.Trials)
+                op = hv2op([Expt.Trials(j).dx Expt.Trials(j).dy],Expt.Stimvals.Ro);
+                Expt.Trials(j).dP = op(2);
             end
         end
     elseif strmatch(code,'rndphase')
@@ -218,7 +239,8 @@ elseif ~isfield(Expt.Trials(1),code)
 end
 
 
-if isfield(Expt.Trials,code)
+if isfield(Expt.Trials,code) && ~sum(strcmp(code,{'mtFl' 'mtFi' 'mtFn'}))
+        
 if length(cat(1,Expt.Trials.(code))) < length(Expt.Trials)
     val = eval(['mode([Expt.Trials.' code '])']);
     for j = 1:length(Expt.Trials)

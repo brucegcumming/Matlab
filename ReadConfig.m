@@ -1,5 +1,5 @@
 function DATA = ReadConfig(DATA, configfile, varargin)
-%Read a file that sets the configuation of GUI parameters
+%DATA = ReadConfig(DATA, filename, ...) Read a file that sets the configuation of GUI parameters
 %See also SaveConfig
 
 %     if ~exist(configfile)
@@ -46,7 +46,7 @@ t = 'Read Configuration';
     a = textscan(fid,'%s','delimiter','\n');
     for j = 1:length(a{1})
         try
-            eval(a{1}{j});
+            eval([a{1}{j} ';']); %force a colon to avoid echos
         catch
             fprintf('Bad Syntax %s\n',a{1}{j});
         end

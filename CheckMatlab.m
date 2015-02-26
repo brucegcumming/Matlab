@@ -1,6 +1,6 @@
 function CheckMatlab(name)
-%Count number of lines in functions for a matlab function. 
-
+%CheckMatlab(name) Count number of lines in functions for a matlab source file 
+%Analyses size of source (.m) files
 if ~exist(name,'file')
     name = which(name);
 end

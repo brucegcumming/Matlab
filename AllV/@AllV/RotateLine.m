@@ -1,0 +1,1 @@
+    function pos = RotateLine(pos, da)    oldangle =  atan(diff(pos([1 3]))/diff(pos([2 4])));    angle = oldangle+da;    len = abs(diff(pos([1 3])) + i * diff(pos([2 4])))/2;    x = mean(pos([1 3]));    y = mean(pos([2 4]));    pos(1) = x + len* sin(angle);    pos(3) = x - len* sin(angle);    pos(2) = y + len* cos(angle);    pos(4) = y - len* cos(angle);

@@ -1,6 +1,6 @@
 function idx =BuildGridIndex(name, Expts, varargin)
+%BUILDGRIDINDEX idx = BuildGridIndex(name, Expts, ...)
 %idx = BuildGridIndex(name, Expts, ...)
-%Build an index of which neV files match Expt .mat files
 %name is a filename or direcotry where the .mat file lives (used to
 %construct path for where .nev files live
 % Expts is a cell array of Expts, as returned by APlaySpkFile
@@ -34,6 +34,7 @@ function idx =BuildGridIndex(name, Expts, varargin)
    forcebsoff = [];
    showerr = 1;
    aargs = {};
+   usealltrials = 0;
 if nargin == 1
     Expts = [];
 end
@@ -70,6 +71,7 @@ while j <= length(varargin)
         reindex = 1;
     elseif strncmpi(varargin{j},'usealltr',8) %remake the new way (V.2)
         aargs= {aargs{:} varargin{j}};
+        usealltrials =1;
     elseif strncmpi(varargin{j},'update',5) %remake the new way (V.2)
         reindex = 2;        
     end
@@ -92,7 +94,7 @@ end
    plotsummary = 2;
 
    if isempty(strfind(path,'BlackRock'))
-       path(path,'/bgc/bgc/matlab/BlackRock');
+      addpath([GetFilePath('bgcmatlab') '/BlackRock']);
    end
    idxfile = [datdir '/FileIdx.mat'];
    
@@ -249,7 +251,7 @@ end
            else
                agediff = 1;
            end
-           if reindex || isempty(idx) || isempty(strmatch(d(j).name,idx.names)) || ...
+           if reindex || ~isfield(idx,'names') || isempty(strmatch(d(j).name,idx.names)) || ...
                    agediff > 0
                if  agediff > 0
                    nev = openNEV('read','nomat','noparse','nowarning',nevfile);
@@ -457,8 +459,9 @@ end
    idx.exbstimes = ebstimes;
    idx.version = VERSION;
    idx.builddate = now;
+   idx.usealltrials = usealltrials;
    
-   if isempty(idx)
+   if  nidx == 0
        fprintf('Missing NeV Data Filesin %s\n',name);
        return;
    end
@@ -653,7 +656,7 @@ for j = 1:length(d)
     end
 end
 idx.datdir = datdir;
-idx.nevdir = nevdir;
+idx.nevdir = datdir;
 
 function PlotIdx(idx)
 

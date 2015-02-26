@@ -1,0 +1,1 @@
+function HitExptPlot(src, b, type, e)    DATA = GetDataFromFig(src);        DATA.currentpoint(1) = e;    DATA = PC.ClearSelections(DATA,0,0);    if DATA.plot.quickspks        PC.PlotAllProbe(DATA,'allspks');    end    set(DATA.toplevel,'UserData',DATA);

@@ -44,7 +44,7 @@ for trial = 1:length(Trials)
   spikes = Trials(trial).Spikes(find(Trials(trial).Spikes > ...
 		 latency+skiplen & Trials(trial).Spikes < duration+latency));
   array = zeros(1,ceil(duration));
-  array(spikes-latency) = 1;
+  array(ceil(spikes-latency)) = 1;
   z = fft(array);
   aceach(k,:) = real(ifft(z .* conj(z)));
   nspikes(k) = length(spikes);

@@ -1,0 +1,1 @@
+function good = GoodCluster(C)    good = 0;    if C.bmc > 0.3 || C.mahal(1) > 6        good = 3;    elseif C.bmc > 0.23 || C.mahal(1) > 3        good = 2;    elseif C.bmc > 0.21 || C.mahal(1) > 2        good = 1;    end

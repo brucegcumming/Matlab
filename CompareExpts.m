@@ -1,25 +1,62 @@
 function CompareExpts(Ea,Eb, varargin)
+%CompareExpts(Ea,Eb, varargin) Compares Expt struct and reports differences
+%Fields that are always different are not reported 'all' is used.
+%'all' is useful for comparing two Expts that should be identical
+%CompareExpts(....'header') Does not compare indivudal trials
+
+headeronly = 0;
 
 j = 1;
+IgnoreTrialFields = {'rptframes' 'Trial' 'End' 'RespDir' 'sq'};
+IgnoreStimvals = {'TrueEnd' 'rwdir' };
 while j <= length(varargin)
-    if strncmpi(varargin{j},'matchtimes',7)
+    if strncmpi(varargin{j},'all',3)
+        IgnoreTrialFields = {};
+        IgnoreStimvals = {};
+    elseif strncmpi(varargin{j},'Header',3)
+        headeronly = 1;
+    elseif strncmpi(varargin{j},'matchtimes',7)
         MatchExptTimes(Ea, Eb);
         return;
     end
     j = j+1;
 end
 
-f = fields(Ea.Stimvals);
+if iscell(Ea) && iscell(Eb)
+    for j = 1:length(Ea)
+        CompareExpts(Ea{j},Eb{j});
+    end
+    return;
+end
+
+f = setdiff(fields(Ea.Stimvals),IgnoreStimvals);
 for j = 1:length(f);
     if isfield(Eb.Stimvals,f{j})
     if Ea.Stimvals.(f{j}) ~= Eb.Stimvals.(f{j})
-        fprintf('Stimval %s different\n',f{j});
+        if sum(~isnan(Ea.Stimvals.(f{j}))) || sum(~isnan(Eb.Stimvals.(f{j}))) 
+            fprintf('Stimval %s different %.2f %.2f \n',f{j},Ea.Stimvals.(f{j}),Eb.Stimvals.(f{j}));
+        end
     end
     else
        fprintf('No %s in Expt2.Stimvals\n',f{j});
     end
 end
-f = fields(Ea.Trials);
+
+f = setdiff(fields(Ea.Trials),fields(Eb.Trials));
+for j = 1:length(f)
+    fprintf('Trial.%s not in Expt2\n',f{j});
+end
+f = setdiff(fields(Eb.Trials),fields(Ea.Trials));
+for j = 1:length(f)
+    fprintf('Trial.%s not in Expt1\n',f{j});
+end
+
+if headeronly
+    return;
+end
+
+f = setdiff(fields(Ea.Trials),IgnoreTrialFields);
+
 for j = 1:length(f);
     if isfield(Eb.Trials,f{j})
         for t = 1:length(Ea.Trials)

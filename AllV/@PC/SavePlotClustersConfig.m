@@ -1,0 +1,1 @@
+function SavePlotClustersConfig(DATA,file, varargin);            DATA.PopupWindowData = getappdata(DATA.toplevel,'PopupWindowData');           savefields = { 'plotcells' 'plot' , 'comparerates' 'show' 'renderer' 'popup' 'options' 'PopupWindowData'};    SaveConfig(DATA, file, savefields, varargin{:});          

@@ -1,0 +1,1 @@
+function h = DrawBoxes(DATA, imtype, varargin)   [e,p] = find(DATA.selectprobe);   for j = 1:length(e)       h(j) = PC.DrawBox(e(j),p(j),imtype, varargin{:});   end   

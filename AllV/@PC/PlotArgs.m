@@ -1,0 +1,1 @@
+function args = PlotArgs(DATA)args = {};if DATA.exclude.offpeak    args = {args{:} 'exclude' 'offpeak'};endif DATA.exclude.onpeak    args = {args{:} 'exclude' 'onpeak'};endif DATA.exclude.onpeak    args = {args{:} 'exclude' 'cellsonly'};endif ~strcmpi(DATA.colorscheme,'Plain')    args = {args{:} 'colorscheme' DATA.colorscheme};end    

@@ -8,11 +8,19 @@ function S = CellToStruct(C, varargin)
 allfields = {};
 for j = 1:length(C);
     if isstruct(C{j})
-    f = fields(C{j});
-    allfields = unique({f{:} allfields{:}});
-    for k = 1:length(f)
-        S(j).(f{k}) = C{j}.(f{k});
+        f = fields(C{j});
+        allfields = unique({f{:} allfields{:}});
+        for k = 1:length(f)
+            S(j).(f{k}) = C{j}.(f{k});
+        end
     end
+end
+for j = 1:length(S)
+    for k = 1:length(allfields)
+        f = allfields{k};
+        if isempty(S(j).(f))
+        S(j).(f) = NaN;
+        end
     end
 end
 

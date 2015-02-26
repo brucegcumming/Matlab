@@ -1,13 +1,17 @@
 function res = RunAllVPcs(name, varargin)
 %res = RunAllVPcs(dir, .....
-%Reads all FullV Matlab files in a directory and calls AllVPcs
+%Reads all FullV Matlab files in a directory and calls AllVPcs. Some arguemnts to
+%AllVPcs ('quantifyall', 'reclassifyall') perform operation on all channels. Others only operate on 
+%a probe named on the command line ('refcluster').  In the latter case, a list of probes must be given to RunAllVPcs
+%Examples: 
 %
 %res = RunAllVPcs(dirname,'quantifyall','savespikes')
 %Uses existing cluster boundary an recalculates statisitcs (finishining
-%"quick" saves)
+%"quick" saves). Checks all channels but only recalculates channels needing finishing. 
 %
-%res = RunAllVPcs(dirname,'reclassifyall','savespikes')
-%rebuilds all files using clusters currently defined on disk.
+%res = RunAllVPcs(dirname,'probes',probelist,'refcut')  Applies RefClusters where clusters are not defind
+%res = RunAllVPcs(dirname,'probes',probelist,'refclusterforce')  Applies RefClusters regardless
+%when probes is used in this way, RunallVPcs calls AllVPcs separately for each probe
 %
 %RunAllVPcs(dirname,'expts',exlist, 'tchan',tlist, 'savespikes', 'refineall',Clusters)
 %Uses clusters defined in Clusters and reapplies these to probes named in
@@ -41,6 +45,7 @@ userefcluster = 0;
 condenselist = 0;
 runinteractive = 0;
 nskip = 0;
+probe = [];
 
 args = {};
 addargs = {};
@@ -236,6 +241,10 @@ else
 [path, fname] = fileparts(name);
 end
 
+if isdir(name)
+    Expts = ReadExptDir(name);
+    args = {args{:} 'Expts' Expts};
+end
 d = dir(name);
 ns = 1;
 res.prefix = name;
@@ -272,7 +281,7 @@ if parallel && ns > 1
     workers = [];
     parfor  (j = 1:ns-1)
         t = mygetCurrentTask();
-        fprintf('Expt%d workder id is %d\n',res.exptlist(j),t.ID);
+        fprintf('Expt%d worker id is %d\n',res.exptlist(j),t.ID);
         cls{j} =  ProcessSuffix(filenames{j}, res.exptlist(j), args{:});
         workers(j) = t.ID;
     end
@@ -280,11 +289,13 @@ if parallel && ns > 1
     res.workerid = workers;
 end
 
+
  res.end = now;
  res.args = args;
  if logfid > 0
      fclose(logfid);
  end
+CheckExceptions(res,'AllVPcs');
 
 function need = FineUnsafes(res, findunsafe)
     need = [];
@@ -311,6 +322,7 @@ makesmall = 1;
 quantify = 0;
 checkspikes = 0;
 userefcluster = 0;
+probes = [];
 
 args = {};
 while j <= length(varargin)
@@ -323,6 +335,9 @@ while j <= length(varargin)
         end
     elseif strncmpi(varargin{j},'nocut',5)
         nocut = 1;
+    elseif strncmpi(varargin{j},'probes',6)
+        j = j+1;
+        probes = varargin{j};
     elseif strncmpi(varargin{j},'quantify',5)
         quantify = 1;
         args = {args{:} varargin{j}};
@@ -363,27 +378,19 @@ if quantify || checkspikes
         end
     else
         load(cfile);
+        ClusterDetails = {};
+        dfile = strrep(cfile,'ClusterTimes','ClusterTimesDetails');
+        if exist(dfile)
+            load(dfile);
+        end
+        Clusters = FixCluster(Clusters);
         for j = 1:length(Clusters)
-            if (isfield(Clusters{j},'quick') && Clusters{j}.quick > 0)
-                needc(j) = 1;
-            elseif userefcluster && (isfield(Clusters{j},'auto') && Clusters{j}.auto > 0)
-                needc(j) = 5;
-            elseif (isfield(Clusters{j},'manual') && Clusters{j}.manual ==2) 
-                needc(j) = 4;
-            elseif Clusters{j}.dropi(3) == 0
-                needc(j) = 3;                
-            elseif CheckSpikeFile(Clusters{j}, outname) == 0
-                needc(j) = 2;
+            if length(ClusterDetails) >= j
+                CD = ClusterDetails{j};
             else
-                needc(j) =0;
+                CD = [];
             end
-            for k = 1:length(Clusters{j}.next)
-                if isfield(Clusters{j}.next{k},'manual') && Clusters{j}.next{k}.manual == 2
-                    needc(j) = 4;
-                elseif isfield(Clusters{j}.next{k},'quick') && Clusters{j}.next{k}.quick > 0
-                    needc(j) = 1;
-                end
-            end
+            [needc(j), reason{j}] = AllV.NeedToQuantify(Clusters{j}, outname, CD);
         end
         if sum(needc) == 0
             fprintf('No Clusters need quantifying in %s\n',cfile);
@@ -408,74 +415,53 @@ if checkspikes
 end
 
 
-ts = now;
-try
-res = AllVPcs(outname,args{:});
-for j = 1:length(nid)
-    res{nid(j)}.needed = 1;
+
+if ~isempty(probes)
+    FullV = LoadFullV(outname);
+    for j = 1:length(probes)
+        res.cls{j} = AllVPcs(FullV,'tchan',probes(j), args{:});
+    end
+    return;
 end
 
-if ~iscell(res)
-    res.runtime = mytoc(ts);
-else
-
-    toplevel = 0;
-    for j = 1:length(res)
-        if isfield(res{j},'toplevel')
-            toplevel = res{j}.toplevel;
-        end
-        if makesmall
-            res{j} = rmfields(res{j},'t','Evec','pcs');
-            if isfield(res{j},'cluster')
-            res{j}.cluster = rmfields(res{j}.cluster,'times');
+ts = now;
+    res = AllVPcs(outname,args{:});
+try
+    for j = 1:length(nid)
+        res{nid(j)}.needed = needc(nid(j));
+        res{nid(j)}.reason = reason{nid(j)};
+    end
+    
+    if ~iscell(res)
+        res.runtime = mytoc(ts);
+    else
+        
+        toplevel = 0;
+        for j = 1:length(res)
+            if isfield(res{j},'toplevel')
+                toplevel = res{j}.toplevel;
+            end
+            if makesmall
+                res{j} = rmfields(res{j},'t','Evec','pcs');
+                if isfield(res{j},'cluster')
+                    res{j}.cluster = rmfields(res{j}.cluster,'times');
+                end
             end
         end
+        if toplevel > 0 && isappdata(toplevel,'Vall')
+            rmappdata(toplevel,'Vall');
+        end
     end
-    if toplevel > 0 && isappdata(toplevel,'Vall')
-        rmappdata(toplevel,'Vall');
-    end
-end
 catch ME
-    fprintf('!!!ALLVPCS FAILED %s for file %s (line %d, m-file %s)\n',ME.message,outname,ME.stack(1).line,ME.stack(1).name);
-    res.exception = ME;
-    res.time = now; 
+    cprintf('errors','!!!ALLVPCS FAILED %s for file %s (line %d, m-file %s)\n',ME.message,outname,ME.stack(1).line,ME.stack(1).name);
+    res.errstate = ME;
+    res.time = now;
     t = mygetCurrentTask();
     res.worker = t.ID;
 end
 
 
-function ok = CheckSpikeFile(C, fullvname)
-    ok = 1;
-    monkey = GetMonkeyName(fullvname);
-    id = findstr(fullvname,monkey);
-    if ~isfield(C,'spkfile')
-        fprintf('No spike file in Cluster %d\n',C.probe(1));
-        return;
-    end
-    bid = findstr(C.spkfile,monkey);
-    spkfile = [fullvname(1:id(1)) C.spkfile(1+bid(1):end)];
-    spkfile = strrep(spkfile,['/Spikes/' monkey],'/Spikes/');
 
-    ddir = fileparts(fullvname);
-    [a,fname] = fileparts(C.spkfile);
-    spkfile = [ddir '/Spikes/' fname '.mat'];
-    newspkfile = strrep(spkfile,'/Spikes/',['/Spikes/' monkey]);
-    if ~exist(spkfile) && ~exist(newspkfile)
-        fprintf('Missing Spk file %s and %s\n',spkfile,newspkfile);
-        ok = 0;
-    else
-        if exist(newspkfile)
-            spkfile = newspkfile;
-        end
-        d = dir(spkfile);
-        if d.datenum < C.savetime(1)-0.01
-            ok = 0;
-            fprintf('Spk file %s is older (%s) than Cluster (%s)\n',spkfile,d.date,datestr(C.savetime(1)));
-        elseif d.datenum > C.savetime(1)+1
-            ok = 0;
-            fprintf('Spk file %s is much newer (%s) than Cluster (%s)\n',spkfile,d.date,datestr(C.savetime(1)));
-        end
-    end
         
     
 function Ex = LoadExpt(name, ei, rebuild, logfid)
@@ -843,11 +829,11 @@ function result = CheckReclassify(X, checktype, varargin)
                     end
                     acts = [acts res.acts];
                 catch
-                    fprintf('Error catting acts E%d\n',e);
+                    cprintf('errors','Error catting acts E%d\n',e);
                 end
-            elseif isfield(X.cls{j},'exception')
+            elseif isfield(X.cls{j},'errstate')
                 t = mygetCurrentTask();
-                s = sprintf('!!!Error (Exception) %s in %s line %d at %s Worker %d',X.cls{j}.exception.message,X.cls{j}.exception.stack(1).file,X.cls{j}.exception.stack(1).line,datestr(X.cls{j}.time),t.ID);
+                s = sprintf('!!!Error (Exception) %s in %s line %d at %s Worker %d',X.cls{j}.errstate.message,X.cls{j}.errstate.stack(1).file,X.cls{j}.errstate.stack(1).line,datestr(X.cls{j}.time),t.ID);
                 result.msg = {result.msg{:} s};
                 result.msgp = [result.msgp 0];
                 result.msge = [result.msge X.exptlist(j)];

@@ -1,0 +1,1 @@
+function TightPlot(ax)    t = get(ax,'title');    ylim = get(ax,'ylim');    xlim = get(ax,'xlim');    set(t,'position',[mean(xlim) ylim(2)],'HorizontalAlignment','center','VerticalAlignment','top');    set(ax,'Xtick',[],'Ytick',[]);    

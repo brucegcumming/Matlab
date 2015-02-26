@@ -6,6 +6,14 @@ function res = RunAllGridFiles(name, varargin)
 %To apply quantification of quick saves, use
 %RunAllGridFiles(file,'quantify','savespikes')  
 %
+%To remake all files using saved clusterse
+%RunAllGridFiles(file,'savespikes','reclassifyall')  
+%
+%To Apply clusters from RefClusters
+%RunAllGridFiles(file,'refcut', 'savespikes')  
+%
+%RunAllGridFiles(file,'expts', exlist, 'probes', probelist, ...)  
+%    sets expts/probes to be done. (can set 
 
 
 expts = [];
@@ -26,9 +34,10 @@ checktype = 'reclassify';
 classifyfromcluster = 1;
 parallel = 0;
 listtasks = 0;
+Expts = {};
+mklog = 0;  %don't make RunAll.log by default - doesn't work properly yet
 
-
-
+exargs = {};
 parid = 0;
 j = 1;
 while j <= length(varargin)
@@ -67,6 +76,9 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'reclassify',6)
         classifyfromcluster = 0;
         args = {args{:} 'reclassify'};
+    elseif strncmpi(varargin{j},'usealltrials',7)
+        exargs = {exargs{:} varargin{j}};
+        args = {args{:} varargin{j}};
     elseif strncmpi(varargin{j},'run',3)
         forcerun = 1;
     else
@@ -115,7 +127,7 @@ if iscellstr(name) && isdir(name{1}) %given a list of directories
         classifyfromcluster = 2;
         exgroups = unique(groups);
         probe = unique(probes);
-        testing = 1;
+        testing = 0;
         if testing
             for k = 1:length(probe)
                 id = find(probes == probe(k));
@@ -145,6 +157,7 @@ if iscellstr(name) && isdir(name{1}) %given a list of directories
             res.dres{j} = RunAllGridFiles(name{j},varargin{:});
         end
     end
+    CheckExceptions(res, 'RunAllGridFiles');
     return;
 end
 
@@ -186,6 +199,7 @@ if isstruct(name)
     path = name;
 else
 [path, fname] = fileparts(name);
+[Trials, Expts] = APlaySpkFile(name, exargs{:});
 end
 
 if listtasks
@@ -207,26 +221,51 @@ res.prefix = name;
 else
     res.prefix = fileparts(name);
 end
+    logfile = [res.prefix '/' 'RunAll.log'];
 if strcmp(checktype,'quantify')
     d = dir([res.prefix '/*ClusterTimes.mat']);
     ns = 1;
     needed = 0;
+    if ~isempty(Expts)
+        args = {args{:} 'Expts' Expts};
+    end
     vfiles = {};
     for j = 1:length(d)
         name = [path '/' d(j).name];
-        load(name);
+        load(name,'Clusters');
+        dname = strrep(name,'ClusterTimes','ClusterTimesDetails');
+        load(dname,'ClusterDetails');
         ex = sscanf(d(j).name(5:end),'%d');
         for c = 1:length(Clusters)
             need = 0;
-            if (isfield(Clusters{c},'quick') && Clusters{c}.quick > 0) || Clusters{c}.manual == 2
+            if isempty(Clusters{c}) %Don't try anytyning
+                cprintf('errors','%s Probe %d Cluster is Empty\n',d(j).name,c);
+            elseif (isfield(Clusters{c},'quick') && Clusters{c}.quick > 0) || Clusters{c}.manual == 2
                 need = 1;
                 fprintf('%s need Probe %d C1\n',d(j).name,c);
             elseif length(Clusters{c}.next) > 0
                 for k = 1:length(Clusters{c}.next)
-                if isfield(Clusters{c}.next{k},'manual') && Clusters{c}.next{k}.manual == 2
-                    need = 1;
-                    fprintf('%s need Probe %d C%d\n',d(j).name,c,k+1);
+                    if isfield(Clusters{c}.next{k},'manual') && Clusters{c}.next{k}.manual == 2
+                        need = 1;
+                        fprintf('%s need Probe %d C%d\n',d(j).name,c,k+1);
+                    elseif isfield(Clusters{c}.next{k},'clusterprog') & strncmp(Clusters{c}.next{k}.clusterprog,'PlotClusters',9)
+                        need = 1;
+                        fprintf('%s need Probe %d C%d - last cut in PlotClusters\n',d(j).name,c,k+1);
+                    end
                 end
+            end
+            if c > length(ClusterDetails) || ~isfield(ClusterDetails{c},'clst')
+                need = 1;
+                fprintf('%s need Probe %d C%d - No ClusterDetails.clst\n',d(j).name,c,k+1);
+            elseif length(ClusterDetails{c}.clst) ~= length(ClusterDetails{c}.xy)
+                need = 1;
+                fprintf('%s need Probe %d C%d - clst/xy mismatch\n',d(j).name,c,k+1);
+            elseif isfield(ClusterDetails{c},'next')
+                for k = 1:length(ClusterDetails{c}.next)
+                    if isfield(ClusterDetails{c}.next{k},'xy') && length(ClusterDetails{c}.next{k}.xy) ~= length(ClusterDetails{c}.xy)
+                        fprintf('%s need Probe %d C%d - next xy mismatch\n',d(j).name,c,k+1);
+                        need = 1;
+                    end
                 end
             end
             if need
@@ -235,34 +274,84 @@ if strcmp(checktype,'quantify')
                 vfiles{needed} = vfile;
                 cids(needed) = c;
                 exids(needed) = ex;
+                allexpts(needed) = ex;
+                probelist(needed) = c;
             end
         end
         if needed == 0
             fprintf('%s is up to date\n',d(j).name);
         end
     end
-    if parallel
-        parfor (j = 1:needed)
+    cls = {};
+    if parallel && needed
+        id = 1:needed;
+        ex = unique(exids);
+        exids = {};
+        for j = 1:length(ex)
+            exids{j} = id(allexpts(id) == ex(j));
+        end
+        fprintf('Calling parfor with %d expts\n',length(exids));
+        cls = {};
+        
+        parfor (e = 1:length(exids))
+            t = mygetCurrentTask();
+        efile = strrep(logfile,'RunAll',['Expt' num2str(ex(e)) 'Run']);
+        if mklog
+        fid = fopen(efile,'a');
+        if fid < 0
+            cprintf('errors','Cant open log %s\n',efile);
+        end
+        else
+            fid = -1;
+        end
+        
+        for k = 1:length(exids{e})
+            j = exids{e}(k);
+            fprintf('Worker %d Processing Expt%d %s %s\n',t.ID,j,vfiles{j},datestr(now));
+
+            if fid > 0
+                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,vfiles{j},datestr(now));
+            end
             try
-              cls{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
+              cls{e}{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
             catch ME
-                fprintf('Error!!!! %s:%d %s\n',vfiles{j},cids(j),ME.message)
+                cls{e}{j}.errstate = ME;
+                cprintf('errors','Error!!!!(W%d) %s:%d %s\n',t.ID,vfiles{j},cids(j),ME.message)
             end
         end
+        if fid > 0
+            fclose(fid);
+        end
+    end
+    res.cls = cls;
+
     elseif listtasks
         for j = 1:needed
             cls{j} = { exids(j) vfiles{j} cids(j) 'reclassify' args{:} };
         end
     else
         for j = 1:needed
-            cls{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
+            try
+                cls{j} = AllVPcs(vfiles{j},'tchan',cids(j),'reclassify',args{:},'noninteractive');
+            catch ME
+                cls{j}.errstate = ME;
+                cls{j}.filename = vfiles{j};
+                cls{j}.probe = cids(j);
+                cls{j}.exptid = exids(j);
+                myprintf(logfid,'Error with %s,E%dP%d\n',vfiles{j},cids(j),exids(j));
+            end
         end
     end
     res = cls;
+    CheckExceptions(res, 'RunAllGridFiles');
     return;
 end
 
-d = dir([name '/*.p*FullV.mat']);
+
+if ~isdir(res.prefix)
+    cprintf('errors','%s is not a Directory\n',res.prefix);
+end
+d = dir([res.prefix '/*.p*FullV.mat']);
 ns = 1;
 DistanceMatrices = {};
 needfile = [];
@@ -286,7 +375,7 @@ for j = 1:length(d)
             needfile(j) = 0;
         end
         allexpts(j) = ex;        
-        probes(j) = p;
+        probelist(j) = p;
     end
 end
 
@@ -311,21 +400,35 @@ end
         exids{j} = id(allexpts(id) == ex(j));
     end
     cls = {};
+    if ~isempty(Expts)
+        args = {args{:} 'Expts' Expts};
+    end
 if parallel  %have to do this by expt. If two probes in one expt done at the same
     %time, can both try to write file and corrupt it.
     fprintf('Calling parfor with %d expts\n',length(exids));
     parfor (e = 1:length(exids))
-        efile = strrep(logfile,'RunAll','ExptRun');
-        fid = fopen(efile,'a');
+        efile = strrep(logfile,'RunAll',['Expt' num2str(ex(e)) 'Run']);
+        if mklog
+            fid = fopen(efile,'a');
+            if fid < 0
+                cprintf('errors','Cant open log %s\n',efile);
+            end
+        else
+            fid  = -1;
+        end
         t = getCurrentTask();
         for k = 1:length(exids{e})
             j = exids{e}(k);
-            fprintf('Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+            fprintf('Worker %d Processing %s %s %s\n',t.ID,names{j},cfiles{j},datestr(now));
             jj = x(j);
-            fprintf(fid,'Worker %d Processing %s %s\n',t.ID,d(j).name,datestr(now));
+            if fid > 0
+                fprintf(fid,'Worker %d Processing %s %s\n',t.ID,cfiles{j},datestr(now));
+            end
             cls{e}{k} = DoFile(names{j},cfiles{j},classifyfromcluster,args{:});
         end
-        fclose(fid);
+        if fid > 0
+            fclose(fid);
+        end
     end
     res.cls = cls;
 elseif listtasks
@@ -342,7 +445,9 @@ else
         for k = 1:length(exids{e})
             j = exids{e}(k);
             fprintf('Processing %s %s\n',d(j).name,datestr(now));
+            if logfid > 0
             fprintf(logfid,'Processing %s %s\n',d(j).name,datestr(now));
+        end
             res.cls{x(j)} = DoFile(names{j},cfiles{j},classifyfromcluster,args{:});
         end
     end
@@ -367,10 +472,27 @@ end
  if logfid > 0
      fclose(logfid);
  end
- 
- 
- function res = DoFile(name, cfile, ctype, varargin)
-     res = [];
+CheckExceptions(res, 'RunAllGridFiles');
+
+
+function myprintf(stream, varargin)
+ if stream > 0
+     try 
+         fprintf(stream,varargin{:});
+     end
+ end
+
+function res = DoFile(name, cfile, ctype, varargin)
+debugging = 0;
+j = 1;
+while j <= length(varargin)
+    if strncmpi(varargin{j},'debug',5)
+        debugging = 1;
+    end
+    j = j+1;
+end
+t = mygetCurrentTask();
+    res = [];
      if ctype ==2
          if exist(cfile)
              load(cfile);
@@ -384,6 +506,9 @@ end
              load(cfile);
              res = ClassifyFromCluster(name,Clusters,'reapply',varargin{:});
          catch ME
+             res.errstate = ME;
+             res.filename = cfile;
+             cprintf('errors','Error!!!!(W%d) %s: %s\n',t.ID,name,ME.message)
          end
      elseif ctype == 1 || ctype == 3
          load(cfile);
@@ -391,25 +516,32 @@ end
      elseif ~exist(cfile)
          fprintf('No Cluster File %s\n',cfile);
      else
+         if debugging
+             load(cfile);
+             res = AllVPcs(name, varargin{:},'noninteractive');
+         else
          try
              load(cfile);
              try
                  res = AllVPcs(name, varargin{:},'noninteractive');
              catch ME
-                 fprintf('!!!AllVPcs Error %s for file %s (line %d, m-file %s)\n',ME.message,name,ME.stack(1).line,ME.stack(1).name);
-                 res = ME;
+                 cprintf('errors','!!!AllVPcs Error %s for file %s (line %d, m-file %s)\n',ME.message,name,ME.stack(1).line,ME.stack(1).name);
+                 res.errstate = ME;
+                 res.filename = name;
              end
          catch ME
-             fprintf('!!!Error Reading %s\n',cfile);
-             res = ME;
+             cprintf('errors','!!!Error Reading %s\n',cfile);
+             res.errstate = ME;
+         end
          end
      end
      if isfield(res,'logfid') && res.logfid > 0
          try
              fclose(res.logfid);
              fprintf('Successfully closed %d\n',res.logfid);
-         catch
-             fprintf('FID %d could not be closed\n',res.logfid);
+         catch ME
+             res.errstate = ME;
+             cprintf('errors','FID %d could not be closed\n',res.logfid);
          end
      else
          fprintf('No Log File in result for %s\n',name);
@@ -427,7 +559,7 @@ end
         elseif strncmpi(varargin{j},'reclassify',6)
             reclassify = 1;
         else
-            argon = [argon varargin{j}];
+            argon = {argon{:} varargin{j}};
         end
         j = j+1;
     end

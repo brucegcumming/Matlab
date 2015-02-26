@@ -1,0 +1,111 @@
+2013	Boston Red Sox	4–2	St Louis Cardinals
+2012	San Francisco Giants	4–0	Detroit Tigers
+2011	St. Louis Cardinals	4–3	Texas Rangers
+2010	San Francisco Giants	4–1	Texas Rangers
+2009	New York Yankees	4–2	Philadelphia Phillies
+2008	Philadelphia Phillies	4–1	Tampa Bay Rays
+2007	Boston Red Sox	4–0	Colorado Rockies
+2006	St. Louis Cardinals	4–1	Detroit Tigers
+2005	Chicago White Sox	4–0	Houston Astros
+2004	Boston Red Sox	4–0	St. Louis Cardinals
+2003	Florida Marlins	4–2	New York Yankees
+2002	Anaheim Angels	4–3	San Francisco Giants
+2001	Arizona Diamondbacks	4–3	New York Yankees
+2000	New York Yankees	4–1	New York Mets
+1999	New York Yankees	4–0	Atlanta Braves
+1998	New York Yankees	4–0	San Diego Padres
+1997	Florida Marlins	4–3	Cleveland Indians
+1996	New York Yankees	4–2	Atlanta Braves
+1995	Atlanta Braves	4–2	Cleveland Indians
+1994	Not held due to players’ strike
+1993	Toronto Blue Jays	4–2	Philadelphia Phillies
+1992	Toronto Blue Jays	4–2	Atlanta Braves
+1991	Minnesota Twins	4–3	Atlanta Braves
+1990	Cincinnati Reds	4–0	Oakland Athletics
+1989	Oakland Athletics	4–0	San Francisco Giants
+1988	Los Angeles Dodgers	4–1	Oakland Athletics
+1987	Minnesota Twins	4–3	St. Louis Cardinals
+1986	New York Mets	4–3	Boston Red Sox
+1985	Kansas City Royals	4–3	St. Louis Cardinals
+1984	Detroit Tigers	4–1	San Diego Padres
+1983	Baltimore Orioles	4–1	Philadelphia Phillies
+1982	St. Louis Cardinals	4–3	Milwaukee Brewers
+1981	Los Angeles Dodgers	4–2	New York Yankees
+1980	Philadelphia Phillies	4–2	Kansas City Royals
+1979	Pittsburgh Pirates	4–3	Baltimore Orioles
+1978	New York Yankees	4–2	Los Angeles Dodgers
+1977	New York Yankees	4–2	Los Angeles Dodgers
+1976	Cincinnati Reds	4–0	New York Yankees
+1975	Cincinnati Reds	4–3	Boston Red Sox
+1974	Oakland Athletics	4–1	Los Angeles Dodgers
+1973	Oakland Athletics	4–3	New York Mets
+1972	Oakland Athletics	4–3	Cincinnati Reds
+1971	Pittsburgh Pirates	4–3	Baltimore Orioles
+1970	Baltimore Orioles	4–1	Cincinnati Reds
+1969	New York Mets	4–1	Baltimore Orioles
+1968	Detroit Tigers	4–3	St. Louis Cardinals
+1967	St. Louis Cardinals	4–3	Boston Red Sox
+1966	Baltimore Orioles	4–0	Los Angeles Dodgers
+1965	Los Angeles Dodgers	4–3	Minnesota Twins
+1964	St. Louis Cardinals	4–3	New York Yankees
+1963	Los Angeles Dodgers	4–0	New York Yankees
+1962	New York Yankees	4–3	San Francisco Giants
+1961	New York Yankees	4–1	Cincinnati Reds
+1960	Pittsburgh Pirates	4–3	New York Yankees
+1959	Los Angeles Dodgers	4–2	Chicago White Sox
+1958	New York Yankees	4–3	Milwaukee Braves
+1957	Milwaukee Braves	4–3	New York Yankees
+1956	New York Yankees	4–3	Brooklyn Dodgers
+1955	Brooklyn Dodgers	4–3	New York Yankees
+1954	New York Giants	4–0	Cleveland Indians
+1953	New York Yankees	4–2	Brooklyn Dodgers
+1952	New York Yankees	4–3	Brooklyn Dodgers
+1951	New York Yankees	4–2	New York Giants
+1950	New York Yankees	4–0	Philadelphia Phillies
+1949	New York Yankees	4–1	Brooklyn Dodgers
+1948	Cleveland Indians	4–2	Boston Braves
+1947	New York Yankees	4–3	Brooklyn Dodgers
+1946	St. Louis Cardinals	4–3	Boston Red Sox
+1945	Detroit Tigers	4–3	Chicago Cubs
+1944	St. Louis Cardinals	4–2	St. Louis Browns
+1943	New York Yankees	4–1	St. Louis Cardinals
+1942	St. Louis Cardinals	4–1	New York Yankees
+1941	New York Yankees	4–1	Brooklyn Dodgers
+1940	Cincinnati Reds	4–3	Detroit Tigers
+1939	New York Yankees	4–0	Cincinnati Reds
+1938	New York Yankees	4–0	Chicago Cubs
+1937	New York Yankees	4–1	New York Giants
+1936	New York Yankees	4–2	New York Giants
+1935	Detroit Tigers	4–2	Chicago Cubs
+1934	St. Louis Cardinals	4–3	Detroit Tigers
+1933	New York Giants	4–1	Washington Senators
+1932	New York Yankees	4–0	Chicago Cubs
+1931	St. Louis Cardinals	4–3	Philadelphia Athletics
+1930	Philadelphia Athletics	4–2	St. Louis Cardinals
+1929	Philadelphia Athletics	4–1	Chicago Cubs
+1928	New York Yankees	4–0	St. Louis Cardinals
+1927	New York Yankees	4–0	Pittsburgh Pirates
+1926	St. Louis Cardinals	4–3	New York Yankees
+1925	Pittsburgh Pirates	4–3	Washington Senators
+1924	Washington Senators	4–3	New York Giants
+1923	New York Yankees	4–2	New York Giants
+1922	New York Giants	4–0–(1)	New York Yankees
+1921	New York Giants	5–3	New York Yankees
+1920	Cleveland Indians	5–2	Brooklyn Robins
+1919	Cincinnati Reds	5–3	Chicago White Sox
+1918	Boston Red Sox	4–2	Chicago Cubs
+1917	Chicago White Sox	4–2	New York Giants
+1916	Boston Red Sox	4–1	Brooklyn Robins
+1915	Boston Red Sox	4–1	Philadelphia Phillies
+1914	Boston Braves	4–0	Philadelphia Athletics
+1913	Philadelphia Athletics	4–1	New York Giants
+1912	Boston Red Sox	4–3–(1)	New York Giants
+1911	Philadelphia Athletics	4–2	New York Giants
+1910	Philadelphia Athletics	4–1	Chicago Cubs
+1909	Pittsburgh Pirates	4–3	Detroit Tigers
+1908	Chicago Cubs	4–1	Detroit Tigers
+1907	Chicago Cubs	4–0–(1)	Detroit Tigers
+1906	Chicago White Sox	4–2	Chicago Cubs
+1905	New York Giants	4–1	Philadelphia Athletics
+1904	No World Series was played in 1904.
+1903	Boston Americans	5–3	Pittsburgh Pirates

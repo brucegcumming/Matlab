@@ -4,7 +4,7 @@ function [nbuilt, details] = filterim( sf, or, wi, varargin)
 % make SF/ori bandpass filtered image
 % sf(1) is peak, sf(2) is SD of Gaussian in frequency domain (cpd)
 % or(1) is peak orientaiton, or(2) is Gaussian sd.
-% rsd is a Gaussian envelope applied to the result.
+% rsd is SD a Gaussian envelope applied to the result.
 %
 %filterim( sf, or, rsd, 'save', dir) saved PGM images in dir
 %
@@ -36,6 +36,7 @@ parallel = 0;
 
 savedir = [];
 getft = 0;
+getimages = 0;
 state.plotim =1;
 j = 1;
 while j < nargin -2
@@ -58,6 +59,8 @@ while j < nargin -2
 
     elseif(strncmpi(varargin{j},'getft',4))
         getft = 1;
+    elseif(strncmpi(varargin{j},'getimages',4))
+        getimages = 1;
     elseif(strncmpi(varargin{j},'nseed',4))
         j = j+1;
         nseed = varargin{j};
@@ -195,6 +198,8 @@ filter = fftshift(filter);
             nbuilt = nbuilt+1;
             if getft
                 fts(nbuilt,:,:) = fft2(im-0.5);
+            elseif getimages
+                fts(nbuilt,:,:) = im;                
             end
             end
         end
@@ -223,12 +228,15 @@ if ~isempty(savedir) & nbuilt
         fprintf(fid,'sf %.4f %.4f or%.1f env%d',sf(1),sf(2),or(1),or(2), envelopeid);
         fclose(fid);
     end
+    str = savedir;
+else
+    str = sprintf('or=%.0f,bw=%.0f',or(1),or(2));
 end
 if nbuilt >1 | quietmode < 2
-fprintf('Took %.3f for seed %d %s (%d new images)\n',toc,seedoffset,savedir,nbuilt);
+fprintf('Took %.3f for seed %d %s (%d new images)\n',toc,seedoffset,str,nbuilt);
 end
 
-if getft
+if getft || getimages
     nbuilt = fts;
 end
 

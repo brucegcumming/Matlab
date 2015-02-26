@@ -1,0 +1,1 @@
+function RatePlotMenu(a,b,fcn)    DATA = GetDataFromFig(a);    R = getappdata(DATA.toplevel,'RateCheckData');    if sum(strcmp(fcn,{'cv' 'skew' 'image'}))        R.plottype = fcn;    end    PC.SetFigure(DATA,DATA.tag.clusters);    PC.PlotRateCheck(R);    setappdata(DATA.toplevel,'RateCheckData',R);

@@ -6,10 +6,18 @@ npsych = 5;
 getem = 0;
 holdon = 0;
 showseq = 0;
+plottype = 'default';
+
 newids = [];
+parentfigure = [];
 j = 1;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'newids',6)
+    if strncmpi(varargin{j},'parentfigure',6)
+        j = j+1;
+        parentfigure = varargin{j};
+    elseif strncmpi(varargin{j},'fano',4)
+        plottype = varargin{j};
+    elseif strncmpi(varargin{j},'newids',6)
         j = j+1;
         newids = varargin{j};
     end
@@ -21,12 +29,14 @@ if isfield(result,'Data')
     Trials = result(1).Data.Trials;
     [Trials.e0] = deal(0);
     if ~isfield(Trials,'RespDir')
-       PlotExptRes(result,varargin{:});
+       PlotExptRes(result,plottype,varargin{:});
         return;
     end
 elseif iscell(result)
-   if isfield(result{1},'plotres')
-       PlotExptRes(result{1}.plotres,varargin{:});
+   if isfield(result{1},'plotres') && isfield(result{1}.plotres(1),'x')
+       PlotExptRes(result{1}.plotres,plottype,varargin{:});
+   else
+       fprintf('%s Missing Data for plot \n',IDString(result{1}));
    end
    return;
 elseif isfield(result,'cp')
@@ -34,7 +44,7 @@ else
     if ~isempty(newids)
         result = RecalcResult(result, newids,varargin{:});
     end
-    PlotExptRes(result,varargin{:});
+    PlotExptRes(result,plottype,varargin{:});
     return;
 end
 
@@ -412,11 +422,10 @@ end
     
    
     
-function PlotExptRes(res,varargin)
+function res = PlotExptRes(res,plottype,varargin)
         
 coloroffset = [];
 showcounts = 1;
-plottype = 'default';
 j = 1;
 cvals= [];
 bvals= [];
@@ -437,7 +446,7 @@ end
         
      if iscell(res)
          for j = 1:length(res)
-             PlotExptRes(res{j});
+             PlotExptRes(res{j},plottype);
          end
          return;
      end
@@ -454,8 +463,10 @@ end
      selectvals = [length(bvals) length(cvals)];
       labels = {};  
      if isfield(res,'bestdelay')
-         a = PlotRC(res, 'sdf', varargin{:});
-         title(sprintf('Cell %d P%.1f',res.cellid,res.Header.probe));
+         [a,b,details]  = PlotRC(res, 'sdf', varargin{:});
+         if ~isempty(details) %don't change title if nothing was plotted
+             title(IDString(res));
+         end
      elseif isfield(res(1),'x2') && res(1).x2 == 0  
         
            for nc = 1:size(res(1).x,3)
@@ -502,6 +513,13 @@ end
            bvals = 1:size(res(1).x,2);
        end
        np = 1;
+       dur = res(1).duration./10000;
+            if strcmp(plottype,'fano')
+                F = gcf;
+                GetFigure('Fano Factors');
+                hold off;
+                figure(F);
+            end
         for k= cvals;
         for j= bvals;
             if sum(selectvals > 0) > 1
@@ -518,13 +536,34 @@ end
             else
                 c = colors{ci};
             end
-            l = errorbar(res(1).x(:,j,k),res(1).means(:,j,k),res(1).sd(:,j,k)./sqrt(res(1).n(:,j,k)),'color',c);
-            if k > 1 && length(bvals) > 1
-                set(l,'linestyle','--');
+            if strcmp(plottype,'fano')
+                ff = res(1).sd.^2./res(1).means;
+                rates = res(1).means./dur;
+                ratesd = (res(1).sd./dur);
+                ratesem = ratesd./sqrt(res.n);
+                l = plot(rates(:,j,k),ratesem(:,j,k),'o',...
+                    'color',c,'markerfacecolor',c);
+                psd = rates./(res(1).n .* dur);
+                psd = sqrt(psd);
+                off = ratesem./psd;
+                hold on;
+                plot(rates(:,j,k),psd(:,j,k),'-','color',c);
+                dx = diff(minmax(range(rates(:))))./50;
+                F = gcf;
+                GetFigure('Fano Factors')
+                plot(rates(:,j,k),ff(:,j,k),'o','color',c');
+                hold on;
+                figure(F);
+                res.ff = ff;
+            else
+                l = errorbar(res(1).x(:,j,k),res(1).means(:,j,k),res(1).sd(:,j,k)./sqrt(res(1).n(:,j,k)),'color',c);
+                if k > 1 && length(bvals) > 1
+                    set(l,'linestyle','--');
+                end
+                hold on;
+                dx = range(res(1).x(:,j,k))./50;
+                allh(j,k) = plot(res(1).x(:,j,k),res(1).means(:,j,k),'o','color',c,'MarkerFaceColor',c);
             end
-            hold on;
-            dx = range(res(1).x(:,j,k))./50;
-            allh(j,k) = plot(res(1).x(:,j,k),res(1).means(:,j,k),'o','color',c,'MarkerFaceColor',c);
             if sum(selectvals > 0) > 1
                 labels{j,k} = sprintf('%s=%.1f %s=%.1f',res(1).type{3},res(1).z(1,1,k),res(1).type{2},res(1).y(1,j,1));
             elseif length(cvals) > length(bvals)

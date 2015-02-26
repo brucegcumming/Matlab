@@ -6,8 +6,14 @@ function res = InterpretLine(txt, varargin)
 % the serial port.  Typically returns a number
 
 res = [];
+if isempty(txt)
+    return;
+end
+if txt(1) == ' '
+    txt = txt(2:end);
+end
 
-if strncmp(txt,'RightHemi',9) || strncmp(txt,'Electrode',8)
+if sum(strncmp(txt,{'RightHem' 'Electrode'},8))
     id = strfind(txt,'Contact');
     if length(id)
         x = id(1);

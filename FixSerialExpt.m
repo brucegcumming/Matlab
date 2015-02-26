@@ -17,6 +17,12 @@ end
 
 %values to keep in each trial even if all the same
 keepvals = {'rw'};
+if ~isfield(Expt.Stimvals,'et')
+    Expt.Stimvals.et = 'e0';
+end
+if ~isfield(Expt.Stimvals,'e2')
+    Expt.Stimvals.e2 = 'e0';
+end
 if strcmp(details.exptype,'ORBW')
     if ~isfield(Expt.Trials,'ob')
         Expt.Trials = [];
@@ -70,9 +76,22 @@ elseif strcmp(Expt.Stimvals.et,'Dc') || strcmp(details.exptype,'DCOR') && isfiel
     end
     Expt.Trials = Expt.Trials(find(good));
     Expt.Trials = rmfields(Expt.Trials,'Stimseq','Seedseq');
+else  %Generic. Check et and e2 are correct
+    if ~strcmp(Expt.Stimvals.e2,'e0')
+        e2 = Expt.Stimvals.e2;
+        for j = 1:length(Expt.Trials)
+            if isempty(Expt.Trials(j).(e2))
+                Expt.Trials(j).(e2) = NaN;
+            end
+        end
+    end
 end
 Expt.Trials = rmfields(Expt.Trials,'so');
 f = fields(Expt.Trials);
+if isfield(Expt.Header,'rcvars') %don't remove these, whatever the values
+    f = setdiff(f,{Expt.Header.rcvars{:} 'line'});
+end
+f = setdiff(f,{Expt.Header.rcvars{:} 'OptionCode'});
 for j = 1:length(f)
     if ~sum(strcmp(f{j},keepvals))
         uvals = unique(cat(1,Expt.Trials.(f{j})));

@@ -1,4 +1,6 @@
 function smrcat(outf, varargin)
+%smrcat(outf, file1, file2, ...) Combines contents of .mat files made by Spike2
+%Only works for old simple files. Best to combine the .smr files in Spike2
 
 nin = 1;
 j = 1;

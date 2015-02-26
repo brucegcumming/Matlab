@@ -20,7 +20,7 @@ for j = 1:length(LFP.Trials)
     if ~isempty(LFP.Trials(j).Start)
     if isfield(LFP.Trials,'lfptime')
     delays(j) = LFP.Trials(j).Start(1) - LFP.Trials(j).lfptime;
-    elseif isfield(LFP.Trials,'lfptime')
+    elseif isfield(LFP.Trials,'ftime')
     delays(j) = LFP.Trials(j).Start(1) - LFP.Trials(j).ftime;
     else
         delays(j) = NaN;
@@ -64,8 +64,10 @@ if fixtype == 1
             LFP.Trials(j).FTlfp = fft(LFP.Trials(j).LFP);
         end
         LFP.Header.lfplen = minlen;
-        if isfield(LFP.Header,'LFPtimes')
-            LFP.Header.LFPtimes = LFP.Header.LFPtimes(1:minlen);
+        if isfield(LFP.Header,'LFPtimes') 
+            if length(LFP.Header.LFPtimes) > minlen
+                LFP.Header.LFPtimes = LFP.Header.LFPtimes(1:minlen);
+            end
         end
     end
     if nch < max(chs)  %some trials with more LFP chans

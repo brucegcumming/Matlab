@@ -1,5 +1,5 @@
 function [name, dir] = splitpath(path, varargin)
-%[name, dir] = splitpath(path, varargin)
+%[name, dir] = splitpath(path, varargin) replicate fileparts
 %
 getcellname = 0;
 j = 1;

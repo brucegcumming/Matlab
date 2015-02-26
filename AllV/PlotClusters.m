@@ -4,6 +4,8 @@ function varargout = PlotClusters(varargin)
 %expt/cell
 %PlotClusters(dir, 'load') preloads all of the cluter files. Without this,
 %files are loaded as needed.
+%PlotClusters(dir, 'loadauto') also loads autoclusters
+%PlotClusters(dir, 'loadautoonly') loads only autoclusters
 %PlotClusters(dir, 'loadfullv') also forces loading of all the FullV files.
 %This allows it to call AllVPcs quickly for any expt.  Not implemented for
 %Utah arrays yet

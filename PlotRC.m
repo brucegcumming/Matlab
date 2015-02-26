@@ -281,6 +281,9 @@ if calcvar
    end
 end
 
+if isempty(RC.sdfs) %no data
+    return;
+end
 sumrate = zeros(size(RC.sdfs.s{1}));
 sumn = 0;
 for k = 1:prod(size(RC.sdfs.s))
@@ -602,6 +605,8 @@ elseif ismember(plottype,[5 SDFDIFF BLANKDIFF]) && (isempty(subres) || sum(subre
      title(sprintf('CP from kernel %.3f',x.cp));
      hold off;
      y = diffspk;
+    else 
+        title(IDString(RC));
     end
     if slices(1) == 0
         details.figb = GetFigure(labelb);
@@ -803,6 +808,9 @@ if ~isempty(resp)
     details.resp = resp;
 end
 
+if isnan(RC.bestdelay) %can happen when no spikes for one Exp3 conditon
+    return;
+end
 details.bestms = RC.delays(RC.bestdelay)./10;
 
 if exist('h')
@@ -856,8 +864,10 @@ if ~isempty(subres) & ~isfield(details,'donesub') & isfield(RC,'subres');
        labels{1} = sprintf('%s= %.2f %.0fms n=%.0f',RC.ctype,RC.(RC.ctype),details.bestms,mean(details.n(:)));
    elseif ~isfield(details,'n')
        labels{1} = sprintf('%s = %.2f, n = 0',RC.ctype, RC.(RC.ctype));
-   else
+   elseif ~isempty(RC.ctype)
        labels{1} = sprintf('%s = %.2f, n = %.0f',RC.ctype, RC.(RC.ctype),mean(details.n(:)));
+   else
+       labels{1} = sprintf('n = %.0f',mean(details.n(:)));
    end
    if length(h) == length(labels);
    mylegend(h,labels);

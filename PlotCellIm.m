@@ -15,6 +15,14 @@ nmark = 0;
 Comments = [];
 nclusters = [];
 
+if isstruct(CellList) 
+    if isfield(CellList,'CellList')
+        X = CellList;
+        CellList = X.CellList;
+        CellDetails = X.CellDetails;
+    end
+end
+
 j = 1;
 while j <= length(varargin)
     if isstruct(varargin{j}) && isfield(varargin{j},'comment')
@@ -44,12 +52,12 @@ end
 if strcmp(CellList,'mark')
     [x,y] = find(CellDetails);
     for j = 1:length(x)
-        DrawBox(x(j),y(j),callback,'color',nclusters);
+        DrawBox(x(j),y(j),callback,'color',colors{1});
     end
     return;
 elseif strcmp(CellList,'marklist')
     for j = 1:size(CellDetails,2)
-        DrawBox(CellDetails(1,j),CellDetails(2,j),callback,'color',nclusters);
+        DrawBox(CellDetails(1,j),CellDetails(2,j),callback,'color',colros{2});
     end
     return;
 end

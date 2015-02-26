@@ -1,4 +1,4 @@
-function [result, Expt] = PlotRevCorAny(Expt, varargin)
+function [result, Expt, details] = PlotRevCorAny(Expt, varargin)
 %
 % result = PlotRevCorAny(Expt....)
 % Plots up data for reverse correlation experiments. By default, a half Gaussian
@@ -18,6 +18,8 @@ function [result, Expt] = PlotRevCorAny(Expt, varargin)
 % new default range is set
 %
 % For all of these arguments, times are in clock ticks, not ms 
+%
+% PlotRevCorAny(Expt, 'exp2', code) forces code to be used as experiment 2
 %
 % PlotRevCorAny(Expt, 'yval', Y) uses only stimuli for which the value of
 %                                exp2 is in Y
@@ -111,6 +113,11 @@ autobox = 0;
 nz = 0;
 blankref = 0;
 selecttrials = 0;
+getallspks = 0;
+trigargs = {'bmethod'};
+details = [];
+respcrit = 4;  %find times where var > var/respcrit to find response window
+%ratio of 4 for var = 2 for SD.
 
 binsiz = [0 0];
 centerRFvals = 0;
@@ -134,6 +141,8 @@ if isfield(Expt.Trials,'RespDir')
     if ~isfield(Expt.Trials,'Signal')
         if isfield(Expt.Trials,'ori')
             [Expt.Trials.Signal] = deal(Expt.Trials.ori);
+        elseif isfield(Expt.Trials,'Dc')
+            [Expt.Trials.Signal] = deal(Expt.Trials.Dc);
         elseif isfield(Expt.Trials,'dx')
             [Expt.Trials.Signal] = deal(Expt.Trials.dx);
         end
@@ -168,6 +177,9 @@ j = 1;
 while j < nargin
     if strncmpi(varargin{j},'addheader',4)
         addheader = 1;
+    elseif strncmpi(varargin{j},'allspks',5)
+        getallspks = 1;
+        trigargs = {trigargs{:} 'allspks'};
     elseif strncmpi(varargin{j},'autoslices',4)
         autoslice = 1;
     elseif strncmpi(varargin{j},'bin',3)
@@ -206,6 +218,8 @@ while j < nargin
         else
         collapse(varargin{j}) = 1;
         end
+    elseif strncmpi(varargin{j},'countwin',7)
+        trigargs = {trigargs{:} varargin{j} varargin{j+1}};
     elseif strncmpi(varargin{j},'range',3)
         j = j+1;
         xrange = varargin{j};
@@ -343,9 +357,9 @@ while j < nargin
         else
             result.bresult = b;
         end
-        GetFigure(labela); hold off;
+        GetFigure(labela, 'keepmenu'); hold off;
         PlotRC(result,'label',labela);
-        GetFigure(labelb); hold off;
+        GetFigure(labelb, 'keepmenu'); hold off;
         PlotRC(result,'sdfs','label',labelb);
         return;
     elseif strncmpi(varargin{j},'ymax',4)
@@ -384,6 +398,10 @@ while j < nargin
         j = j+1;
         Expt.Trials = Expt.Trials(varargin{j});
         selecttrials = 1;
+    elseif strncmpi(varargin{j},'trialids',8)
+        j = j+1;
+        id = find(ismember([Expt.Trials.id],varargin{j}));
+        Expt.Trials = Expt.Trials(id);
     elseif strncmpi(varargin{j},'yval',4)
         j = j+1;
         setyvals = varargin{j};
@@ -406,11 +424,13 @@ if isfield(Expt.Trials,'Fr') && length(unique([Expt.Trials.Fr])) > 1 && selecttr
         bExpt = Expt;
         bExpt.Trials = Expt.Trials(id);
         if j == length(Frs)
-        subres{j} = PlotRevCorAny(bExpt,varargin{:});
+            [subres{j}, ~, details{j}] = PlotRevCorAny(bExpt,varargin{:});
         else
-        subres{j} = PlotRevCorAny(bExpt,varargin{:},'figa',labelc);
-        GetFigure(labelc);
-        title(sprintf('Fr = %.0f',Frs(j)));
+            [subres{j}, ~, details{j}] = PlotRevCorAny(bExpt,varargin{:},'figa',labelc);
+        if showplot
+            GetFigure(labelc, 'keepmenu');
+            title(sprintf('Fr = %.0f',Frs(j)));
+        end
         end
         if isfield(subres{j},'bestdelay') && subres{j}.bestdelay <= size(subres{j}.y,3) %missing for LFP files.
             ys{j} = subres{j}.y(:,:,subres{j}.bestdelay);
@@ -421,9 +441,12 @@ if isfield(Expt.Trials,'Fr') && length(unique([Expt.Trials.Fr])) > 1 && selecttr
     result.subres = {subres{1:j-1}};
     result.ctype = 'Fr';
     result.name = GetEval(Expt,'name');
-    GetFigure(labelb);
-    hold off;
-    PlotRC(result,'best','label',labelb);
+    result.Frs = Frs;
+    if showplot
+        GetFigure(labelb,'keepmenu');
+        hold off;
+        PlotRC(result,'best','label',labelb);
+    end
     return;
 end
 
@@ -438,7 +461,7 @@ if ~isempty(ctype)
         subres{j} = PlotRevCorAny(bExpt,varargin{:});
         else
         subres{j} = PlotRevCorAny(bExpt,varargin{:},'figa',labelc);
-        GetFigure(labelc);
+        GetFigure(labelc, 'keepmenu');
         title(sprintf('%s = %.2f',ctype,cs(j)));
         end
         subres{j}.(ctype) = cs(j);
@@ -537,9 +560,14 @@ if ~isfield(Expt.Header,'RCparams')
         else
         result.probe = Expt.Header.probe;
         end
-        if isfield(Expt.Header,'Clusters')
-            if length(Expt.Header.Clusters{1}) > 1
-                result.Cluster = {Expt.Header.Clusters{1}{:,round(result.probe)}};
+        if isfield(Expt.Header,'Clusters') && ~isempty(Expt.Header.Clusters)
+            if size(Expt.Header.Clusters{1},2) >= result.probe
+%offline with AllClsuters, this is a strcut, not cell array
+                if iscell(Expt.Header.Clusters{1})
+                    result.Cluster = {Expt.Header.Clusters{1}{:,round(result.probe)}};
+                else
+                    result.Cluster = {Expt.Header.Clusters{1}(:,round(result.probe))};
+                end
             else
                 result.Cluster = Expt.Header.Clusters{1};
             end
@@ -643,7 +671,7 @@ end
             pstr = [];
         end
         estr = GetEval(Expt,'Name');
-        fprintf('No Spikes in %s%s\n',estr,pstr);
+        fprintf('PlotRevCor: No Spikes in cluster %s%s\n',estr,pstr);
         return;
     end
     else
@@ -1066,7 +1094,7 @@ end
 
 
 if showplot
-    result.figa = GetFigure(labela);
+    result.figa = GetFigure(labela, 'keepmenu');
     result.labela = labela;
     result.labelb = labelb;
     hold off;
@@ -1103,6 +1131,14 @@ end
 
 if isfield(Expt.Trials,'st')
     idx = find([Expt.Trials.st] == 0);
+    if ~isempty(idx)
+        nextra = nextra+1;
+        extraidx{nextra} = idx;
+        extralabel{nextra} = 'Blank';
+        extraval(nextra) = IBLANK;
+    end
+elseif sum(tx(:) == IBLANK)
+    idx = find(tx == IBLANK);
     if ~isempty(idx)
         nextra = nextra+1;
         extraidx{nextra} = idx;
@@ -1203,6 +1239,7 @@ elseif getpsych == 3
 end
 pid = find(times > minplottime);
 
+
 for j = 1:length(Expt.Trials)
     alltriggers{j} = [];
     if plotlfp
@@ -1214,6 +1251,8 @@ if plotlfp
     nch = max(nchs);
     Expt.Trials = Expt.Trials(find(nchs == nch));
 end
+details.tx = tx;
+stimtriggers = {};
 for loop = aloop: nloops;
     nx = 1;
     if secondorder
@@ -1244,10 +1283,11 @@ for loop = aloop: nloops;
             end
             %tidx is a list of Trials, containing at least one of the desired stim
             %types. n is the total number of stim presentations.
-            for k =1:length(tidx)
-                    alltriggers{tidx(k)} = [ alltriggers{tidx(k)} Expt.Trials(tidx(k)).Trigger];
-            end
             if ~isempty(tidx) & (n > nmin);
+                for k =1:length(tidx)
+                    alltriggers{tidx(k)} = [ alltriggers{tidx(k)} Expt.Trials(tidx(k)).Trigger];
+                    stimtriggers{nx,ny}{tidx(k)} = Expt.Trials(tidx(k)).Trigger;
+                end
                 if plotlfp
                     [sdfs.lfp{nx,ny,loopctr}, a] = TrigLFP(Expt.Trials(tidx),[-500 2000],Expt.Header.LFPsamplerate,nch);
                     sdfs.lfptimes = a.lfptimes;
@@ -1257,17 +1297,25 @@ for loop = aloop: nloops;
                     else
                         sdf = 0;
                     end
+                    sdfx = [];
                else
-                    [sdf, n] = trigsdfa(Expt.Trials(tidx),sdfw,times,smtype);
+                    [sdf, n, nspk, spks, sdft, sdfx] = trigsdfa(Expt.Trials(tidx),sdfw,times,smtype,trigargs{:});
                 end
-               
-      
+
+                pid = pid(pid <= length(sdf));
                 if npsych > 1
                     sdfs.respdir(ny) = respdirs(choiceval);
                 end
+                sdflen(nx,ny,loopctr) = length(sdf);
                 sdfs.x(nx, ny, loopctr) = x;
                 sdfs.y(nx, ny, loopctr) = y;
                 sdfs.n(nx, ny, loopctr) = n;
+                if getallspks
+                    sdfs.spks{nx,ny,loopctr} = spks;
+                end
+                if isfield(sdfx,'counts')
+                    sdfs.counts{nx,ny,loopctr} = sdfx.counts;
+                end
                 if secondorder
                     sdfs.z(nx, ny, loopctr) = sxv;
                 end
@@ -1307,6 +1355,7 @@ for loop = aloop: nloops;
                 end
                 ny = ny+1;
             else %not enough data
+                sdflen(nx,ny,loopctr) = 0;
                 if ny == 2 || (makeall && x > -1000)
                     sdfs.n(nx,ny) = n;
                     nx = nx+1;
@@ -1367,7 +1416,7 @@ for j = 1:nextra * npsych
         end
                 
         if isfield(Expt.Trials,'Spikes')        
-        [sdf, n] = trigsdfa(Expt.Trials(tidx),sdfw,times,smtype);
+        [sdf, n, nspks, spks, ~, sdfx] = trigsdfa(Expt.Trials(tidx),sdfw,times,smtype,trigargs{:});
         if showplot
             h(np+nex-1) = plot(times(pid)/10,sdf(pid),':','color',excolors{nex - (choiceval-1)*goodextras},'linestyle',linestyles{3+choiceval-1},'linew',2);
             labels{np+nex-1} = [extralabel{lid} sprintf(' n = %d',n)];
@@ -1376,21 +1425,32 @@ for j = 1:nextra * npsych
         sdfs.extras{lid,choiceval}.n = n;
         sdfs.extraval(lid,choiceval) = extraval(lid);
         sdfs.extras{lid,choiceval}.label = extralabel{lid};
+        if isfield(sdfx,'counts')
+            sdfs.extras{lid,choiceval}.counts = sdfx.counts;
+        end
+        if getallspks
+            sdfs.extras{lid,choiceval}.spks = spks;
+        end
         elseif showplot
             h(np+nex-1) = plot(sdfs.lfptimes/10,sdfs.extras{lid,choiceval}.lfp(:,plotlfp),':','color',excolors{nex - (choiceval-1)*goodextras},'linestyle',linestyles{3+choiceval-1},'linew',2);
             labels{np+nex-1} = [extralabel{lid} sprintf(' n = %d',n)];
         end
         nex = nex+1;
+    else
+        sdflen(nex) = 0;
     end
 end
 np = np+nex;
 end
+
+details.stimtriggers = stimtriggers;
 
 %remove any extras that were empty
 while length(sdfs.extras) > 0 && isempty(sdfs.extras{1})
     sdfs.extras = {sdfs.extras{2:end}};
     sdfs.extraval = sdfs.extraval(2:end);
 end
+sdfs.npts = min(sdflen(sdflen(:)>0));
 
 if secondorder
 for j = 1:length(alltriggers)
@@ -1480,24 +1540,26 @@ if (plotbest  | needvar) & isfield(sdfs,'s')
     end
     result.timeoff = times(1);
     if showplot & plotbest & bestnv > 0
-        GetFigure(labelb);
+        GetFigure(labelb, 'keepmenu');
         hold off;
         for co = 1:size(sdfs.s,2)
             result.h(co) = plot(bestx,besty(:,co),'-','color',colors{np});
             hold on;
             np = np+1;
         end
-        title(sprintf('%s at %d',Expt.Header.Name,bestj));
+        title(sprintf('%s at %d',MakeTitle(Expt),bestj));
     end
     if showplot & exist('vars','var')
-        GetFigure(labela);
+        GetFigure(labela, 'keepmenu');
         plot(delays./10,sqrt(vars).*4,'k','linewidth',2);
     end
 else
     bestnv = 1;
 end
 
-if length(sampleid)
+if length(times) ==1
+    w = 1;
+elseif length(sampleid)
 w = 100/((times(2)-times(1))* mean(diff(sampleid))); %10ms
 else
 w = 100/((times(2)-times(1))* 2); %10ms
@@ -1548,11 +1610,11 @@ if showplot
         hid = find(ishandle(h) & h > 0);
         result.legend = legend(h(hid),labels{hid},legendpos);
     end
-    title(sprintf('%s V%.1f',Expt.Header.Name,result.varratio(1)));
+    title(sprintf('%s V%.1f',MakeTitle(Expt),result.varratio(1)));
     ylabel('Rate (sp/s)');
     xlabel('Time (ms)');
 
-    GetFigure(labelb);
+    GetFigure(labelb, 'keepmenu');
     hold off;
 end
 h = [];
@@ -1561,9 +1623,13 @@ labels = {};
 
 if ~plotbest & isfield(sdfs,'s') & bestnv > 0
     if showplot
-        result.figb = GetFigure(labelb);
+        result.figb = GetFigure(labelb, 'keepmenu');
     end
-    if autoslice
+    if length(result.delays) ==1
+        result.slices = result.delays;
+        sliceid = 1;
+        cslices = 1;
+    elseif autoslice
         [mv, mj] = max(result.vars);
         minv = min(result.vars);
         th = minv + (mv-minv)/10;
@@ -1640,11 +1706,11 @@ if ~plotbest & isfield(sdfs,'s') & bestnv > 0
             end
             labels{np} = sprintf('dT = %.0fms',delays(j)/10);
             if size(sdfs.s,2) > 2 & j == bestnv & showpcolor
-                GetFigure(labelc);
+                GetFigure(labelc, 'keepmenu');
                 hold off;
                 pcolor(sdfs.x,sdfs.y,y);
                 shading('interp');
-                GetFigure(labelb);
+                GetFigure(labelb, 'keepmenu');
             end
             np = np+1;
         end
@@ -1659,9 +1725,9 @@ if ~plotbest & isfield(sdfs,'s') & bestnv > 0
             result.blegend = legend(h,labels,0);
         end
         if getpsych
-            title(sprintf('%s Solid = Up',Expt.Header.Name)); %Rd 1, I think
+            title(sprintf('%s Solid = Up',MakeTitle(Expt))); %Rd 1, I think
         else
-            title(sprintf('%s',Expt.Header.Name));
+            title(sprintf('%s',MakeTitle(Expt)));
         end
         if secondorder ==4
             zmax = 0;
@@ -1740,6 +1806,17 @@ if isfield(sdfs,'s')
     result.times = times;
     if isfield(Expt.Trials,'Spikes')
     result.delaysamples = sampleid;
+    end
+    try
+        allsdf = cat(2,sdfs.s{:});
+        result.sdfvar = var(allsdf,[],2);
+        [a,b] = max(result.sdfvar);
+        id = find(result.sdfvar < a/respcrit);
+        result.resptime(1) = max(id(id < b));
+        result.resptime(2) = b;
+        result.resptime(3) = min(id(id > b));
+    catch ME
+        result.resptime(1:3) = NaN;
     end
 end
 
@@ -1873,7 +1950,9 @@ for j = 1:length(Expt.Trials)
 % if secondorder ==1, build RC using only frames preceded by
 % negative (fy == -1) one where the preceding frame was positive (fy==1)
 % i.e. for AC expts, look at resp to Corr when preceded by Corr or AntiCorr
-        if secondorder == 1
+        if secondorder == 0
+            idx = find(tx(:,j) == x & ty(:,j) == y & good(:,j) == gval);
+        elseif secondorder == 1
             if loop == 1
                 fidx = find(ty(:,j) == 1);
             else
@@ -1905,7 +1984,7 @@ for j = 1:length(Expt.Trials)
             idx = intersect(idx,fidx+1);
 % if secondorder == 4, build RC for all preceding x vals;
 % if aloop is set to n, build only for precding values xvals[aloop:nloop]
-        elseif ismember(secondorder,[4 6])
+        elseif secondorder == 4 || secondorder == 6
             fidx = find(tx(:,j) == xval);
             idx = find(tx(:,j) == x & ty(:,j) == y & good(:,j) == gval);
             if ~isempty(idx) & ~isempty(fidx)
@@ -1923,8 +2002,6 @@ for j = 1:length(Expt.Trials)
             idx = find(tx(:,j) == xval & ty(:,j) == y & good(:,j) == gval);
             idx = intersect(idx,fidx+1);
             idx = find(tx(:,j) == x & ty(:,j) == y & good(:,j) == gval);
-        else
-            idx = find(tx(:,j) == x & ty(:,j) == y & good(:,j) == gval);
         end
 % with full sceond order kernels, include extras in the matrix. 
 % Easier than having separate matrices for the extras.
@@ -1937,7 +2014,7 @@ for j = 1:length(Expt.Trials)
             fprintf('%s not build with -trials, Cannot do RC\n');
             return;
         end
-        Expt.Trials(j).Trigger = Expt.Trials(j).Start(idx)' - Expt.Trials(j).TrialStart;
+        Expt.Trials(j).Trigger = round(Expt.Trials(j).Start(idx)' - Expt.Trials(j).TrialStart);
         tidx = [tidx j];
         ns = ns+length(idx);
     end
@@ -1984,4 +2061,29 @@ for j = 1:length(Expt.Trials)
     Expt.Trials(j).Trigger = Expt.Trials(j).Start(fidx(id))' - Expt.Trials(j).TrialStart;
 end
 
+function str = MakeTitle(Expt)
 
+
+H = Expt.Header;
+if isfield(H,'ExptFile')
+    [a, str] = fileparts(H.ExptFile);
+else
+    [a, str] = fileparts(Expt.Header.Name);
+    if isfield(Expt.Header,'cellnumber')
+        if isfield(Expt,'probes')
+            str = strrep(str,'.mat',['.cell' num2str(Expt.Header.cellnumber) 'P' sprintf(':%d',unique([Expt.probes]))]);
+        elseif Expt.Header.cellnumber ==0
+            str = strrep(str,'.mat',[' MU P' sprintf(':%.1f',Expt.Header.probe)]);
+        else
+            str = strrep(str,'.mat',['.cell' num2str(Expt.Header.cellnumber) 'P' sprintf(':%.1f',Expt.Header.probe)]);
+        end
+    elseif isfield(H,'probe')
+        str = sprintf('%s P%d',str,H.probe);
+    end
+end
+[e, elist] = GetExptNumber(Expt);
+if length(elist) > 1
+        str = sprintf('%s E%d-%d',str,min(elist),max(elist));
+elseif e > 0
+        str = sprintf('%s E%d',str,e);
+end    

@@ -440,7 +440,7 @@ elseif strmatch(list,'comment')
      OTTF.comments{OTTF.id} = get(findobj('Tag','FileComment'),'String');
      runlist('store',OTTF);
 elseif strmatch(list,'update')
-     top = num2str(OTTF.toplevel);
+     top = num2str(double(OTTF.toplevel));
      OTTF.prefix = get(findobj('Tag','Prefix'),'String');
      OTTF.args = get(findobj('Tag','Args'),'String');
      OTTF.plot.legendpos = get(findobj('Tag','LegendPos'),'value') -1;
@@ -890,7 +890,7 @@ if isfield(OTTF,'xfunc') & ~funcalled
      
  end
 runlist('store',OTTF);
-if OTTF.state.verbose & isfield(OTTF.data, 'current')
+if OTTF.state.verbose & isfield(OTTF,'data') & isfield(OTTF.data, 'current')
     [area, depth] = GetPenData(OTTF.data.current.name);
     fprintf('%s V%d %.3f\n',splitpath(OTTF.data.current.name),area,depth);
     toc;
@@ -1492,7 +1492,7 @@ if isempty(findobj('Tag',tag))
   cntrl_box = figure('Position', [200 scrsz(4)-(h+30)*wsc w*wsc h*wsc], 'Menubar', 'none',...
        'NumberTitle', 'off', 'Tag',tag,'Name','Section Criteria');
    OTTF.figid.options = cntrl_box;
-   top = num2str(OTTF.toplevel); 
+   top = num2str(double(OTTF.toplevel)); 
    cw = 10 * wsc;
    ch = 11 * wsc;
    bh = 18*wsc;

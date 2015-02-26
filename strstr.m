@@ -1,5 +1,5 @@
 function [found, ids] = strstr(str, pattern)
-%[found, ids] = strstr(str, pattern)
+%[found, ids] = strstr(str, pattern) 
 % if str is a string, calls strfind.
 % if str is a cell array of strings, calls strfind for each element.
 if iscellstr(pattern)

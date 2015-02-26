@@ -27,7 +27,7 @@ onoff = {'off' 'on'}; %in case value > 1
 %would be nice to have second check type
 %or could have value = value > 0?? 
 if ischar(F) %tag for a figure  
-    F = findobj('type','figure','tag',F);
+    F = findobj(get(0,'children'),'flat','type','figure','tag',F);
     if isempty(F);
         return;
     end
@@ -37,17 +37,18 @@ if ishandle(F) & ~isfigure(F)
     
     if nargin > 1 && strncmp(tag,'exclusive',5)
         exclusive = 1;
+        tag = 1; 
     end
     if exclusive
         c = get(get(F,'parent'),'children');
         set(c,'Checked','off')
     end
-    if nargin ==2 && length(tag) == 0 && tag == 0
+    if nargin ==2 && (length(tag) == 0 || tag == 0)
         set(F,'Checked','off');
     else
         set(F,'Checked','on');
     end
-elseif ischar(tag)
+elseif ischar(tag) %Oftern called by SetGUI...
     it = findobj(F,'Tag',tag);
     if length(it) == 1
         if exclusive

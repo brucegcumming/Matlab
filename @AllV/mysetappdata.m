@@ -1,0 +1,1 @@
+function DATA = mysetappdata(DATA, str, val)if DATA.interactive < 0 || ~isfield(DATA,'toplevel')    DATA.appdata.(str) = val;else    setappdata(DATA.toplevel,str, val);end

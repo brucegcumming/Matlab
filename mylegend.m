@@ -16,7 +16,7 @@ for j = 1:length(labels)
         ilb(j) = 0;
     end
 end
-id = intersect(find(h & ishandle(h)),find(ilb));
+id = intersect(find(myhandle(h)),find(ilb));
 if length(id)
 legend(h(id),{labels{id}}, varargin{:});
 end

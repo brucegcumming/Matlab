@@ -1,0 +1,1 @@
+function ScrollWheel(src, evnt)DATA = GetDataFromFig(src);DATA.elmousept.axis = gca;AllV.RotateCluster(DATA, 0.02*evnt.VerticalScrollCount);

@@ -1,0 +1,1 @@
+function mspid = GetMeanSpikeProbe(C, p)    if size(C.MeanSpike.ms,1) == 1        mspid = 1;    else        mspid = p;    end               

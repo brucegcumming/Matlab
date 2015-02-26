@@ -1,0 +1,1 @@
+function DATA = FindMissing(DATA)    for e = 1:length(DATA.expnames)        for p = 1:DATA.nprobes;            DATA.missing(e,p) = PC.MissedCell(DATA,[e p]);        end    end        

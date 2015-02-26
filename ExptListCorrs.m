@@ -1,7 +1,7 @@
 function [res, details] = ExptListCorrs(list, varargin)
 %
 %ExptListCorrs(list....
-%takes a cell array of strings in liest, reads in those files, and
+%takes a cell array of strings in list, reads in those files, and
 %calculates correlations between any simultaneously recorded cells. 
 res = [];
 verbose = 0;

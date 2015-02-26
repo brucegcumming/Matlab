@@ -1,0 +1,1 @@
+function PlotCorrelogram(C, varargin)    ta = C.times(C.clst ==1);    tb = C.times(C.clst ==2);    xc(:,1) = xcorrtimes(ta,tb);     xc(:,2) = xcorrtimes(ta,ta);     xc(:,3) = xcorrtimes(tb,tb);     xc(201,2:3) = 0;    PC.SetFigure(DATA,DATA.tag.xcorr);    plot(xc);

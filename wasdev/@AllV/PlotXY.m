@@ -1,0 +1,1 @@
+function PlotXY(xy, clst)        ptsz = 1;    if length(xy) < 1000        ptsz = 6;    end  hold off;  plot(xy(:,1),xy(:,2),'.','markersize',ptsz);  hold on;  id = find(clst == 2);  plot(xy(id,1),xy(id,2),'r.','markersize',ptsz);  

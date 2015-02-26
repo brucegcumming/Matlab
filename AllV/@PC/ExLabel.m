@@ -1,0 +1,1 @@
+ function s = ExLabel(DATA, j) s = ''; if DATA.show.exptno     s = [s num2str(DATA.exptid(j))]; end if DATA.show.exptname     s = [s ':' DATA.expnames{DATA.exptid(j)}]; end if DATA.show.ed      s = [s ''  sprintf('%.2f', DATA.electrodedepth(DATA.exptid(j)))]; end

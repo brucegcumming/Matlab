@@ -33,8 +33,10 @@ javaobj = 0;
                     break;
                 end
             end
+            b = get(b,'parent');
+        else
+            b = GetFigure(b,'noforce');
         end
-        b = get(b,'parent');
         DATA = get(b,'UserData');
     end
     if isfigure(DATA)

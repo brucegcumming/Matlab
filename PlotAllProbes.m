@@ -1664,13 +1664,13 @@ for j = probes;
             Clusters{k}{j} = Expt.Header.Clusters{k}{j};
         end
     end
-    end
     result.isrc = isrc;
 
     result.Cluster(j).autocut = [C.autocut];
     result.Cluster(j).dprime = [C.dprime];
     if isfield(Expt.Header,'SpkStats')
         result.Cluster(j).SpkStats = Expt.Header.SpkStats;
+    end
     end
 end
 

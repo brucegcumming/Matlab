@@ -100,15 +100,23 @@ for k = 1:length(p)
                 end
                 nc = nc+1;
             end
+            n = counts(1) + sum(counts(2:end).* [1:length(counts)-1]);
+            if n > j + (b-1) * ntrials
+                n = counts(1) + sum(counts(2:end).* [1:length(counts)-1]);
+            end
         end
+        n = counts(1) + sum(counts(2:end).* [1:length(counts)-1]);
         if nc > length(counts) -1
             counts(nc+1) = 0;
         end
-        counts(nc+1) = counts(nc+1)+1;
         nt = nt+length(x);
         score(b) = mean(x); %actual %correct
     end
-    bar(counts);
+    if(nc > 0) %last trial was good
+        counts(nc) = counts(nc)+1;
+    end
+    n = counts(1) + sum(counts(2:end).* [1:length(counts)-1]);
+    bar(counts(2:end));
     n = counts(1) + sum(counts(2:end).* [1:length(counts)-1]);
     fprintf('%.2f%% misses %d/%d\n',100* counts(1)./nt,counts(1),nt);
     allcounts(k,1:length(counts)) = counts;

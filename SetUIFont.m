@@ -1,5 +1,5 @@
 function SetUIFont(F, varargin)
-
+%SetUIFont(F, varargin) sets the font for UI elements belonging to a figure
 j = 1;
 while j <= length(varargin)
     if isstruct(varargin{j})

@@ -15,6 +15,11 @@ while j < nargin-1
     j = j+1;
 end
 
+if nargout > 1
+    details.nancount = [sum(isnan(acounts)) sum(isnan(bcounts))];
+end
+acounts = acounts(~isnan(acounts));
+bcounts = bcounts(~isnan(bcounts));
 n = length(acounts);
 m = length(bcounts);
 if m * n == 0

@@ -1,8 +1,6 @@
 function figify(fig, ax, varargin)
-%
-% figify(fighandle, axhandle)
-%  makes a matlab figure better for importing to PowerPoint, by
-%     making lines thicker
+% figify(fighandle, axhandle)  makes a matlab figure better for importing to PowerPoint, 
+%     by: making lines thicker
 %     removing the backgroudn white
 %     making the font bigger, and sans serif.
 %
@@ -16,6 +14,7 @@ function figify(fig, ax, varargin)
 %
 %  figify(gcf,gca,'linew',pts); sets the line width
 
+%Aadd listfonts and strcmp to match partial names
 fontsize = 20;
 lineweight = 2;
 fontname = 'Comic Sans MS';

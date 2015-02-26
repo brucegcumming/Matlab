@@ -1,0 +1,1 @@
+function pos = xyr2pos(xyr)    pos(1) = xyr(1)-xyr(3);    pos(2) = xyr(2)-xyr(4);    pos(3) = xyr(1)+xyr(3);    pos(4) = xyr(2)+xyr(4);

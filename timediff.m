@@ -1,6 +1,5 @@
 function d = timediff(t, varargin)
-%timediff(t, varargin)
-%calculates differences between time values, in seconds (default)
+%timediff(t, varargin) calculates differences between time values, in seconds (default)
 %if t is a vector of times, returns differeces relative to earliest
 
 reftime = [];

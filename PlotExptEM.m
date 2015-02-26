@@ -423,6 +423,7 @@ elseif ismember(plotmode,[2 4 5 6 6 7 8 9]) %plot sum of saccades for each trial
         end
         end
     end
+    nullsac = [mean(x) mean(y)];
     allsac(nidx,:) = cat(1,x,y)';
     if plotmode == 4
         allsac = cat(1,mdh,mdv)';
@@ -457,6 +458,17 @@ elseif ismember(plotmode,[2 4 5 6 6 7 8 9]) %plot sum of saccades for each trial
     result.adjpid = pidx(pid);
     result.adjnid = nidx(nid);
     result.removed = [setdiff(pidx, pidx(pid)) setdiff(nidx, nidx(nid))];
+    if plotmode ==5
+    for j = 1:length(result.removed)
+        s = find(ismember(nidx,result.removed(j)));
+        if isempty(s)
+            s = find(ismember(pidx,result.removed(j)));
+            plot(diff(hpos(pidx(s),:)),diff(vpos(pidx(s),:)),'bx','buttondownfcn',{@whichsaccade, 3, s});
+        else
+            plot(diff(hpos(nidx(s),:)),diff(vpos(nidx(s),:)),'rx','buttondownfcn',{@whichsaccade, 2, s});
+        end
+    end
+    end
     result.diffmean(1) = mean(z(pidx(pid)))-mean(z(nidx(nid)));
     result.diffmean(2) = mean(diff(hpos(pidx(pid),:),[],2))-mean(diff(hpos(nidx(nid),:),[],2));
     result.diffmean(3) = mean(diff(vpos(pidx(pid),:),[],2))-mean(diff(vpos(nidx(nid),:),[],2));

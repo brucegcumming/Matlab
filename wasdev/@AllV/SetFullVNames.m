@@ -1,0 +1,1 @@
+function FullV = SetFullVNames(DATA, FullV)        [a,b] = fileparts(FullV.loadname);    eid = sscanf(b,'Expt%d');    if isfield(DATA,'exptname')        [c,d, e] = fileparts(DATA.exptname);        FullV.matfile = [a '/' d e];    elseif isfield(FullV, 'matfile')        [c,d, e] = fileparts(FullV.matfile);        FullV.matfile = [a '/' d e];    end    

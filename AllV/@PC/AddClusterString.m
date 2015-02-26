@@ -1,0 +1,1 @@
+function ch = AddClusterString(DATA, h, cl)    if isempty(cl)        cl = 0;    end    if h > 0 && ishandle(h)        x = get(h,'extent');        ch = text(x(1)+x(3),x(2)+x(4)/2,sprintf(' Cl%d',cl),'color',DATA.colors{cl+1},'verticalalignment','middle');    else        ch = [];    end        

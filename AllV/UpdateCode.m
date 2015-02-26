@@ -13,5 +13,4 @@ if listonly == 0
 end
         
     
-cpfiles('/bgc/bgc/matlab/dev','/bgc/bgc/matlab/AllV',args{:},'hidenew');
-cpfiles('/bgc/bgc/matlab','/bgc/bgc/matlab/AllV',args{:},'hidenew');
+cpfiles('/b/bgc/matlab','/b/bgc/matlab/AllV',args{:},'hidenew');

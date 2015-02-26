@@ -8,6 +8,8 @@ function [count, vals] = Counts(x, varargin)
 % if x is a cell array of numeric values, count returns a vector, with counts
 %  counts(1) is the number of unique elements. counts(2:n+1) is the count of unique values of
 %  the nth element of each element of x. 
+%Counts (x, 'decend') sorts results in descending order of count. So first
+%element of vals is the most commonn
 minval= NaN;
 if isempty(x)
     count = [];
@@ -34,18 +36,23 @@ elseif iscellstr(x)
 elseif iscell(x)
     for j = 1:length(x)
         lens(j) = length(x{j});
+        sizes(j,:) = size(x{j});
+        if isempty(x{j})
+            x{j} = []; %size 0,0 always
+        end
         for k = 1:length(x{j})
             allvals(j,k) = x{j}(k);
         end
     end
     count(1) = length(unique(lens));
     if max(lens) > 1
-    for j = 1:size(allvals,2);
-    count(j+1) = length(unique(allvals(:,j)));
-    vals{j} = unique(unique(allvals(:,j)));
+        for j = 1:size(allvals,2);
+            count(j+1) = length(unique(allvals(:,j)));
+            vals{j} = unique(unique(allvals(:,j)));
     end
-    else
-        vals = unique(cat(1,x{:}));
+    else %cell array but with single values
+        vals = unique(cat(1,x{:})); %used to do this. but bad for
+%        [count, vals] = Counts(allvals(:));
     end
 else
     vals = unique(x);

@@ -2,6 +2,7 @@ function [P, details] = FitDriftMatrix(M, varargin)
 
 maxiter = 20000;
 quickfirst = 1;
+%initial estimate is just measured steps between adjacent cells
 for j = 2:size(M,1)
     dvals(j-1) = M(j,j-1);
 end
@@ -25,7 +26,7 @@ end
 
 dvals(isnan(dvals)) = 0;
 setappdata(gcf,'fittedparams',[]);
-ssq = TryMatrix(dvals,M,1:length(dvals));
+[ssq, guess] = TryMatrix(dvals,M,1:length(dvals));
 options = optimset('MaxFunEvals',100000,'maxiter',maxiter,'display','off');
 if quickfirst
     [a,b] = find(abs(dvals) > 0.8);
@@ -52,13 +53,15 @@ function [ssq, P, errs] = TryMatrix(x, M, xi)
 
 X = zeros(1,size(M,1)-1);
 X(xi) = x;
-for j = 1:length(X)
-    P(j,j) = X(j);
+n = length(X);
+for j = 1:n
+    P(j+1,j) = X(j);
 end
-for j = 1:size(P,1)
-    for k = j-1:-1:1
-        P(j,k) = sum(X(k:j));
-        errs(j,k) = P(j,k)-M(j+1,k);
+P(n+1,n+1) = 0;
+for j = 1:n
+    for k = j:-1:1
+        P(j+1,k) = sum(X(k:j));
+        errs(j,k) = P(j+1,k)-M(j+1,k);
     end
 end
 params = getappdata(gcf,'fittedparams');

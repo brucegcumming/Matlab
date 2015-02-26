@@ -5,11 +5,11 @@ function [rax,h] = AddRPlot(lax, varargin)
 
 if isfigure(lax)
     fig = lax;
-    axs = get(fig,'Children');
+    axs = findobj(allchild(fig),'flat','type','axes');
     lax = axs(1);
 else
 fig = get(lax,'Parent');
-axs = get(fig,'Children');
+axs = findobj(allchild(fig),'flat','type','axes');
 end
 
 

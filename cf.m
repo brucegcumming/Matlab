@@ -1,1 +1,1 @@
-clear functions;
+clear functions; %clear functions

@@ -1,0 +1,1 @@
+    function ScrollV(src, evnt)DATA = GetDataFromFig(src);if src ~= gcf    return;endDATA = GetDataFromFig(src);xl = get(gca,'xlim');w = diff(xl);if sign(evnt.VerticalScrollCount) > 0    xl(1) = xl(2);    xl(2) = xl(2)+w;    set(gca,'xlim',xl);elseif sign(evnt.VerticalScrollCount) < 0    xl(2) = xl(1);    xl(1) = xl(1)-w;    set(gca,'xlim',xl);end

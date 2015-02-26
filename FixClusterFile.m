@@ -1,13 +1,24 @@
 function DATA = FixClusterFiles(name, varargin)
-%PlotClusters(dir, ......)
-%reads in Cluster files made by AllVPcs and plots up clusters for each
-%expt/cell
-%FixClusterFiles(name, 'write')  writes out any modified Cluster structs
+%FixClusterFile(dir, ......) Read Clusters, check, modify if necessary
+%reads in Cluster files and fixes missing fields/lists errors
+%FixClusterFiles(dir, 'checkexpt','Expts',Expts) Checks that numbering of Expts
+%FixClusterFiles(dir, 'checkmark') Checks that clusers marked as bad probe
+%                               matches ArrrayConfig
+%FixClusterFiles(dir, 'errors') Builds Error Listing
+%FixClusterFiles(dir, 'details') Checks for empty ClusterDetails Structs
+%FixClusterFiles(dir, 'details','write','savedetails') sasves the fixed ClusterDetails Structs
+%and replaces them with contents of the latest backup
+%FixClusterFiles(dir, 'expts', eid) Just checks expts in eid
+%FixClusterFiles(name, 'write')  writes out any modified Cluster structs,
+%       provided the modification was caused by a check named on the
+%       command line. 
+%in the ClusterTimes Files matches Expts
 %
 cmpdrive = [];
 forcewrite = 0;
 TAGTOP = 'PlotClusters';
 args = {};
+Expts = [];
 errs = {};
 j = 1;
 while j <= length(varargin)
@@ -34,7 +45,13 @@ if ishandle(name)  % callback
     end
 end
 
-if isstruct(name) || iscell(name)
+
+if iscellstr(name)
+    for j = 1:length(name)
+        DATA{j} = FixClusterFile(name{j}, varargin{:});
+    end
+    return;
+elseif isstruct(name) || iscell(name)
     DATA.name = 'ClusterArg';
     DATA.strings{1} = 'ClusterArg';
     if isstruct(name) && isfield(name,'cls') %template fits
@@ -73,11 +90,27 @@ elseif isdir(name)
     end
     id = setdiff(1:length(strings),xid);
     strings = strings(id);
+    Array = GetArrayConfig(name);
+    if ~isempty(Array)
+        args = {args{:} 'Array' Array};
+    end
 elseif exist(name,'file')
-    strings{1} = name;
+    d = mydir([fileparts(name) '/*ClusterTimes.mat']);
+    strings = {d.name name};
+%    strings{1} = name;
 end
 
 DATA = FixClusters(strings,args{:});
+
+if ~isempty(DATA.errorlist)
+    errorfile = [name '/ClusterErrors.mat'];
+    if exist(errorfile)
+        E = load(errorfile);
+    end
+    errorlist = DATA.errorlist;
+    save(errorfile,'errorlist');
+end
+
 
 function [DATA, errs] = FixClusters(strings, varargin)
     useman = 1;
@@ -94,14 +127,38 @@ function [DATA, errs] = FixClusters(strings, varargin)
     clstcheck = 0;
     copyallnewer = 0;
     checkauto = 0;
+    checkexpt = 0;
+    checkdetails = 0; 
+    checktrigger = 0;
+    
     fixlatestbug = 0;
+    filldummy = 0;
+    checkmark = 0;
+    showolderrs = 1;
+    
+    detailsbackup = [];
     findspace = [];
     sublist = [];
+    Expts = [];
+    Array = [];
+    eids = [];
     DATA.saves = {};
+    savedetails = 0;
+    saveclusters = 0;
+    removetrigset = 0;
+
 while j <= length(varargin)
-    if strncmpi(varargin{j},'templatesrc',11)
+    if strncmpi(varargin{j},'Array',6)
+        j = j+1;
+        Array = varargin{j};
+    elseif strncmpi(varargin{j},'templatesrc',11)
         j = j+1;
         DATA.templatesrc = varargin{j};
+    elseif strncmpi(varargin{j},'dummy',5)
+        j = j+1;
+        filldummy = 1;
+        writemode = 2;
+        saveclusters = 1;
     elseif strncmpi(varargin{j},'cmpdrive',6)
         j = j+1;
         cmpdrive =  varargin{j};
@@ -109,12 +166,29 @@ while j <= length(varargin)
         clstcheck =  1;
     elseif strncmpi(varargin{j},'checkauto',9)
         checkauto = 1;
+    elseif strncmpi(varargin{j},'checkexpt',9)
+        checkexpt = 1;
     elseif strncmpi(varargin{j},'checknext',9)
         checknext = 1;
     elseif strncmpi(varargin{j},'checkmean',9)
         checkmean = 1;
+    elseif strncmpi(varargin{j},'checktrigger',9)
+        checktrigger = 1;
+        showolderrs = 0;
+    elseif strncmpi(varargin{j},'checkmark',9)
+        checkmark = 1;
+        saveclusters = 1;
     elseif strncmpi(varargin{j},'copynew',7)
         copyallnewer = 1;
+    elseif strncmpi(varargin{j},'details',7)
+        checkdetails = 1;
+    elseif strncmpi(varargin{j},'expts',5)
+        j = j+1;
+        if isnumeric(varargin{j})
+            sublist = varargin{j};
+        else
+            Expts = varargin{j};
+        end
     elseif strncmpi(varargin{j},'latest',6)
         fixlatestbug = 1;
     elseif strncmpi(varargin{j},'sublist',7) % just checkcertain files
@@ -128,6 +202,12 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'timecheck',6)
         j = j+1;
         timecheck =  varargin{j};
+    elseif strncmpi(varargin{j},'savedetails',9)
+        savedetails = 1;
+    elseif strncmpi(varargin{j},'switchtrigger',9)
+        removetrigset = 2;  %special case for fixing pauls trigset{1} -> 0
+        checktrigger = 1;
+        saveclusters = 1; %will need saving if found;
     elseif strncmpi(varargin{j},'write',5)
         writemode = 2;
     elseif strncmpi(varargin{j},'tag',3)
@@ -141,6 +221,7 @@ end
 
     AllClusters = {};
     AllCClusters = {};
+    errorlist = [];
    
    msgmode = 0;
    newlog = [];
@@ -150,31 +231,44 @@ end
        newlog.expts = CellToMat(newlog.ClusterLog,'exptno');
        newlog.savetime = CellToMat(newlog.ClusterLog,'savetime');
    end
+   
+   if checkexpt && isempty(Expts)
+       [a, Expts] = APlaySpkFile(strings{end});
+   end
+   if checkexpt && isempty(strfind(strings{end},'ClusterTimes'))
+       strings = strings(1:end-1);
+   end
+   exptlist = [];
+   if ~isempty(sublist)
+       exids = GetExptNumber(strings);
+       id = find(ismember(exids,sublist));
+       strings = strings(id);
+   end
+
     for j = 1:length(strings)
         nerr = length(errs);
+        eid = GetExptNumber(strings{j});
+        DATA.exptno(j) = eid;
         if ischar(strings{j})
         dname = strrep(strings{j},'.mat','Details.mat');
         if ~exist(dname,'file')
             dname = strrep(dname,'ClusterTimes','ClusterTimesDetails.mat');
         end
+        if checkdetails
+            bname = strrep(dname,'/Expt','/backup/Expt');
+            bname = strrep(bname,'.mat','*');
+            db = dir(bname);
+            if ~isempty(db)
+                [a,b] = sort([db.datenum]);
+                s = [fileparts(bname) '/' db(b(end)).name];
+                fprintf('Loading Backup %s\n',s);
+                detailsbackup = load(s);
+            end
+        end
 
         go = 1;
-        if length(sublist) %only check some expts
-            id = regexp(strings{j},'Expt[0-9]*');
-            if length(id)
-                exptno = sscanf(strings{j}(id(1)+4:end),'%d');
-            else 
-                exptno = NaN;
-            end
-            id = find(exptno == sublist(:,1));
-            if length(id)
-                exptlist = sublist(id,2);
-            else
-                go  = 0;
-                exptlist = [];
-            end
-        else 
-            exptlist = [];
+        if isempty(strfind(strings{j},'ClusterTimes'))
+            go = 0;
         end
         if go
             if length(cmpdrive)
@@ -205,6 +299,8 @@ end
             autofile = length(strfind(strings{j},'AutoCluster'));
             if exist(dname,'file')
                 load(dname);
+            else
+                ClusterDetails = {};
             end
             AllClusters{j} = Clusters;
             if isempty(exptlist)
@@ -219,12 +315,34 @@ end
         end
         
         modified = 0;
-        savedetails = 0;
-        saveclusters = 0;
         if diff(size(exptlist)) <0
             exptlist = exptlist';
         end
-        for k = exptlist
+        nerr = 0;
+        if checkexpt && ~isempty(Expts)
+            if isfield(Clusters{1},'usealltrials') && Clusters{1}.usealltrials
+                fprintf('Calling APlaySpkFile with usealltrials');
+                if ~isfield(Expts{1}.Header,'usebadtrials') || Expts{1}.Header.usebadtrials == 0
+                    [a, Expts] = APlaySpkFile(Expts{1}.Header.loadname,'usealltrials');
+                end
+            end
+            t = minmax(Clusters{1}.times);
+            for e = 1:length(Expts)
+                matched(e) = 0;
+                if t(1) > Expts{e}.Header.trange(1)./10000 && t(2) < Expts{e}.Header.trange(2)./10000 
+                    fprintf('%s Matches Expt %d\n',strings{j},e);
+                    matched(e) = 1;
+                elseif t(1) > Expts{e}.Header.trange(1)./10000 && t(1) < Expts{e+1}.Header.trange(1)./10000
+                    cprintf('red','%s Bigger than  Expt %d\n',strings{j},e);
+                    matched(e) = 2;
+                end
+            end
+            if sum(matched) == 0
+                    cprintf('red','%s No matching Expt\n',strings{j});                    
+            end
+        end
+        foundCD = 0;
+        for k = 1:length(Clusters)
             cmodified = 0;
             errtype = 0;
             C = Clusters{k};
@@ -234,6 +352,17 @@ end
                     fprintf('E%.0fP%d space is %s\n',C.exptno,k,sprintf(' %d',C.space));
                 end
 
+            end
+            if isfield(C,'marked') && C.marked == 3
+                fprintf('E%dP%d marked bad',eid,k);
+                if isfield(Array,'badprobes') && ~ismember(k,Array.badprobes);
+                    fprintf(' But not in ArrayConfig.badprobes\n');
+                    if checkmark
+                        Clusters{k}.marked = 0;
+                        modified = 1;
+                        saveclusters = 1;
+                    end
+                end
             end
             if length(ClusterDetails) >= k && isfield(ClusterDetails{k},'clst')
                 D = ClusterDetails{k};
@@ -249,6 +378,24 @@ end
                 Clusters{k}.quick = 1;
                 modified = 1;
                 saveclusters = 1;
+            end
+            if checktrigger && isfield(C,'trigset')
+                fprintf('E%dP%d extra Trigset\n',C.exptno, C.probe);
+                [a,b] = GetTriggerSet(C,'warn');
+                if ~isempty(b.duplicates)
+                    s = sprintf('E%dP%d Duplicate TriggerCluster',C.exptno,C.probe(1));
+                    errs = {errs{:} s};
+                end
+                if removetrigset == 2
+                    modified = modified+1; 
+                   C = CopyFields(C,C.trigset{1});
+                   C.triggerset = 0;
+                   for c = 1:length(C.next)
+                       C.next{c}.triggerset = 0;
+                   end
+                   C = rmfield(C,'trigset');
+                   Clusters{k} = C;
+                end
             end
             if length(cmpdrive) && length(cmp.Clusters) >= k
                 CC = cmp.Clusters{k};
@@ -344,6 +491,19 @@ end
                     
             end
             
+            if isfield(C,'errs') && ~isempty(C.errs)              
+                nerr = nerr+1;
+                errorlist(nerr).errs = C.errs;
+                errorlist(nerr).p = C.probe;
+                errorlist(nerr).ex = C.exptno;     
+                errorlist(nerr).auto = C.auto;     
+                if showolderrs
+                    for e = 1:length(C.errs)
+                        cprintf('blue','E%dP%d %s',C.exptno,C.probe(1),deblank(C.errs{e}));
+                    end
+                    fprintf('\n');
+                end
+            end
             if isfield(C,'next') && ~iscell(C.next)
                 fprintf('Converting C2 next to cell %s,%d\n',strings{j},k);
                 next = Clusters{k}.next;
@@ -451,6 +611,7 @@ end
 
 
             if length(ClusterDetails) >= k && ~isempty(ClusterDetails{k})
+                foundCD = foundCD+1;
             if ~isfield(Clusters{k},'clst') && ~isfield(ClusterDetails{k},'clst')
                 if Clusters{k}.nspks == length(ClusterDetails{k}.t) && length(Clusters{k}.times) == Clusters{k}.ncut
                     s=sprintf('**Need to reconstruct clst for %s,%d\n',strings{j},k);
@@ -499,9 +660,41 @@ end
                 end
             end
             end
+            elseif checkdetails
+                fprintf('ClusterDetails %d is empty/missing\n',k);
+                 if ~isempty(detailsbackup) && length(detailsbackup.ClusterDetails) >= k && ~isempty(detailsbackup.ClusterDetails{k})
+                    ClusterDetails{k} = detailsbackup.ClusterDetails{k};
+                    modified = modified+1;
+                end
+            end
+            if filldummy
+                force = 1; %temp
+                if ~isfield(C,'shape')|| force
+                    Clusters{k}.space = [1 3];
+                    Clusters{k}.shape = 0;
+                    Clusters{k}.dvdt = 0;
+                    Clusters{k}.csd = 0;
+                    Clusters{k}.auto = 0;
+                    Clusters{k}.dropi = [0 0 0];
+                    Clusters{k}.time = now;
+                    Clusters{k}.ctime = now;
+                    if ~ isfield(Clusters{k},'MeanSpike') || isempty(Clusters{k}.MeanSpike)
+                        Clusters{k}.MeanSpike.ms = ones(1,32);
+                    end
+                    if ~isfield(Clusters{k}.MeanSpike,'mu')
+                        Clusters{k}.MeanSpike.mu = ones(1,32);
+                    end
+                    DATA.modified(j,k) = 1;
+                    modified = modified+1;
+                end
+                saveclusters = 1;
             end
             DATA.modified(j,k) = cmodified;
             DATA.nerr(j,k) = errtype;
+        end
+        if checkdetails 
+            fprintf('E%d Found Details for %d probes\n',GetExptNumber(strings{j}),foundCD);
+            DATA.ndetails(j) = foundCD;
         end
         if modified &&  writemode > 0
             if writemode > 1
@@ -514,6 +707,7 @@ end
                     s = sprintf('Saving %s',dname);
                     DATA.saves = {DATA.saves{:} s};
                     fprintf('%s\n',s);
+                    BackupFile(dname);
                     if exist('FullVData')
                         save(dname,'ClusterDetails','FullVData');
                         clear FullVData;
@@ -525,6 +719,7 @@ end
                     s=sprintf('Saving %s',strings{j});
                     DATA.saves = {DATA.saves{:} s};
                     fprintf('%s\n',s);
+                    BackupFile(strings{j});
                     if exist('FullVData','var')
                         save(strings{j},'Clusters','FullVData');
                     else
@@ -535,7 +730,8 @@ end
         end
     end
     fprintf('Done\n');
- 
+
+    DATA.errorlist = errorlist;
     DATA.errs = errs;
     DATA.Clusters = AllClusters;
     DATA.CC = AllCClusters;

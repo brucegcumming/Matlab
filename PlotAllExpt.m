@@ -1,5 +1,5 @@
-function PlotAllExpt(Expt, varargin)
-%plots online data delivered from spike2
+function PlotAllExpt(A, varargin)
+%plots data from an AllExpt Struct
 %takes a struct with all trials so far in a file, and plots most recent
 %data. Intended to replace the plots in binoc eventually.
 

@@ -6,7 +6,7 @@ DATA.layout.top = [];
     DATA.layout.lfp = [];
     DATA.layout.combineplot = [];
     DATA.layout.options = [];
-    DATA.prefsdir = '/bgc/group/matlab/preferences/Combine/';
+    DATA.prefsdir = [GetFilePath('preferences') '/Combine/'];
     DATA.layoutfile = [DATA.prefsdir 'default.config.mat'];
     DATA.bysuffix = 0;
     if ~isempty(layout)
@@ -68,6 +68,8 @@ DATA.usenev = 0;
     DATA.state.includeprobename = 0;
     DATA.state.applylastcluster = 0;
     DATA.state.classifyallprobes = 0;
+    DATA.state.interactive = 1;
+    DATA.state.fixdrift = 0;
     DATA.state.verbose = 0;
     DATA.tag.top = TOPTAG;
     DATA.tag.options = [TOPTAG 'Options'];

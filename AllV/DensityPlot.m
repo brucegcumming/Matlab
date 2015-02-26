@@ -48,6 +48,14 @@ end
 if sy == 0 
     sy= std(y)/10;
 end
+if diff(yrange) ==0
+    cprintf('Must have positive Y ranges for density plot\n');
+    return;
+end
+if diff(xrange) ==0
+    cprintf('Must have positive X ranges for density plot\n');
+    return;
+end
     G = exp(-(gx).^2/sx - (gy).^2/sy);
     G = G./sum(G(:));
 
@@ -64,7 +72,7 @@ end
     yi = 1+floor(nbins(2) * (y-yrange(1))/diff(yrange));
  
     %something like histc might make this a lot fater...
-    for j = 1:length(x)
+    for j = 1:length(xi)
         z(yi(j),xi(j)) = z(yi(j),xi(j))+1;
     end
     if sx+sy > 0

@@ -1,6 +1,9 @@
 function [x,DATA] = GetSpikeVals(DATA, ispk, values, dVdt, type, recalc, pcs)
 %[x,DATA] = GetSpikeVals(DATA, ispk, values, dVdt, type, recalc, pcs)
 % calculate spike properties like Envergy, Var, Width etc
+% GetSpikeVals(DATA, NaN, NaN) returns list of variable names
+% GetSpikeVals(DATA, spaces, NaN) returns list of variable names associated
+% with numbers in vector spaces
 
 %Do NOT change the order of these definiitons. Cluster params are saved
 %as integers....
@@ -81,6 +84,9 @@ if addsub
 DATA = [DATA ENERGY1 ENERGY2  ENERGY3 ENERGY4 ];
 x = {x{:} 'Energy 1' 'Energy 2' 'Energy 3' 'Energy 4'};
 end
+if sum(isnan(ispk)) == 0 && length(ispk) < 20
+    x = x(ismember(DATA, ispk));
+end
 return;
 end
 
@@ -99,7 +105,12 @@ arange = DATA.clusterArange;
 brange = DATA.clusterBrange;
 splen = size(values,2).*size(values,3);
 erange = intersect(DATA.clusterErange,1:splen-1);    
-    
+   
+if max(ispk) > size(values,1)
+    x = zeros(size(ispk));
+    return;
+end
+
 if ismember(type,[SPKMAXACCEL SPKMINACCEL SPKMEANACCEL])
     acc = diff(values,2,2);
 end

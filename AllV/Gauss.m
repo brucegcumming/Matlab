@@ -10,9 +10,13 @@ function resp = gauss(params,x,varargin)
 %
 
 period = 0;
+amp = 0;
 j = 1;
 while j  <= nargin-2
-    if strncmpi(varargin{j},'period',4)
+    if strncmpi(varargin{j},'amplitude',3)
+        j = j+1;
+        amp = varargin{j};
+    elseif strncmpi(varargin{j},'period',4)
         j = j+1;
         period = varargin{j};
     end
@@ -22,7 +26,9 @@ if(length(params) == 1)
   base = 0;
   mean = 0;
   sd = params(1);
-  amp = 1/(sd * (2 * pi)^0.5);
+  if (amp == 0) %normalize to unit area
+      amp = 1/(sd * (2 * pi)^0.5);
+  end
 %  amp = 1/(sd);
 else
   mean = params(1);

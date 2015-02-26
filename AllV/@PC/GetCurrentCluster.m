@@ -1,0 +1,1 @@
+function  C = GetCurrentCluster(DATA)    Clusters = getappdata(DATA.toplevel,'Clusters');    C = Clusters{DATA.currentpoint(1)}{DATA.currentpoint(2)};     

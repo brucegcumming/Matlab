@@ -1,0 +1,1 @@
+function  SetCheckExclusive(a)%Set current menu item checked, all others offif ishandle(a)        m = get(a,'parent');    c = get(m,'Children');    set(c,'Checked','off');    set(a,'checked','on');end

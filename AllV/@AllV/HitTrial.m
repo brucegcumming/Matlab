@@ -1,0 +1,1 @@
+function HitTrial(data,b, cell)    DATA = GetDataFromFig(data);    Expt = DATA.Expt;    f = gcf;    D = get(f,'UserData');    pos = get(gca,'currentpoint');    xl = get(gca,'xlim');    yl = get(gca,'ylim');    x = get(data,'xdata');    y = get(data,'ydata');    [a,id] = min(abs(pos(1,1)-x));        AllV.PlotOneTrial(DATA, id);     

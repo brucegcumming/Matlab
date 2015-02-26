@@ -1,0 +1,1 @@
+function xc = CalcTemplateXcorr(tmpl, C)src = tmpl.MeanSpike.ms;b = C.MeanSpike.ms;[x, ai, bi] = intersect(tmpl.spts,C.spts);chspk = tmpl.probe-1:tmpl.probe+1;bspk = chspk + C.probe -tmpl.probe;probes = find(bspk > 0 & bspk <= 24 & chspk > 0 & chspk <= 24);b = b(bspk(probes),bi);a = src(chspk(probes),ai);c = corrcoef(a(:),b(:));xc = c(1,2);

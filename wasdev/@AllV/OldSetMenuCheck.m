@@ -1,0 +1,1 @@
+function OldSetMenuCheck(F, tag, value)    onoff = {'off' 'on'};if ischar(F) %tag for a figure      F = findobj('type','figure','tag',F);    if isempty(F);        return;    endendit = findobj(F,'Tag',tag);if length(it) == 1    set(it,'Checked',onoff{1+value});end

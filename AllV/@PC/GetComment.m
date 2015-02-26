@@ -1,0 +1,1 @@
+function GetComment(DATA,a,b)    f = GetString(DATA.tag.comments,DATA.toplevel,{@PC.AddComment, []});    str = sprintf('Ex%.1f (%d), Probe%d',DATA.exptid(a),a,b);    it = findobj(f,'tag','CommentLabel');    if length(it) == 1        set(it,'string',str);    end  

@@ -1,6 +1,6 @@
 function [DATA, dprime, details] = SetSpkCodes(DATA, expspks, probe, show, varargin)
 
-     onecluster = 0;
+onecluster = 0;
 nexp = DATA.currentexpt;
      j = 1;
 while j <= length(varargin)
@@ -14,6 +14,15 @@ details.nc = 0;
 if isempty(expspks)
     return;
 end
+
+
+if ~isfield(DATA,'cluster')
+ nclusters = 0;
+ DATA.cluster = {};
+end
+
+clusterdefined = cmb.iscluster(DATA.cluster,1,DATA.probe);
+
 if isfield(DATA,'AllClusters')
     if iscell(DATA.AllClusters)
         DATA.AllClusters{nexp}(probe).codes(expspks) = 0;
@@ -61,7 +70,11 @@ elseif isfield(DATA,'AllSpikes')
 elseif isfield(DATA,'Spikes')
   Cx = DATA.Spikes.cx;
   Cy = DATA.Spikes.cy;
+  %if no cluster defined, don't wipe out codes - might have been set by
+  %autocut
+  if DATA.state.online == 0 || clusterdefined
     DATA.AllData.Spikes.codes(expspks,2) = 0;
+  end
     Spikes = DATA.AllData.Spikes;
     if isempty(DATA.AllData.pcs) || length(DATA.AllData.pcs) < max(expspks)
         PCs = DATA.AllData.Spikes.codes;
@@ -74,11 +87,6 @@ end
 
 %
 %really want to limit this to spike in the current scope;id = find(DATA.Spks.cluster == 0);
-
-if ~isfield(DATA,'cluster')
- nclusters = 0;
- DATA.cluster = {};
-end
 nclusters = size(DATA.cluster,1);
 p = probe;
 if nclusters >1
@@ -94,10 +102,11 @@ elseif nclusters > 7 %includes and artifact. Do this last
 else
     cllist = nclusters:-1:1;
 end
+
 for cl = cllist
     cspks = expspks;
     nspk = 0;
-    if p > size(DATA.cluster,2)
+    if p > size(DATA.cluster,2) %no cluster defined in combine for this yet. Stick with exisitng
         C = [];
     else
         C = DATA.cluster{cl,p};
@@ -107,12 +116,18 @@ for cl = cllist
     else
         splitlist = 0;
     end
-    if isfield(DATA.cluster{cl,p},'forceid') & DATA.cluster{cl,p}.forceid
-        clid = DATA.cluster{cl,p}.forceid;
+    if isfield(C,'forceid') & C.forceid
+        clid = C.forceid;
     else
         clid = cl;
     end
     while ~isempty(C) & isfield(C,'x')
+        if C.params(1) ~= DATA.plot.clusterX || C.params(2) ~= DATA.plot.clusterY
+            if isfield(Spikes,'cache') %will need spike values again
+                DATA = cmb.LoadSpikes(DATA, DATA.currentexpt(1), probe,'force');
+                Spikes = DATA.AllData.Spikes;
+            end
+        end
         if ~isfield(C,'lastspk')  & ~isempty(DATA.spklist)
             C.lastspk = DATA.spklist(end);
         end
@@ -124,21 +139,35 @@ for cl = cllist
     if C.params(1) == DATA.plot.clusterX  %%otherwise need to calc values again)     
         x = (Cx(cspks) - C.x(1))./C.x(3);
     else
-        x = GetSpikeVals(DATA, cspks, Spikes.values(cspks,:), Spikes.dVdt(cspks,:),C.params(1), 1,PCs(cspks,:));
+%Jan 2015 what was here before can't work unless max(csspks) = length(cspks)        
+%        x = GetSpikeVals(DATA, cspks, Spikes.values(cspks,:), Spikes.dVdt(cspks,:),C.params(1), 1,PCs(cspks,:));
+        x = GetSpikeVals(DATA, 1:length(cspks), Spikes.values(cspks,:), Spikes.dVdt(cspks,:),C.params(1), 1,PCs(cspks,:));
         x = (x- C.x(1))./C.x(3);
     end
     if C.params(2) == DATA.plot.clusterY  %%otherwise need to calc values again)     
         y = (Cy(cspks) - C.y(1))./C.y(3);
     else
-        y = GetSpikeVals(DATA, cspks, Spikes.values(cspks,:), Spikes.dVdt(cspks,:),C.params(2), 1,PCs(cspks,:));
+%        y = GetSpikeVals(DATA, cspks, Spikes.values(cspks,:), Spikes.dVdt(cspks,:),C.params(2), 1,PCs(cspks,:));        
+        y = GetSpikeVals(DATA, 1:length(cspks), Spikes.values(cspks,:), Spikes.dVdt(cspks,:),C.params(2), 1,PCs(cspks,:));
         y = (y- C.y(1))./C.y(3);
     end
     xr = x .* cos(C.angle) + y .* sin(C.angle);
     yr = y .* cos(C.angle) - x .* sin(C.angle);
     d = (yr./C.y(2)*C.y(3)).^2 + (xr./C.x(2)*C.x(3)).^2;
+    
+    
+%####################################    
+%Here is where cluser is actually set
+%###################################
     id = find(d <= 1);
     nid = find(d > 1);
     nspk = nspk + length(id);
+%####################################    
+%Here is where cluser is actually set
+%###################################
+
+    
+    
     if length(id) & length(nid)
     dprime(cl) = (mean(d(nid))-mean(d(id)))./sqrt(mean([var(d(nid)) var(d(id))]));
     else
@@ -206,9 +235,9 @@ for cl = cllist
     else
         DATA.AllData.Spikes.codes(cspks(id),2) = clid;
     end
+    DATA = cmb.SpkCache(DATA,DATA.currentexpt(1),DATA.probe,'set');
     DATA.cluster{cl,p}.dprime = dprime(cl);
     DATA.cluster{cl,p}.bii = max(bii);
-    
     if isfield(C,'Cluster')
         C = C.Cluster;
     else
@@ -232,8 +261,8 @@ for cl = cllist
     title(sprintf('%s dprime %.2f(%.2f) %.1fHz:%d/%dspks',DATA.explabels{DATA.currentexpt},dprime(cl),bii,rate,length(id),length(cspks))); 
         end
     else
-        if isfield(DATA,'explabels') && length(DATA.explabels) >= DATA.currentexpt & cl == DATA.currentcluster
-    title(sprintf('%s dprime %.2f %d/%dspks',DATA.explabels{DATA.currentexpt},dprime(cl),length(id),length(cspks))); 
+        if isfield(DATA,'explabels') && length(DATA.explabels) >= DATA.currentexpt(1) && cl == DATA.currentcluster
+    title(sprintf('%s dprime %.2f %d/%dspks',DATA.explabels{DATA.currentexpt(1)},dprime(cl),length(id),length(cspks))); 
         end
     end
     end

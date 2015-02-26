@@ -1,0 +1,1 @@
+function C = GetSubCluster(Cluster, c)%    return struct with details for a given clusterif c ==1    C = Cluster;elseif c <= length(Cluster.next)+1    C = Cluster.next{c-1};else    C = [];end

@@ -1,13 +1,24 @@
 function DATA = CombinerInit(DATA, name, TOPTAG, layout)
 
+
 DATA.layout.top = [];
+if ~isfield(DATA,'nevdir')
+    DATA.nevdir = [];
+end
     DATA.layout.spkv = [];
     DATA.layout.spkxy = [];
     DATA.layout.lfp = [];
     DATA.layout.combineplot = [];
     DATA.layout.options = [];
-    DATA.prefsdir = '/bgc/group/matlab/preferences/Combine/';
-    DATA.layoutfile = [DATA.prefsdir 'default.config.mat'];
+    DATA.gui.prefsdir = [GetFilePath('preferences') '/Combine/'];
+    DATA.defaultconfig = [DATA.gui.prefsdir '/' gethostname '.' GetUserName '.config'];
+    DATA.defaultlayout = [DATA.gui.prefsdir '/' gethostname '.' GetUserName '.layout.mat'];
+    if ~isfield(DATA,'configfile') || isempty(DATA.configfile)
+        DATA.configfile = DATA.defaultconfig;
+    end
+    if ~isfield(DATA,'layoutfile') || isempty(DATA.layoutfile)
+        DATA.layoutfile = DATA.defaultlayout;
+    end
     DATA.bysuffix = 0;
     if ~isempty(layout)
         f = fields(layout);
@@ -55,7 +66,7 @@ DATA.usenev = 0;
     DATA.state.autoplot = 0;
     DATA.state.autolist = 0;
     DATA.state.autoplotcells = 0;
-    DATA.state.autoplotnewprobe = 1;
+    DATA.state.autoplotnewprobe = 0;
     DATA.state.autoreplotgraph = 1;
     DATA.state.autosetlist = 1;
     DATA.state.NeedAllProbeFile = 0;
@@ -96,6 +107,7 @@ DATA.usenev = 0;
     DATA.densityplot = 0;
     DATA.alldensityplot = 0;
     DATA.plot.showspikeshapes = 0;
+    DATA.plot.showallxy = 0;
     DATA.plot.clusterXrange = [0 10];
     DATA.plot.clusterYrange = [0 1.5];
     DATA.plot.clusterZrange = [0 10];
@@ -196,6 +208,9 @@ DATA.usenev = 0;
     DATA.state.scalelfp = 0;
     DATA.state.autoplotallspikes = 0;
     DATA.state.useonlineclusters = 1;
+    DATA.state.interactive = 1;
+    DATA.state.fixdrift = 0;
+
     DATA.filetype = 'Spike2';
     DATA.profiling = 0;
     if ischar(name)
@@ -247,3 +262,5 @@ DATA.usenev = 0;
     DATA.savedclusters = 1; %no changes made yet
     DATA.plot.prettyfigs = 0;
     DATA.plot.voffsets = [];
+    DATA.progname = 'Combine';
+    DATA.progversion = 2.1;

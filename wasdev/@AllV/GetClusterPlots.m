@@ -1,0 +1,1 @@
+function clusterplot = GetClusterPlots(DATA,E, plots,pt)clusterplot(1) = AllV.GetClusterPlot(DATA,E, plots,pt);j = 1;if isfield(E,'next')for j = 1:length(E.next)    clusterplot(j+1) = AllV.GetClusterPlot(DATA,E.next{j},plots,pt);endend

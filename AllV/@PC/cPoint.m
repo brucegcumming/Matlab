@@ -1,0 +1,1 @@
+function [e,p] = cPoint(DATA)    e = DATA.currentpoint(1);    p = DATA.currentpoint(2);    

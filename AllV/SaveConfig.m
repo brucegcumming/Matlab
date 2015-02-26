@@ -24,6 +24,7 @@ if interactive
     end
     file = [outdir '/' name];
 end
+BackupFile(file);
 fid = fopen(file,'w');
     if fid < 0
         cprintf('errors','Cant write to %s\n',file)
@@ -53,10 +54,29 @@ fid = fopen(file,'w');
                 val = DATA.(f{1}).(sf{j});
                 if isempty(val)
                     fprintf(fid,'DATA.%s.%s=[];\n',f{1},sf{j});
-                elseif isnumeric(val)
+                elseif isnumeric(val) || islogical(val)
                     fprintf(fid,'DATA.%s.%s=[%s];\n',f{1},sf{j},num2str(val));
                 elseif ischar(val)
                     fprintf(fid,'DATA.%s.%s=''%s'';\n',f{1},sf{j},val);
+                end
+            end
+        elseif iscell(val)
+            for j = 1:size(val,1);
+                for k = 1:size(val,2)
+                    cval = DATA.(f{1}){j,k};
+                    if ischar(cval)
+                        fprintf(fid,'DATA.%s{%d,%d}=''%s'';\n',f{1},j,k,cval);
+                    elseif isstruct(cval)
+                        for p = fields(cval)'
+                            if ishandle(cval.(p{1}))
+                                fprintf(fid,'DATA.%s{%d,%d}.%s=%f;\n',f{1},j,k,p{1},double(cval.(p{1})));
+                            else
+                                fprintf(fid,'DATA.%s{%d,%d}.%s=%f;\n',f{1},j,k,p{1},cval.(p{1}));
+                            end
+                        end
+                    else
+                        fprintf(fid,'DATA.%s{%d,%d}=%f\n',f{1},j,k,cval);
+                    end
                 end
             end
         end
@@ -65,3 +85,4 @@ fid = fopen(file,'w');
         fprintf('Saved Config to %s\n',file);
     end
 
+fclose(fid);

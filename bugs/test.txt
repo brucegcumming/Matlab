@@ -1,0 +1,21 @@
+Error using parallel_function (line 589)
+
+	
+Method 'SetFigure' is not defined for class 'AllV' or is removed from MATLAB's search path.
+
+
+Error stack:
+AllVPcs.m at 1741
+
+	AutoCutOne.m at 8
+AutoCutAll>(parfor body) at 66
+
+
+Error in AllV.AutoCutAll (line 65)
+          
+	  parfor j = 1:length(ispk)
+
+
+Error in AllV.AllVPcs (line 1478)
+
+	res = AllV.AutoCutAll(ispk,  F, Vall, DATA, varargin(id));

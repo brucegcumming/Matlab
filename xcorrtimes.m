@@ -43,8 +43,10 @@ end
 
 details.counts = [length(at) length(bt)];
 details.xpts = (times(1:end-1)+times(2:end))/2;
-if method == 2
-    xc = zeros(size(times));
+times = reshape(times,1,length(times));
+xc = zeros(size(times));
+if method == 2    
+    bt = reshape(bt,1,length(bt));
     for j = 1:length(at);
         dt =  at(j) - bt;
         cc = histc(dt(abs(dt)<= maxt),times);
@@ -52,9 +54,11 @@ if method == 2
             xc = xc + cc;
         end
     end
+    [a,b] = min(abs(times));
+    details.efficacy = [xc(b)./length(at) xc(b)./length(bt)];
+    details.midpt = b;
     xc = xc(1:end-1);
 elseif method == 3
-    xc = zeros(size(times));
     for j = 1:length(at);
         dt(j,:) =  at(j) - bt;
     end
@@ -62,6 +66,7 @@ elseif method == 3
 elseif method == 4  % tests
     dts = [];
     ts = [];
+    xc = [];
     for j = 1:length(at);
         dt =  at(j) - bt;
         id = find(abs(dt) < maxt);
@@ -73,7 +78,6 @@ elseif method == 4  % tests
     xc(1,:) = dts;
     xc(2,:) = ts;
 elseif method == 5
-    xc = zeros(size(times));
     id = find(diff(bt) > maxt);
     if isempty(bt)
         return;
@@ -99,7 +103,6 @@ elseif method == 5
     end
 
 else
-    xc = zeros(size(times));
     for j = 1:length(at);
         dt =  at(j) - bt;
         cc = hist(dt,times);
@@ -108,4 +111,5 @@ else
 end
 if clipping
     xc = xc(2:end-1);
+    details.xpts = details.xpts(2:end-1);
 end

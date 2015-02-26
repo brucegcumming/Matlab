@@ -1,0 +1,1 @@
+function xy = AxPos(ax, pos)    xl = get(ax,'Xlim');    yl = get(ax,'Ylim');    xy(1) = xl(1) + diff(xl) .* pos(1);             xy(2) = yl(1) + diff(yl) .* pos(2);             

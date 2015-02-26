@@ -1,0 +1,1 @@
+function h= oldDrawLine(E,varargin)x = [E.pos(1) E.pos(3)];y = [E.pos(2) E.pos(4)];if ishandle(E.h)     set(E.h,'Xdata',x,'Ydata',y);    h = E.h;else    hold on;    h = plot(real(x),real(y),varargin{:});    hold off;end

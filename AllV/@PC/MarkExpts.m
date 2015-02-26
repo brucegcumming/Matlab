@@ -1,0 +1,1 @@
+function MarkExpts(DATA,type)        if strcmp(type,'none')        return;    end    id = find(strcmp(type,DATA.expnames));    eid = find(ismember(DATA.exptid,id));    for j = 1:length(eid)        PC.DrawBox(eid(j),[1.3 DATA.nprobes-0.7],3,'color','g','linewidth',1);    end

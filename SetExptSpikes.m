@@ -1,10 +1,17 @@
 function [DATA, ispk, dprime, details] = SetExptSpikes(DATA, expid, show, varargin)
 %[DATA, ispk, dprime, details] = SetExptSpikes(DATA, expid, show, varargin)
-%Find Which Spikes fall within a given Expt for combine
+%Find Which Spikes fall within a given Expt for combine, then calculate
+%cluster paramters
+%SetExptSpikes(DATA, expid, 'setrange')  just finds spk list
 
     details = [];
     dprime = 0;
     ispk = [];
+    if  DATA.state.online
+        quickmode = 1;
+    else
+        quickmode = 0;
+    end
     
     j = 1;
     while j <= length(varargin)
@@ -20,6 +27,8 @@ function [DATA, ispk, dprime, details] = SetExptSpikes(DATA, expid, show, vararg
             if isfield(DATA.Expts{expid}.gui,'spks')
                 ispk = DATA.Expts{expid}.gui.spks;
             end
+        elseif strncmpi(varargin{j},'quick',5)
+            quickmode = 1;
         elseif strncmpi(varargin{j},'useexp',5)
 %            if isfield(DATA.Expts{expid},'Cluster') &
 %            size(DATA.Expts{expid}.Cluster,2) >= DATA.probe & size(DATA.Expts{expid}.Cluster,1) > 0 & ~isfield(DATA.Expts{expid}.Cluster{1,DATA.probe},'touched')
@@ -46,16 +55,29 @@ if isfield(DATA.Expts{expid},'Cluster') & size(DATA.Expts{expid}.Cluster,2) >= D
         else
             espk = [];
         end
-    for j = 1:length(DATA.Expts{expid}.Trials)
-        times(1) = DATA.Expts{expid}.Trials(j).Start(1)-DATA.state.preperiod;
-        times(2) = DATA.Expts{expid}.Trials(j).End(end)+DATA.state.postperiod;
-        if DATA.bysuffix || strncmp(DATA.filetype,'Grid',4)
-            espk = expid;
+        
+        if isempty(espk)
+            ispk = [];
+        elseif quickmode
+                times(1) = DATA.Expts{expid}.Trials(1).Start(1)-DATA.state.preperiod-10000;
+                times(2) = DATA.Expts{expid}.Trials(end).End(end)+DATA.state.postperiod+10000;
+                if DATA.bysuffix || strncmp(DATA.filetype,'Grid',4)
+                    espk = expid;
+                end
+                ispk = FindSpikes(DATA, times, probe, espk);
+        else
+            for j = 1:length(DATA.Expts{expid}.Trials)
+                times(1) = DATA.Expts{expid}.Trials(j).Start(1)-DATA.state.preperiod;
+                times(2) = DATA.Expts{expid}.Trials(j).End(end)+DATA.state.postperiod;
+                if DATA.bysuffix || strncmp(DATA.filetype,'Grid',4)
+                    espk = expid;
+                end
+                tspk = FindSpikes(DATA, times, probe, espk);
+                ispk = [ispk; tspk];
+            end
         end
-        tspk = FindSpikes(DATA, times, probe, espk);
-        ispk = [ispk; tspk];
     end
-    end
+    
 DATA.Expts{expid}.gui.spkrange = [min(ispk) max(ispk)];
 DATA.Expts{expid}.gui.spks = ispk;
 
@@ -70,7 +92,7 @@ if ~isfield(DATA,'spklist') | isempty(DATA.spklist)
     DATA.spklist = ispk;
 end
 
-DATA = CalcClusterVars(DATA,  ispk);
+DATA = CalcClusterVars(DATA,  ispk, 'expt',expid);
 % if a cluster is set for this expt, use it.
 % otherwise use the current one
 cl = DATA.currentcluster;

@@ -1,0 +1,1 @@
+    function bad = BadCluster(C)    bad = 0;    if C.mahal(1) < 2        bad = 1;    end        

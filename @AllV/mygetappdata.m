@@ -1,0 +1,1 @@
+function val = mygetappdata(DATA, str)val = [];        if DATA.interactive < 0 || ~isfield(DATA,'toplevel')            if isfield(DATA,'appdata') && isfield(DATA.appdata,str)                val = DATA.appdata.(str);            end        elseif isfield(DATA,'toplevel') && isfigure(DATA.toplevel)            val = getappdata(DATA.toplevel,str);        end        

@@ -1,0 +1,1 @@
+function PrintComments(DATA,e,p)    if isempty(DATA.Comments)        return;    end        exid = sum(ismember(cat(2,DATA.Comments.ex),e),2)';    for j = 1:length(p)        id = find(exid > 0 & [DATA.Comments.p] == p(j));        for k = 1:length(id)            fprintf('E%.0f P%d %s\n',DATA.Comments(id(k)).exptno,p(j),DATA.Comments(id(k)).comment);        end    end

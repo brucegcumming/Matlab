@@ -12,6 +12,10 @@ function [probes, errs]  = MakeProbeIndex(dname, varargin)
 %the disk.  To force rebuiling use
 %
 %     MakeProbeIndex(path,'recalc')
+%     MakeProbeIndex(path,'suffix', x)  Builds index for just suffix x
+%     MakeProbeIndex(path,'suffixrecalc', x)  ReBuilds index for just
+%     suffix x, and does not save
+
 probes = [];
 errs = [];
 nc = 0;
@@ -156,6 +160,10 @@ for j = 1:length(d)
     end
 end
 
+if isempty(d) || isempty(filesuff)
+    cprintf('red','No spkblk files in %s\n',dname);
+    return;
+end
 if rescan == 2  %updating any new spkblks
     [sfiles, aid] = unique({probes.file});
     sfiledate = [probes(aid).filetime];
@@ -197,13 +205,25 @@ pos = filesuff.*1000+blkn;
 
 ltimes = [];
 ts = now;
+errs = {};
 for m = 1:length(ids)
     j = ids(idlist(m));
     sid = strfind(d(j).name,'spkblk');
     if length(sid) & ~ismember(filesuff(idlist(m)),oldsuff) & ismember(filesuff(idlist(m)),dosuffs);
         fname = [dname '/' d(j).name];
         tl = now;
+        timefix = 0;
+        try
         a = load(fname);
+        catch ME
+            cprintf('red', 'Error Loading%s\n',fname);
+            errs{end+1}.exc = ME;
+            errs{end}.name = fname;
+        end
+        if isfield(a,'timefix')
+            timefix = a.timefix;
+            cprintf('blue','Adjusting times in %s by %.2f\n',fname,timefix);
+        end
         ltimes(m) = mytoc(tl);
         f = fields(a);
         filenames{j} = fname;
@@ -213,13 +233,14 @@ for m = 1:length(ids)
             nc = nc+1;
             probe = sscanf(C.title,'Spike %d');
             probes(nc).probe = probe;
-            probes(nc).start = a.(f{k}).start;
-            probes(nc).end = C.start+C.length .* C.interval;
+            probes(nc).start = a.(f{k}).start+timefix;
+            probes(nc).end = timefix+C.start+C.length .* C.interval;
             probes(nc).var = f{k};
             probes(nc).file = d(j).name;
             probes(nc).fileid = sscanf(d(j).name(sid+6:end),'%d');
             probes(nc).suffix = filesuff(idlist(m));
             probes(nc).filetime = d(j).datenum;
+            probes(nc).vsd = std(C.values);
             end
         end
     end
@@ -228,7 +249,7 @@ if verbose > 1
 fprintf('Processing took %.1f (%.1f loading)\n',mytoc(ts),sum(ltimes));
 end
 if nosave == 0
-save(outfile,'probes');
+save(outfile,'probes','errs');
 end
 errs = CheckProbes(probes, verbose);
 if plottype

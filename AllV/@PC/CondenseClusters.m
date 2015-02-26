@@ -1,0 +1,1 @@
+ function [CC, GM] = CondenseClusters(C)     for j = 1:length(C)         [CC{j}, GM{j}] = PC.CondenseCluster(C{j});     end     

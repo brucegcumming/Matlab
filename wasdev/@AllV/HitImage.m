@@ -1,0 +1,1 @@
+function HitImage(a,b,p)DATA = GetDataFromFig(a);        DATA.selectprobe(p) = 0;        delete(a);%PlotTrialSpikes(DATA,DATA.currenttrial,'probes',p);

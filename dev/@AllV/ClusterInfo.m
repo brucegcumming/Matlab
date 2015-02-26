@@ -1,1 +1,0 @@
-function C = ClusterInfo(DATA)if DATA.currentcluster > 1    if length(DATA.cluster.next) >= DATA.currentcluster-1        C = DATA.cluster.next{DATA.currentcluster-1};        if isempty(C) %can happen after deleting            C.space = [0 0];        end    else        C.space = [0 0];    endelse     C = DATA.cluster;end

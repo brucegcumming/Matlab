@@ -1,0 +1,1 @@
+function [nx, ny] = Data2Norm(x,y)        xl = get(gca,'xlim');    yl = get(gca,'ylim');        nx = (x-xl(1))./diff(xl);    ny = (y-yl(1))./diff(xl);    

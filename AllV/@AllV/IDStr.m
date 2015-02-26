@@ -1,0 +1,1 @@
+function str = IDStr(DATA)str = sprintf('E%dP%d',DATA.exptno,AllV.ProbeNumber(DATA));

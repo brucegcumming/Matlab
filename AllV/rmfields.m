@@ -2,8 +2,16 @@ function S = rmfields(S, varargin)
 %rmfields(S, a,b,c....)    removes a list of fields from S
 %   just calls rmfield, building a cell string array if necessary.
 %   Also checks that the field exits to avoid errors
+% if S is a cell array, does it for each element of S
 
 f = {};
+if iscell(S)
+    for j = 1:length(S)
+        S{j} = rmfields(S{j},varargin{:});
+    end
+    return;
+end
+
 j = 1;
 while j <= length(varargin)
     if iscellstr(varargin{j})
@@ -19,5 +27,5 @@ while j <= length(varargin)
 end
     
 if ~isempty(f)
-S = rmfield(S, f);
+    S = rmfield(S, f);
 end

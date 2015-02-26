@@ -6,7 +6,7 @@ if ispc
         hostname=getenv('USERDOMAIN');
     end
 else
-    hostname = system('hostname');
+    [status, hostname] = system('hostname');
 end
 
 %elseif strncmp(os,'GLNXA64',7)

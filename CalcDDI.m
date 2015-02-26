@@ -48,6 +48,11 @@ scale = 10000/duration;
 if strcmp(type,'dO') & ~isfield(Expt.Trials,'dy') & ~isfield(Expt.Trials,'dO') & isfield(Expt.Trials,'dx')
     type = 'dx';
 end
+for j = 1:length(Expt.Trials)
+    dx = Expt.Trials(j).(type);
+    dx = round(dx.*500)./500;
+    Expt.Trials(j).(type) = dx;
+end
 dxs = unique([Expt.Trials.(type)]);
 
 if(~isfield(Expt.Trials,'ce'))
@@ -78,6 +83,10 @@ Expt = FillTrials(Expt,'ce');
 Expt = FillTrials(Expt,'st');
 ceval = max([Expt.Trials.ce]);
 ndx = 1;
+if strcmp(Expt.Stimvals.e2,'dp')
+    id = find([Expt.Trials.dp] == 0);
+    Expt.Trials = Expt.Trials(id);
+end
 for dx = dxs
     if strcmp(type,'dx') || strcmp(type,'dO')
         idx =find([Expt.Trials.(type)] == dx & [Expt.Trials.me] == 0 & [Expt.Trials.ce] ...

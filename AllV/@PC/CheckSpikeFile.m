@@ -1,0 +1,1 @@
+function go = CheckSpikeFile(DATA, C)name = PC.SpikeFileName(DATA,C);d = dir(name);tdiff = C.savetime(1)-datenum(d.date); if tdiff > 0.001 %at least 1 min old to avoid rounding in d.date (string)    fprintf('%s %.2f older\n',name,tdiff);    go = 1;else   if tdiff > 0.0001    go = 0;   end    go = 0;end

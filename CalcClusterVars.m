@@ -7,6 +7,7 @@ SPKVARE = 2;
 noforce  = 1;
 j = 1;
 probe = DATA.probe;
+eid = DATA.currentexpt(1);
 while j <= length(varargin)
     if isstruct(varargin{j}) & isfield(varargin{j},'values')
         j = j+1;
@@ -16,6 +17,9 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'probe',5)
         j =j+1;
         probe = varargin{j};
+    elseif strncmpi(varargin{j},'expt',5)
+        j =j+1;
+        eid = varargin{j};
     end
     j = j+1;
 end
@@ -26,9 +30,17 @@ if isfield(DATA,'AllClusters') && noforce % All calculated and stored, but No AD
   return;
 end
 
+if nargin == 1 || isempty(ispk) %use all
+    ispk = 1:length(DATA.AllData.Spikes.times);
+end
 if length(ispk) == 2
     ispk = ispk(1):ispk(2);
 end
+
+cspace{1} = GetSpikeVals(DATA, DATA.plot.clusterX, NaN);
+cspace{2} = GetSpikeVals(DATA, DATA.plot.clusterY, NaN);
+DATA.Spikes.space = {cspace{1}{:} cspace{2}{:}};
+
 if ispk
     DATA = CheckForPCA(DATA,ispk, 1);
     if isfield(DATA,'AllSpikes')
@@ -43,6 +55,12 @@ if ispk
             Spikes.dVdt(ispk,:) = diff(adc,[],2);
         end
     else
+        if DATA.state.usexycache
+            [DATA,ok] = cmb.SpkCache(DATA,eid,DATA.probe,'addxy');
+            if ok == 1
+                return;
+            end
+        end
         Spikes = DATA.AllData.Spikes;
         adc = Spikes.values(ispk,:);
         if isempty(DATA.AllData.pcs) || length(DATA.AllData.pcs) < max(ispk) %might have pcs computed for earlier spikes

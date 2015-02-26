@@ -1,0 +1,1 @@
+function CheckRates(DATA, expname, cell)    exid = find(strcmp(expname, DATA.expnames));    nx = 0;    for e = exid        [p,clnum] = find(DATA.CellList(e,:,:) == cell);        if ~isempty(p)            nx = nx+1;            Expts{nx} = PC.CountExptSpikes(DATA, Expts{e},Clusters{e}{p},clnum);        end    end    

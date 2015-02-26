@@ -7,6 +7,7 @@ if DATA.plot.showartifacts
 else
     maxcl = 8;  %>8 is artifacts. Set this to 9 to include artifacts
 end
+ctype = 2;
 if isfield(DATA,'AllSpikes')
     if ~isfield(DATA.AllSpikes{probe},'codes') | isempty(DATA.AllSpikes{probe}) | ~isfield(DATA.AllSpikes{probe},'times')
         ispk = [];
@@ -14,10 +15,10 @@ if isfield(DATA,'AllSpikes')
     end
     ispk = find(DATA.AllSpikes{probe}.times > times(1) &...
     DATA.AllSpikes{probe}.times < times(2) & ...
-    DATA.AllSpikes{probe}.codes(:,2) < maxcl);
+    DATA.AllSpikes{probe}.codes(:,ctype) < maxcl);
     if nargout > 1
     spktimes = DATA.AllSpikes{probe}.times(ispk);
-    codes = DATA.AllSpikes{probe}.codes(ispk,2);
+    codes = DATA.AllSpikes{probe}.codes(ispk,ctype);
     end
 elseif isfield(DATA,'AllClusters') && iscell(DATA.AllClusters)
     if length(range)
@@ -42,14 +43,17 @@ elseif isempty(DATA.AllData.Spikes) || ~isfield(DATA.AllData.Spikes,'times')...
         || isempty(DATA.AllData.Spikes.times)
     ispk = [];
 else
+    if size(DATA.AllData.Spikes.codes,2) == 1
+        ctype = 1;
+    end
     if isempty(range)
         ispk = find(DATA.AllData.Spikes.times > times(1) &...
             DATA.AllData.Spikes.times < times(2) ...
-            & DATA.AllData.Spikes.codes(:,2) < maxcl);
+            & DATA.AllData.Spikes.codes(:,ctype) < maxcl);
     else
         ispk = find(DATA.AllData.Spikes.times(range) > times(1) &...
             DATA.AllData.Spikes.times(range) < times(2)...
-            & DATA.AllData.Spikes.codes(range,2) < maxcl);
+            & DATA.AllData.Spikes.codes(range,ctype) < maxcl);
         ispk = range(ispk);
     end
 end

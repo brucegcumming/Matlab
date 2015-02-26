@@ -1,0 +1,1 @@
+function SetRateseqPlot(a,b,cellid)    DATA = GetDataFromFig(a);    DATA.currentcell = cellid;PC.PlotMenu(DATA,b,'cells','rateseqone', cellid);            

@@ -1,0 +1,1 @@
+function tt = TimeMark(tt, str, show)    ttn = length(tt)+1;    tt(ttn).time = now;    tt(ttn).str = str;    if show        fprintf('%s at %.2f\n',str,mytoc(tt(1).time));    end

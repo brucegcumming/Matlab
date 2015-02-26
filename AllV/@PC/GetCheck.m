@@ -1,0 +1,1 @@
+function [value, it] = GetCheck(tag, varargin)if nargin == 2 & isfigure(varargin{1})    it = findobj(varargin{1},'Tag',tag);else        it = findobj('Tag',tag);endif ~isempty(it)     value = get(it(1),'value');else    value = 0;end

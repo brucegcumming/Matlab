@@ -1,12 +1,25 @@
 
 function DATA = ProcessGridFullV(name, varargin)
-%DATA = ProcessGridFullV(name, varargin)
-%make FullV files from .ns5 files. Apply clusters
-%ProcessGridFullV(name,'online')
-%ProcessGridFullV(name,'initial') =  'chopfile','BuildV','mains', 'submean', 'refcut', 'prebuild';
+%DATA = ProcessGridFullV(name, varargin) make FullV files from .ns5 files. 
+%Name is usually a .mat file for the .smr file.
+% Can be a dir for online.
+%ProcessGridFullV(name,'online') =  'BuildV','mains', 'submean';
+%ProcessGridFullV(name,'initial') =  'BuildV','mains', 'submean', 'refcut', 'prebuild';
 %
+%ProcessGridFullV(name,'buildv')  forces (re-)building of FullV file
+%ProcessGridFullV(name,'expts',exlist) do only expt #s listed in vector exlist
 %ProcessGridFullV(name,...'parallel') uses parfor loops where possible
 %(currently for refcuts only)
+%ProcessGridFullV(name,...'usealltrials') includes badfix trials
+%( ...,'nochopfile')  Saves everything from the ns5 file, regardless of
+%     Fixation/Trials etc. 
+%
+% ...,  'refcut') Applies RefClusters
+% ...,  'autocut') Applies AutoCut
+% ...,  'quickautocut') Applies quick version of AutoCut (single template)
+% ....,'nocut') turns off refcut and autocut
+
+
 
 DATA = [];
 Trials = [];
@@ -38,9 +51,15 @@ waitforfiles = 0;
 highpass = NaN;
 parallel = 0;
 usealltrials = 0;
+usegoodtrials = 0;
 savespikes = 1;
 allvargs = {};
 buildargs = {};
+nevdir = [];
+verstr = '$Revision: 1.2 $';
+version = sscanf(verstr(12:end),'%f');
+
+
 j = 1;
 while j <= length(varargin)
     if isfield(varargin{j},'Trials')
@@ -53,6 +72,8 @@ while j <= length(varargin)
         Expts = varargin{j};
     elseif strncmpi(varargin{j},'autocut',5)
         autocut = 1;
+    elseif strncmpi(varargin{j},'quickautocut',8)
+        autocut = 2;
     elseif strncmpi(varargin{j},'buildlfp',7)
         BuildLFP = 1;
     elseif strncmpi(varargin{j},'buildv',6)
@@ -93,12 +114,17 @@ while j <= length(varargin)
         buildmean = 3;
     elseif strncmpi(varargin{j},'nochopfile',5)
         chopfile = 0;
+    elseif strncmpi(varargin{j},'nocut',5)
+        refcut = 0;
+        autocut = 0;
     elseif strncmpi(varargin{j},'nosave',5)
         savespikes = 0;
     elseif strncmpi(varargin{j},'forcebuildv',8)
         BuildV = 1;
         forcebuild = 1;
         buildargs = {buildargs{:} varargin{j}};
+    elseif sum(strncmpi(varargin{j},{'mklfp' 'nolfp'},6))
+        buildargs = {buildargs{:} varargin{j}};        
     elseif strncmpi(varargin{j},'meanv',5)
         j = j+1;
         sumv = varargin{j};
@@ -107,6 +133,10 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'maxgap',5)
         j = j+1;
         gaplen = varargin{j};
+    elseif strncmpi(varargin{j},'nevdir',5)
+        gargs = {gargs{:} varargin{j} varargin{j+1}};
+        j = j+1;
+        nevdir = varargin{j};
     elseif strncmpi(varargin{j},'nosave',5)
         savefile = 0;
     elseif strncmpi(varargin{j},'prebuildforce',10)
@@ -127,6 +157,8 @@ while j <= length(varargin)
         smoothw = varargin{j};
     elseif strncmpi(varargin{j},'submean',5)
         buildmean = 3;
+    elseif strncmpi(varargin{j},'nosubmean',5)
+        buildmean = 0;
     elseif strncmpi(varargin{j},'refcut',5)
         refcut = 1;
     elseif strncmpi(varargin{j},'reindex',5)
@@ -134,14 +166,15 @@ while j <= length(varargin)
         gargs = {gargs{:} varargin{j}};
     elseif strncmpi(varargin{j},'relist',5)
         args = {args{:} varargin{j}};
-    elseif strncmpi(varargin{j},'verbose',5)
-        allvargs = {allvargs{:} varargin{j}};
-    elseif strncmpi(varargin{j},'watch',5)
+    elseif sum(strncmpi(varargin{j},{'allspikes' 'strict' 'verbose' 'watch'},5))
         allvargs = {allvargs{:} varargin{j}};
     elseif strncmpi(varargin{j},'wait',4)
         waitforfiles = 1;
     elseif regexp(varargin{j},'Expt.*FullV.mat')
         fullVname = varargin{j};
+    elseif strncmpi(varargin{j},'usegoodtrials',8) %force using only good, if index was made including all
+        usealltrials = 0;
+        usegoodtrials = 1;
     elseif strncmpi(varargin{j},'usealltrials',8)
         usealltrials = 1;
         args = {args{:} varargin{j}};
@@ -181,10 +214,9 @@ while waitforfiles && ready == 0
 end
 
 
-if isempty(strfind(path,'BlackRock'))
-    path(path,'/bgc/bgc/matlab/BlackRock');
-end
+BlackRockPath();
 
+MeanV.probes = probes;
 if buildmean == 1
     for e = expts
     for j = 1:length(probes)
@@ -198,13 +230,14 @@ if buildmean == 1
     end
     end
     sumv = sumv./length(probes);
+    MeanV.savetime = now;
     if savefile
-        save(sprintf('%s/Expt%dFullVmean.mat',datadir,e),'sumv')
+        save(sprintf('%s/Expt%dFullVmean.mat',datadir,e),'sumv','MeanV')
     end
     DATA = sumv;
     return;
 end
-
+progts = now;
 if buildmean == 2
     ts = now;
     for e = expts
@@ -226,11 +259,20 @@ if buildmean == 2
     end
     fprintf('Took %.2fsec\n',mytoc(ts));
     sumv = sumv./length(probes);
-    save(sprintf('%s/Expt%dFullVmean.mat',datadir,e),'sumv')
+    MeanV.savetime = now;
+    save(sprintf('%s/Expt%dFullVmean.mat',datadir,e),'sumv','MeanV')
     DATA = sumv;
     return;
 end
 
+idxfile = [datadir '/FileIdx.mat'];
+if exist(idxfile)
+    load(idxfile);
+    if isfield(idx,'usealltrials') && idx.usealltrials == 1 && usegoodtrials == 0
+        usealltrials = 1;
+        allvargs = {allvargs{:} 'usealltrials'};
+    end
+end
 
 if ~isempty(Trials)
 elseif isdir(name)  %online
@@ -243,6 +285,9 @@ elseif isdir(name)  %online
     All.Events.codes = [];
     All.Events.times = [];
     nx = 0;
+    if isempty(nevdir)
+        nevdir = name;
+    end
     d = dir([name '/Expt*.mat']);
     for j = 1:length(d)
         if isempty(strfind(d(j).name,'idx')) && isempty(strfind(d(j).name,'FullV')) ...
@@ -262,9 +307,11 @@ elseif isdir(name)  %online
             All.Events.codes = cat(1,All.Events.codes,A.Events.codes);
             All.Events.times = cat(1,All.Events.times,A.Events.times);
             Expts{nx}.loadname = [name '/' d(j).name];
+            exptstarts(nx) = Expts{nx}.Header.Start;
         end
     end
-    
+    [a,b] = sort(exptstarts);
+    Expts = Expts(b);
 else
     [Trials, Expts, All] = APlaySpkFile(name, 'nospikes',  args{:});
     for j = 1:length(Expts)
@@ -272,6 +319,11 @@ else
     end
 end
 
+for j = 1:length(Expts)
+    if ~isfield(Expts{j},'loadname')
+        Expts{j}.loadname = Expts{j}.Header.loadname;
+    end
+end
 
 if ~isempty(fullVname)
     
@@ -302,6 +354,7 @@ if ~isempty(fullVname)
     end
     return;
 end
+
 if isempty(Trials)
     DATA.idx = BuildGridIndex(name, [], gargs{:});
     expts = unique(DATA.idx.expt);
@@ -327,8 +380,10 @@ else
         expts = 1:length(Expts);
     else
         expts = expts(expts <= length(Expts));
+        gargs = {gargs{:} 'noerrs'};
     end
 
+DATA.usealltrials = usealltrials;
 if chopfile
     preperiod = 10000;
     postperiod = 2000;
@@ -354,6 +409,8 @@ if chopfile
   DATA.blocks = [starts ends];
   starts = starts./10000;
   ends = ends./10000;
+else
+    starts(1) = (Trials.Trials.Start(1) - preperiod)./10000;
 end
 
 %Odd. seems like all files need the 1 = "on" convetion, but code used to
@@ -410,10 +467,11 @@ end
             Expts{j}.Header.expname,Expts{j}.Header.Start/10000);
     end
 if prebuild
+    ts = now;
     for e = gotexpts
         id = find(DATA.idx.expt == e);
         for suff = 1:length(id)
-        filename = [DATA.idx.datdir '/' DATA.idx.names{id(suff)}];
+        filename = [DATA.idx.nevdir '/' DATA.idx.names{id(suff)}];
         filename = strrep(filename,'nev','ns5');
         needv = [];
         for k = probes
@@ -424,24 +482,55 @@ if prebuild
         end
         if sum(needv) || prebuild == 2
             ts = now;
+            fprintf('Reading %s...',filename);
             nsx = openNSx('read',filename,'p:int16');
-           DATA.readtime(e,1) = mytoc(ts);
+            DATA.readtime(e,1) = mytoc(ts);
+            fprintf('Took %.1f sec\n',DATA.readtime(e,1))
             ts = now;
         if isfield(nsx,'Data')
-        for k = 1:size(nsx.Data,1)
-            Data = nsx.Data(k,:);
-            MetaTags = nsx.MetaTags;
-            probe = k;
-            rawfile = strrep(filename,'.ns5',['rawp' num2str(k) '.mat']);
-            save(rawfile,'Data','MetaTags','probe');
-        end
-        DATA.readtime(e,2) = mytoc(ts);
-        clear v;
-        clear V;
+            if iscell(nsx.Data)
+                for k = 1:length(nsx.MetaTags.DataPoints)
+                    tid{k} = nsx.MetaTags.Timestamp(k)+[1:nsx.MetaTags.DataPoints(k)];
+                    totalpts = nsx.MetaTags.Timestamp(k) + nsx.MetaTags.DataPoints(k);
+                    if k > 1
+                        gaps(k) = tid{k}(1)-tid{k-1}(end);
+                    end
+                end
+                fprintf('Largest Gap in %s is %.2f sec\n',filename,max(gaps)./30000);
+                MetaTags = nsx.MetaTags;
+                for k = 1:size(nsx.Data{1},1)                   
+                    Data = zeros(1,totalpts);
+                    for t= 1:length(tid)
+                        Data(tid{t}) = nsx.Data{t}(k,:);
+                    end
+                    X = nsx.ElectrodesInfo(k);
+                    MetaTags.VoltsPerDigit(k) = double(X.MaxAnalogValue - X.MinAnalogValue) ...
+                        ./ (double(X.MaxDigiValue - X.MinDigiValue) .* 1e6);
+                    MetaTags.ElecLabel(k,1:length(X.Label)) = X.Label;
+                    probe = k;
+                    rawfile = strrep(filename,'.ns5',['rawp' num2str(k) '.mat']);
+                    save(rawfile,'Data','MetaTags','probe');
+                end
+            else
+                for k = 1:size(nsx.Data,1)
+                    Data = nsx.Data(k,:);
+                    MetaTags = nsx.MetaTags;
+                    probe = k;
+                    rawfile = strrep(filename,'.ns5',['rawp' num2str(k) '.mat']);
+                    save(rawfile,'Data','MetaTags','probe');
+                end
+            end
+            DATA.readtime(e,2) = mytoc(ts);
+            clear v;
+            clear V;
+        else
+            mycprintf('errors','No Data in %s\n',filename);
+            DATA.readtime(e,2) = NaN;
         end
         end
         end
     end
+    DATA.prebuilddur = mytoc(ts);
 end
 
 DATA.prebuild = prebuild;
@@ -452,8 +541,9 @@ DATA.highpass = highpass;
 DATA.submains = submains;
 DATA.buildmean = buildmean;
 DATA.chopfile = chopfile;
+DATA.starts = starts;
+DATA.version = ['Process: ' num2str(version)];
 if chopfile
-    DATA.starts = starts;
     DATA.ends = ends;
     DATA.gaplen = gaplen;
     DATA.postperiod = postperiod;
@@ -486,6 +576,20 @@ if BuildLFP
 end
 
 if BuildV
+    if isempty(nevdir)
+        DATA.nevdir = DATA.idx.datdir;
+    else
+        DATA.nevdir = nevdir;
+    end
+    d = dir([nevdir '/*.ns5']);
+    xdir = [DATA.nevdir '/ns5'];
+    if isdir(xdir)
+        xd = dir([xdir '/*.ns5']);
+        if isempty(d) && ~isempty(xd)
+            DATA.nevdir = xdir;
+            DATA.idx.nevdir = xdir;
+        end
+    end
     DATA.mainstimes = Trials.mainstimes;
     fprintf('Building FullV for expts %s\n',sprintf('%d ',gotexpts));
     outvarname = 'FullV';
@@ -515,10 +619,10 @@ if BuildV
             end
         end
     else
-        
+        res = {};
         
         %    parfor (ex = 1:length(gotexpts))
-        if parallel
+        if parallel && length(gotexpts) > 1
             parfor (j = 1:length(gotexpts))
                 try
                     res{j} = BuildGridFullV(DATA, Expts, gotexpts(j), probes, buildargs{:});
@@ -528,6 +632,9 @@ if BuildV
                 end
             end
         else
+            if parallel
+                buildargs = {buildargs{:} 'parallel'};
+            end
             for j = 1:length(gotexpts)
                 res{j} = BuildGridFullV(DATA, Expts, gotexpts(j), probes, buildargs{:});
             end
@@ -536,7 +643,17 @@ if BuildV
     DATA.buildres = res;
 end
 
-
+if isfield(DATA,'buildres')
+    iotime = 0;
+    for j = 1:length(DATA.buildres)
+        iotime = iotime+DATA.buildres{j}.loadtime;
+        iotime = iotime+DATA.buildres{j}.writedur;
+        iotime = iotime+DATA.buildres{j}.reload;
+        iotime = iotime+DATA.buildres{j}.savedur;
+    end
+    DATA.iotime = iotime;
+end
+        
 id = [];
 for j = 1:length(Arrays)
  if ~isempty(Arrays{j})
@@ -553,9 +670,9 @@ else
 end
 
 
-if refcut
+cfile = [DATA.idx.datdir '/RefClusters.mat'];
+if refcut && (~isempty(Clusters) || exist(cfile,'file'))
     if isempty(Clusters)
-        cfile = [DATA.idx.datdir '/RefClusters.mat'];
         C = load(cfile);
         Clusters = C.Clusters;
         clear C;
@@ -573,15 +690,20 @@ if refcut
     if savespikes
         DATA.allvargs = {DATA.allvargs{:} 'savespikes'};
     end
+    if usealltrials
+        DATA.allvargs = {DATA.allvargs{:} 'usealltrials'};
+    end
     DATA.cutstart = now;
     cutres{1} = [];
     V = ver('MATLAB');
     mver = sscanf(V.Version,'%f');
-    if parallel && mver > 7.5
+    if parallel && length(gotexpts) == 1
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(1),probes,1);
+    elseif parallel && mver > 7.5
         parfor (j = 1:length(gotexpts))
             fprintf('####Expt%d is Lab %d of %d\n',gotexpts(j),labindex,numlabs);
             try
-            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes);
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes,0);
             catch ME
                 cutres{j} = ME;
             end
@@ -590,7 +712,7 @@ if refcut
         parfor (j = 1:length(gotexpts))
             fprintf('####Expt%d is Lab %d of %d\n',gotexpts(j),labindex,numlabs);
             try
-            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes);
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes,0);
             catch ME
                 fprintf('!!!!!!Error E%d %s\n',gotexpts(j),errstr(ME));
                 cutres{j} = [];
@@ -598,17 +720,30 @@ if refcut
         end        
     else
         for (j = 1:length(gotexpts))
-            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes);
+            cutres{j} = MakeCut(DATA, Clusters, gotexpts(j),probes,0);
         end
     end
     DATA.cutres = cutres;
     DATA.cutfinish = now;
+elseif refcut
+    cprintf('errors','No RefClusters.mat for Ref Clusters\n');
 end
 if autocut
+    if autocut == 2
+        autotype = 'quickautocutall';
+    else
+        autotype = 'autocutall';
+    end
+    if length(gotexpts) == 1 && parallel
+        e = gotexpts(1);
+        outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p1FullV.mat'];
+        AllVPcs(outfile,'tchan',probes,'GridData','nocheck','savespikes',autotype,'parallel');
+    else
     parfor (j = 1:length(gotexpts))
         e = gotexpts(j);
         outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p1FullV.mat'];
-        AllVPcs(outfile,'tchan',probes,'GridData','savespikes','autocutall');
+        AllVPcs(outfile,'tchan',probes,'GridData','nocheck','savespikes',autotype);
+    end
     end
 end
 
@@ -626,12 +761,13 @@ if CheckV
     DATA.ratios = ratios;
     DATA.coilratios = coilratios;
 end
+fprintf('Total Duration %.2f\n',mytoc(progts));
 
 function s =errstr(err)
    s = sprintf('%s at line %d, m-file %s)\n',err.message,err.stack(1).line,err.stack(1).name);
 
 
-function res = MakeCut(DATA, Clusters, e, probes)
+function res = MakeCut(DATA, Clusters, e, probes, parallel)
 
 res = [];
 tag = sprintf('Expt%d',e);
@@ -639,7 +775,19 @@ if isfield(DATA,'Expts') && length(DATA.Expts) >= e
     Expt = DATA.Expts{e};
     DATA.allvargs = {DATA.allvargs{:} 'Expt' Expt};
 end
-    
+   
+if parallel
+    res = {};
+    parfor p = probes
+        outfile = [DATA.idx.datdir '/Expt' sprintf('%d.p%dFullV.mat',e,p)];
+        if isfield(Clusters{p},'shape')
+            res{p} = AllVPcs(outfile,'tchan',p,'GridData','reapply',Clusters{p},DATA.allvargs{:},'savespikesonly','noninteractive','nolog');
+        end
+    end
+    for j = 1:length(res)
+        Clusters{j} = res{j}.Cluster;
+    end
+else
 for p = probes;
     outfile = [DATA.idx.datdir '/Expt' sprintf('%d.p%dFullV.mat',e,p)];
     if isfield(Clusters{p},'shape')
@@ -653,8 +801,10 @@ for p = probes;
     end
 end
 if res.toplevel
-close(res.toplevel);
+    close(res.toplevel);
 end
+end
+
 
 function took = SaveFullV(name, FullV)
 
@@ -947,6 +1097,9 @@ FullV.nsnames = DATA.idx.names(id);
             FullV.exptno = e;
             FullV.buildtime = mytoc(ts);
             FullV.start = FullV.blkstart(1);
+            if DATA.usealltrials
+                FullV.usealltrials = 1;
+            end
             if isfield(Expts{e},'loadname')
                 FullV.matfile = Expts{e}.loadname;
             else

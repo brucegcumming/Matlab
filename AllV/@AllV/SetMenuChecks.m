@@ -1,0 +1,1 @@
+function SetMenuChecks(hm, S)%Set checked on/off for menu items in hm whose tags%match fields in structre Sqf = fields(S);onoff = {'off' 'on'};c = get(hm,'children');tags = get(c,'Tag');for j = 1:length(c)    k = strmatch(get(c(j),'Tag'),qf);    if length(k) == 1    set(c(j),'checked',onoff{1+S.(qf{k})});    endend

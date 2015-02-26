@@ -1,0 +1,1 @@
+function PlotExpts(DATA)    PC.SetFigure(DATA, DATA.tag.expt);    Expts = Expts{DATA.currentpoint(1)};   ex =      PlotExpt(Expts{1},'rcnmin',10);   ts = now;    for j = 1:length(Expts)        PlotRates(Expts{j},ex);%        PlotExpt(Expts{j},'hold');        hold on;    end     mytoc(ts);     

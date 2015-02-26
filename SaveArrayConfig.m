@@ -1,4 +1,6 @@
 function SaveArrayConfig(DATA)
+%SaveArrayConfig(DATA) save array configuration
+% if no file ArrrayConfig exists
 
 ArrayConfig.X = ones(1,DATA.nprobes);
 ArrayConfig.Y = 1:DATA.nprobes;

@@ -1,0 +1,1 @@
+function SetCellFromSubplot(a,b, cell)    axdata = get(gca,'UserData');    DATA = get(axdata.toplevel,'UserData');       DATA.CellList(DATA.currentpoint(1),axdata.probe,DATA.cellcluster) = cell;    DATA.CellDetails.Quality(DATA.currentpoint(1),axdata.probe,DATA.cellcluster) = 4;    PC.PlotCellList(DATA,'showfig');

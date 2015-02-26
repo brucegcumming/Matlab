@@ -1,0 +1,1 @@
+function xy = XYSpace(C)    if C.shape == 0        [x, y] = PC.CalcRadius(C, C.xy);        xy(:,1) = PC.Rprime(x);        xy(:,2) = y;    else        xy = xyrotate(xy(:,1),xy(:,2),E.angle);    end            

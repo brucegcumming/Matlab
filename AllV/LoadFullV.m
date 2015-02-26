@@ -15,9 +15,12 @@ smoothw = 100;
 keepsmooth = 0;
 addtime = 0;
 convert = 1;
+silent = 0;
 toint = 0;
-
+loadmean = 0;
 FullV = [];
+meandata = [];
+loadmeanfile = [];
 if ~exist(name,'file')
     fprintf('%s Does not exist\n',name);
     return;
@@ -35,8 +38,17 @@ while j <= length(varargin)
         toint = 3;
     elseif strncmpi(varargin{j},'converttoint',5)
         toint = 1;
+    elseif strncmpi(varargin{j},'meanfile',5)
+        j = j+1;
+        loadmean = 1;
+        meandata = varargin{j};
+        if isfield(meandata,'name')
+            loadmeanname = meandata.name;
+        end
     elseif strncmpi(varargin{j},'saveint',5)
         toint = 2;
+    elseif strncmpi(varargin{j},'silent',5)
+        silent = 1;
     elseif strncmpi(varargin{j},'noconvert',5)
         convert = 0;
     elseif strncmpi(varargin{j},'nohighpass',5)
@@ -50,6 +62,26 @@ isint = 0;
 ts = now;
 load(name);
 FullV.loadname = name;
+if ~isfield(FullV,'V')
+  cprintf('red','Error loading %s no V data\n', name);
+  return
+end
+
+if loadmean && isfield(FullV,'sumscale') %A Utah file with means removed
+    mname = regexprep(name,'\.p[0-9]+FullV.mat','FullVmean.mat');
+    if ~strcmp(loadmeanfile,mname)
+        if exist(mname)
+            load(mname);
+            FullV.meandata.meanV = sumv;
+            FullV.meandata.name = mname;
+            if ~isfield(MeanV,'probes')
+                FullV.meandata.probes = 1:96;
+            else
+                FullV.meandata.probes = MeanV.probes;
+            end
+        end
+    end
+end
 if toint && isfloat(FullV.V)
     if isinteger(FullV.V) %alreay i sint
         isint = 1;
@@ -119,4 +151,15 @@ if highpass && isfield(FullV,'highpass') && ~isnan(FullV.highpass)
 end
 if addtime
     FullV.t = BuildFullVt(FullV);
+end
+if isfield(FullV,'firstblk') && FullV.firstblk > 1 && strfind(FullV.loadname,'aFullV');
+    FullV.exptno = floor(FullV.exptno)+0.1;
+end
+if isfield(FullV,'errmsg') && ~silent
+    for j = 1:length(FullV.errmsg)
+        cprintf('blue','FullV err:%s\n',FullV.errmsg{j});
+    end
+end
+for j = 1:length(FullV.blkstart)
+    FullV.blkend(j) = FullV.blkstart(j)+ FullV.blklen(j).*FullV.samper;
 end

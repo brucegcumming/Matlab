@@ -1,0 +1,1 @@
+function rawxy = RawXY(C, xy)%Convert from XY saved in clusters (rotated for lines)%Back into the original space    if C.shape == 0        rawxy = xy;    else        rawxy = xyrotate(xy(:,1),xy(:,2),-C.angle);    end

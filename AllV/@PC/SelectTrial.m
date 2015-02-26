@@ -1,0 +1,1 @@
+function SelectTrial(src, b, type)DATA = GetDataFromFig(src);id = get(src,'value');if strcmp(type,'one')    PC.SpoolSpikes(DATA,DATA.currentpoint,'ids',id);else    DATA.currenttrial = PC.PlotTrialSpikes(DATA,id,'showall');endset(DATA.toplevel,'UserData',DATA);

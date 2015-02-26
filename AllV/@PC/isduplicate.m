@@ -1,0 +1,1 @@
+function dup = isduplicate(DATA, row, p, cl)if size(DATA.CellList,3) < cl || DATA.CellList(row,p,cl) >= 0    dup = 0;else    dup = -DATA.CellList(row,p,cl);end    

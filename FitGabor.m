@@ -1,6 +1,6 @@
 %=================================================================================================
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function GaborFit = FitSqrtGabor(x,y,varargin)
+function GaborFit = FitGabor(x,y,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %=================================================================================================
 
@@ -11,21 +11,18 @@ function GaborFit = FitSqrtGabor(x,y,varargin)
 % If a fourth argument is supplied, it is assumed to be an initial-guess Gabor fit
 
 
-% Takes sqrt of y and fits sqrt of a Gabor to it.
-
-
 if nargin==3
-    sqrtyuncorr = sqrt(varargin{1});
+    sqrtyuncorr = varargin{1};
     if ~isempty(sqrtyuncorr)
         uncorr = mean(varargin{1});
     end
 elseif nargin==4
-    sqrtyuncorr = sqrt(varargin{1});
+    sqrtyuncorr = varargin{1};
     if ~isempty(sqrtyuncorr)
         uncorr = mean(varargin{1});
     end
     g = varargin{2};
-    suppliedguessparams = [g.amp g.SD g.phase g.SF g.baseline g.offset];
+    suppliedguessparams = [g.SF g.SD g.phase g.amp g.offet g.baseline];
 end
 
 
@@ -52,7 +49,7 @@ for j=1:nx
     xx = [xx x(j)*ones(size(y{j}))];
     yy = [yy y{j}];
 end
-sqrtyy = sqrt(yy);
+sqrtyy = yy;
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -165,7 +162,7 @@ while exitflag<=0 & randattempt<100;
             phase = -angle(FTfit);
 
 
-            guessparams = [amp, SD, phase, peakfreq, base, offset];
+            guessparams = [peakfreq, SD, phase, amp, offset, base];
         end
         % By this stage should have an initial guess, either from the user or worked out by the program
         % add noise to initial guess
@@ -193,12 +190,12 @@ while exitflag<=0 & randattempt<100;
             bestfval = fval;
         end
     end % next trial
-    GaborFit.baseline = bestfitparams(5);
-    GaborFit.amp = bestfitparams(1);
-    GaborFit.SF = bestfitparams(4);
+    GaborFit.baseline = bestfitparams(6);
+    GaborFit.amp = bestfitparams(4);
+    GaborFit.SF = bestfitparams(1);
     GaborFit.phase = bestfitparams(3);
     GaborFit.SD = abs(bestfitparams(2));
-    GaborFit.offset = bestfitparams(6);
+    GaborFit.offset = bestfitparams(5);
     GaborFit.fval = fval;
 
 

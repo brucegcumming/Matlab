@@ -1,0 +1,1 @@
+function name = SpikeFileName(DATA, C)            xs = '';            p  = C.probe;    if rem(C.exptno,1) > 0.001        xs = 'a';    end    [a,b] = fileparts(DATA.name);    [c,d] = fileparts(a);    name = [DATA.name '/Spikes/' b '.p' num2str(p)  't' num2str(floor(C.exptno)) xs '.mat'];

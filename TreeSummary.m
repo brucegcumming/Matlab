@@ -81,7 +81,7 @@ end
 
 
 function [T, details] = FixData(T, varargin)
-filetypes = { '.smr' '.ns5' 'FullV.mat' 'spkblk.*.mat|rawp.*.mat'};
+filetypes = { '.smr' '.ns5' 'FullV.mat' 'spkblk.*.mat|rawp.*.mat' 'p[0-9,x]+t[0-9]+.mat'};
 
 j = 1;
 while j <= length(varargin)
@@ -144,6 +144,10 @@ end
 details.dids = dids;
 details.filetypes = filetypes;
 details.nlvl = nlvl;
+totals = sum(details.sizes);
+for j = 1:length(filetypes)
+    fprintf('%s %.2f (%.0f%%)\n',filetypes{j},totals(j+1)./(1024*1024),100 * totals(j+1)/totals(1)); %MB
+end
 
 
 function PlotFixedData(T, D, varargin)

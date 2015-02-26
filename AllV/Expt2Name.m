@@ -6,7 +6,15 @@ suff = [];
 addsuff = 0;
 crtrial = 0;
 addprobe = 0;
-nt = length(Expt.Trials);
+
+if isempty(Expt)
+    expname = 'Empty';
+    return;
+end
+
+if isfield(Expt,'Trials')
+    nt = length(Expt.Trials);
+end
 
 j = 1;
 while j <= length(varargin)
@@ -19,6 +27,10 @@ while j <= length(varargin)
 end
 
 
+if ~isfield(Expt,'Stimvals')
+    expname = 'Unknown';
+    return;
+end
 if isfield(Expt.Stimvals,'st')
     if ischar(Expt.Stimvals.st)
     stimname = Expt.Stimvals.st;
@@ -28,7 +40,12 @@ if isfield(Expt.Stimvals,'st')
 else
     stimname = '';
 end
-
+if isnumeric(Expt.Stimvals.et)
+    Expt.Stimvals.et = NumberToExptName(Expt.Stimvals.et);
+end
+if isnumeric(Expt.Stimvals.e2)
+    Expt.Stimvals.e2 = NumberToExptName(Expt.Stimvals.e2);
+end
     if strmatch(Expt.Stimvals.e2, 'e0')
         exptypename = Expt.Stimvals.et;
         if strmatch(Expt.Stimvals.e3, 'e0')
@@ -56,7 +73,8 @@ end
         if isfield(Expt.Header,'rc') && Expt.Header.rc
             suff = 'RC';
         end
-        if isfield(Expt.Header,'explabel')
+%if Expt is a manual type, and explabel is set, use this        
+        if isfield(Expt.Header,'explabel') && length(Expt.Header.explabel) > 1 && ~isempty(strfind(Expt.Header.Options,'+exm'))
             exptypename = Expt.Header.explabel;
         end
     end
@@ -96,7 +114,7 @@ end
     if strncmp(exptypename,'dxXce',5)
         if isfield(Expt.Stimvals,'n2') && Expt.Stimvals.n2 > 2
             exptypename = strrep(exptypename,'dxXce','dxXces');
-        elseif Expt.Stimvals.i2 < 2 %not +- 1
+        elseif isfield(Expt.Stimvals,'i2') && Expt.Stimvals.i2 < 2 %not +- 1
             exptypename = strrep(exptypename,'dxXce','dxXces');
         end
     end
@@ -115,3 +133,6 @@ end
     end
     
     
+
+        
+           

@@ -13,10 +13,14 @@ end
 highpass = 1;
 smoothw = 100;
 keepsmooth = 0;
+addtime = 0;
 convert = 1;
+silent = 0;
 toint = 0;
-
+loadmean = 0;
 FullV = [];
+meandata = [];
+loadmeanfile = [];
 if ~exist(name,'file')
     fprintf('%s Does not exist\n',name);
     return;
@@ -28,14 +32,27 @@ while j <= length(varargin)
         j = j+1;
         smoothw = varargin{j};
         keepsmooth = 1;
+    elseif strncmpi(varargin{j},'addtime',6)
+        addtime = 1;
     elseif strncmpi(varargin{j},'checkint',6)
         toint = 3;
     elseif strncmpi(varargin{j},'converttoint',5)
         toint = 1;
+    elseif strncmpi(varargin{j},'meanfile',5)
+        j = j+1;
+        loadmean = 1;
+        meandata = varargin{j};
+        if isfield(meandata,'name')
+            loadmeanname = meandata.name;
+        end
     elseif strncmpi(varargin{j},'saveint',5)
         toint = 2;
+    elseif strncmpi(varargin{j},'silent',5)
+        silent = 1;
     elseif strncmpi(varargin{j},'noconvert',5)
         convert = 0;
+    elseif strncmpi(varargin{j},'nohighpass',5)
+        highpass = 0;
     end
     j = j+1;
 end
@@ -45,6 +62,26 @@ isint = 0;
 ts = now;
 load(name);
 FullV.loadname = name;
+if ~isfield(FullV,'V')
+  cprintf('red','Error loading %s no V data\n', name);
+  return
+end
+
+if loadmean && isfield(FullV,'sumscale') %A Utah file with means removed
+    mname = regexprep(name,'\.p[0-9]+FullV.mat','FullVmean.mat');
+    if ~strcmp(loadmeanfile,mname)
+        if exist(mname)
+            load(mname);
+            FullV.meandata.meanV = sumv;
+            FullV.meandata.name = mname;
+            if ~isfield(MeanV,'probes')
+                FullV.meandata.probes = 1:96;
+            else
+                FullV.meandata.probes = MeanV.probes;
+            end
+        end
+    end
+end
 if toint && isfloat(FullV.V)
     if isinteger(FullV.V) %alreay i sint
         isint = 1;
@@ -96,7 +133,11 @@ FullV.loadtime = mytoc(ts);
 if keepsmooth
     FullV.highpass = smoothw;
 end
-if isfield(FullV,'highpass') && ~isnan(FullV.highpass)
+if isfield(FullV,'chspk') &&  isempty(strfind(name,'p96FullV')) && FullV.chspk(1) == 96    
+    FullV.chspk = GetProbeFromName(name);
+    mycprintf('red','\nSetting FullV.chspk to %d\n',FullV.chspk);
+end
+if highpass && isfield(FullV,'highpass') && ~isnan(FullV.highpass)
     ts = now;
     if FullV.highpass > 0
         smoothw = FullV.highpass;
@@ -107,4 +148,18 @@ if isfield(FullV,'highpass') && ~isnan(FullV.highpass)
      end
      FullV.V = int16(round(double(FullV.V) - sm));
      FullV.filtertime = mytoc(ts);
+end
+if addtime
+    FullV.t = BuildFullVt(FullV);
+end
+if isfield(FullV,'firstblk') && FullV.firstblk > 1 && strfind(FullV.loadname,'aFullV');
+    FullV.exptno = floor(FullV.exptno)+0.1;
+end
+if isfield(FullV,'errmsg') && ~silent
+    for j = 1:length(FullV.errmsg)
+        cprintf('blue','FullV err:%s\n',FullV.errmsg{j});
+    end
+end
+for j = 1:length(FullV.blkstart)
+    FullV.blkend(j) = FullV.blkstart(j)+ FullV.blklen(j).*FullV.samper;
 end

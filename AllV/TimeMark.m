@@ -1,4 +1,5 @@
 function tt = TimeMark(tt, str, show)
+%tt = TimeMark(tt, str, show)  keep track of exection time
 
 if nargin < 3
     show = 0;

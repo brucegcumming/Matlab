@@ -1,0 +1,1 @@
+function synci = SyncIndices(xc)midpt = ceil(length(xc)./2);synci(1) = mean([xc(midpt-1) xc(midpt+1)])./xc(midpt);synci(2) = mean([xc(1:midpt-10) xc(midpt+10:end)])./xc(midpt);

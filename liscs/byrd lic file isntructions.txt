@@ -1,0 +1,7 @@
+57978-38114-61455-61274-18879
+
+
+To generate lic file on Mathworks website:
+Host ID: DISK_SERIAL_NUM=3e17ab2a         
+Release: R2012b         
+Computer Login Name: Expt 

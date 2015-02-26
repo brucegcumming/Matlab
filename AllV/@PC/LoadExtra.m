@@ -1,0 +1,1 @@
+ function DATA = LoadExtra(DATA, force)     Xbits = [];     outname = [DATA.name '/PlotClusterExtra.mat'];     if exist(outname,'file')         load(outname);         f = fields(Xbits);         for j = 1:length(f)             if ~isfield(DATA,f{j}) || force             DATA.(f{j}) = Xbits.(f{j});             end         end     end

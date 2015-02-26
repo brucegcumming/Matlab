@@ -1,7 +1,7 @@
 function [latency, details] = sdflatency(sdf, presamples, varargin)
 
-%
-% sdflatency(sdf, presamples)
+%[latency, details] = sdflatency(sdf, presamples, varargin) estmate latency
+% of sdf. 
 % returns a latency estimate from a spike density function, sdf
 % presamples is the number of samples in the sdf guaranteed not to
 % contain a response.

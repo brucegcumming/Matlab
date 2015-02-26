@@ -47,10 +47,20 @@ elseif strcmpi(type,'probe')
         tf = GetProbeFromName(GetEval(Expt,'name'));
     end
     return;
-elseif strcmpi(type,'name')
+elseif sum(strcmpi(type,{'duration'}))
+    if isfield(Expt.Trials,'dur')
+        tflist = sum([Expt.Trials.dur]);
+        tf = sum(tflist);
+    else
+        tflist = expt.TrialVals(Expt,'dur');
+        tf = sum(tflist);
+    end
+elseif sum(strcmpi(type,{'name', 'shortname'}))
     if isfield(Expt.Header,'expname')
         tflist = Expt.Header.expname;
+        tf = Expt.Header.expname;
     else
+        tf = Expt2Name(Expt);
         tflist = '';
     end
     if isfield(Expt.Header,'loadname')
@@ -60,10 +70,23 @@ elseif strcmpi(type,'name')
     elseif isfield(Expt.Header,'Name')
         tf = Expt.Header.Name;
     end
+    if strcmp(type,'shortname')
+       [~,tf] = fileparts(tf);
+    end
     return;
 end
 
-if(isfield(Expt.Trials,type))
+
+if iscell(Expt)
+    if nargin < 3
+      flag = 'mode';
+    end
+    for j = 1:length(Expt)
+        [tf(j), tflist{j}] = GetEval(Expt{j},type,flag);
+    end
+    return;
+end
+if(isfield(Expt.Trials,type)) && ~isempty(Expt.Trials)
   if length(Expt.Trials(1).(type)) > 1
       x = [];
       for j = 1:length(Expt.Trials)
@@ -118,10 +141,20 @@ elseif strcmp(type,'sz')
     elseif isisfield(Expt,'Stimvals') & isfield(Expt.Stimvals,'wi')
         tf = Expt.Stimvals.wi;
     end
+elseif sum(strcmp(type,{'dO' 'dP'}))
+    E = FillTrials(Expt,type);
+    x = cat(1,E.Trials.(type));
+    tf = mean(x);
+elseif strcmp(type,'stimtag')
+    if ~isfield(Expt.Stimvals,'stimtag')
+        x = {};
+       tf = ''; 
+       tflist = {};
+    end
 else
     tf = NaN;
     tflist(1) = tf;
-end
+    end
 
 
 function [d, dlist] = ReadPenSep(Header)

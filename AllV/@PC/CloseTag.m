@@ -1,0 +1,1 @@
+function CloseTag(tag)it = FindFig(tag);for j = 1:length(it)    close(it(j));end

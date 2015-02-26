@@ -9,7 +9,12 @@ function [cExpt, details]= LoadEmData(cExpt, varargin)
 % Eeydata(:,1) = LH, 2 = RH, 3 = LV 4 = RV
 global bgcfileprefix;
 
-  name = strrep(cExpt.Header.Name,'\','/');
+  if isfield(cExpt,'Expt') %An AllExpt
+      cExpt.Expt = LoadEmData(cExpt.Expt);
+      return;
+  end
+
+      name = strrep(cExpt.Header.Name,'\','/');
   if isfield(cExpt.Header,'Spike2Version')
       [cExpt, details] = LoadSpike2EMData(cExpt, varargin{:});
       return;
@@ -56,7 +61,7 @@ emname = strrep(name,'.mat','.em.mat');
 if isunix && strncmp(name,'Z:',2)
     emname = strrep(emname,'Z:','/bgc');
 elseif isunix && (strncmp(name,'/data',5) || strncmp(name,'/smr',4))
-    emname = ['/bgc' emname];
+    emname = ['/b' emname];
 end
 fixid = 0;
 reread = 0;
@@ -91,28 +96,79 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'trials',5)
         j = j+1;
         usetrials = find(ismember([cExpt.Trials.Trial],varargin{j}));
+    elseif strncmpi(varargin{j},'zeropad',5)
+        sacargs = {sacargs{:} varargin{j}};
     end
     j = j+1;
+end
+
+if isfield(cExpt.Header,'loadname')
+    [prefix, fname, fsuffix] = fileparts(cExpt.Header.loadname);
+    [a,b,c] = fileparts(emname);
+    newname = [prefix '/' b c];
+    
+    if isdir(prefix) && exist(newname)
+        emname = newname;
+    else
+        newname = name2path(cExpt.Header.Name);
+        if exist(newname)
+            emname = newname;
+        else
+            fname = regexprep(fname,'\..*','');
+            newname = [prefix '/' fname '.em.mat']; 
+            if exist(newname)
+                emname = newname;
+            end
+        end
+    end
 end
 
 
 if isfield(cExpt.Header,'bysuffix') && cExpt.Header.bysuffix == 1    
     cExpt.Header.bysuffix =2;
-    for j = 1:length(cExpt.Header.BlockStart)
-        if j == length(cExpt.Header.BlockStart)
-            tid = cExpt.Header.BlockStart(j):cExpt.Trials(end).Trial;
+    if ~isfield(cExpt.Header,'errs')
+        cExpt.Header.errs = {};
+    end
+    tid = [cExpt.Trials.Trial];
+    id = find(diff(tid) < 0);
+    if ~isempty(id) 
+        if length(id) == length(cExpt.Header.BlockStart) -1; %easy fix
+            cExpt.Header.errs{end+1} = sprintf('Fixed Trials.Trial');
+            cExpt = FixExpt(cExpt,'Trials');
         else
-            tid = cExpt.Header.BlockStart(j):cExpt.Header.BlockStart(j+1)-1;
+            cExpt.Header.errs{end+1} = sprintf('Trials.Trial is not consecutive - needs fixing');
         end
-        [cExpt, details{j}] = LoadSpike2EMData(cExpt, varargin{:},...
-            'trials',tid,'suffix',cExpt.Header.Combineids(j));
+        cprintf('error','%s\n',cExpt.Header.errs{end});
+    end
+    if isfield(cExpt.Header,'BlockStart')
+        for j = 1:length(cExpt.Header.BlockStart)
+            if j == length(cExpt.Header.BlockStart)
+                tid = cExpt.Header.BlockStart(j):cExpt.Trials(end).Trial;
+            else
+                tid = cExpt.Header.BlockStart(j):cExpt.Header.BlockStart(j+1)-1;
+            end
+            if isfield(cExpt.Header,'suffixes')
+                suffix = cExpt.Header.suffixes(j);
+            else
+                suffix = cExpt.Header.Combineids(j)
+            end
+            [cExpt, details{j}] = LoadSpike2EMData(cExpt, varargin{:},...
+                'trials',tid,'suffix',suffix);
+            for k = 1:length(details{j}.errs)
+                cExpt.Header.errs{end+1} = details{j}.errs{k};
+            end                
+        end
+    else
+        [cExpt, details] = LoadSpike2EMData(cExpt, varargin{:});
     end
     cExpt.Header.bysuffix =1;
-    cExpt = CheckEyeData(cExpt);
-    cExpt = CheckSaccades(cExpt,sacargs{:});
-
+    if isfield(cExpt.Trials,'EyeData') %success
+        cExpt = CheckEyeData(cExpt, sacargs{:});
+        cExpt = CheckSaccades(cExpt,sacargs{:});
+    end
     return;
 end
+details.errs = {};
 
 if suffix
     emname = regexprep(emname,'\.[0-9]*\.em.mat',['.' num2str(suffix) '.em.mat']);
@@ -137,6 +193,7 @@ if ~exist(emname,'file') && isfield(cExpt.Header,'loadname')
         emname = strrep(cExpt.Header.loadname,'.mat','.em.mat');
     end
 end
+details.emname = emname;
 if isfield(cExpt.Trials,'EyeData') 
     if ~isempty(usetrials)
     elseif reread
@@ -146,15 +203,35 @@ if isfield(cExpt.Trials,'EyeData')
     end
 end
 
-if ~exist(emname,'file')
-    return;
-end
 
 if isempty(usetrials)
     usetrials = 1:length(cExpt.Trials);
 end
+
+if ~exist(emname,'file')
+    details.errs{end+1} = sprintf('Cannot find %s, needed for Trials %d - %d Id %d - %d\n',...
+        emname,usetrials(1),usetrials(end),cExpt.Trials(usetrials(1)).id,cExpt.Trials(usetrials(end)).id);
+    [cExpt.Trials(usetrials).goodem] = deal(0);
+    [cExpt.Trials(usetrials).emstarti] = deal(NaN);
+    cprintf('red','%s\n', details.errs{end})
+    return;
+end
+
+
 if ok
     load(emname);
+    if ~exist('Expt','var')
+        if isempty(strfind('.em',emname))
+            cprintf('red','Cannot Find EM file for %s\n',emname);
+        else
+            fprintf('red','%s Does not contatin EM Data\n',emname);
+        end
+     ok = 0;
+    end
+     
+end
+if ok
+        
 
 %emtpy start values mess up [Expt.Trials.Start] below
 for j = 1:length(Expt.Trials)
@@ -163,6 +240,19 @@ for j = 1:length(Expt.Trials)
     end
     if ~isfield(Expt.Trials,'ftime') || isempty(Expt.Trials(j).ftime)
         Expt.Trials(j).ftime = NaN;
+    end
+    if isfield(Expt.Trials,'Eyevals') && ~isempty(Expt.Trials(j).Eyevals)
+        V = Expt.Trials(j).Eyevals;
+        ls(1) = max(find(~isnan(V.rh)));
+        ls(2) = max(find(~isnan(V.lh)));
+        ls(3) = max(find(~isnan(V.rv)));
+        ls(4) = max(find(~isnan(V.lv)));
+        ls = min(ls);
+        V.rh = V.rh(1:ls);
+        V.lh = V.lh(1:ls);
+        V.rv = V.rv(1:ls);
+        V.lv = V.lv(1:ls);
+        Expt.Trials(j).Eyevals = V;
     end
 end
 
@@ -200,6 +290,7 @@ fprintf('%s: Max Start mismatch %.1fms\n',emname,max(diffs./10));
 id = find(emlen > 0 & diffs < 500);
 emlen = floor(prctile(emlen(id),selectile)) -1;
 if isempty(emlen)
+    cprintf('red','No Useable Trials in %s\n',emname);
     return;
 end
 cExpt.Header.emlen = emlen;
@@ -212,6 +303,11 @@ else
 end
 
 pre = [Expt.Trials.Start] - [Expt.Trials.ftime];
+if isfield(Expt.Header,'preperiod')
+prepts = Expt.Header.preperiod./cExpt.Header.CRsamplerate;
+else
+prepts = 100;
+end
 cExpt.Header.emtimes = ([1:emlen] .* 1./cExpt.Header.CRsamplerate) - mean(pre(find(~isnan(pre))));
 minprepts = floor(min(pre) .* cExpt.Header.CRsamplerate);
 if ~isfield(Expt.Trials,'Eyevals')
@@ -234,14 +330,20 @@ if isfield(Expt.Trials,'Eyevals')
         k = trial(j);
         pre(j) = cExpt.Trials(j).Start(1) - Expt.Trials(k).ftime;
     end
-    details.pretimes = pre;
+    details.pretimes = pre;    
     pretime = min(pre(pre > 0));
     minprepts = floor(pretime .* cExpt.Header.CRsamplerate);
+    if minprepts < 1
+        cprintf('red','Missing preperiod\n');
+    end
     for j = usetrials
         k = trial(j);
         prept(j) = floor((cExpt.Trials(j).Start(1) - Expt.Trials(k).ftime) .* cExpt.Header.CRsamplerate);
     end
-    minprepts = floor(prctile(prept,5))-1;
+    minprepts = floor(prctile(prept(usetrials),5))-1;
+    if minprepts < 1
+        cprintf('red','Missing preperiod\n');
+    end
     for j = usetrials
         starti(j) = prept(j)-minprepts+1;
         if starti(j) <= 0
@@ -264,8 +366,8 @@ if isfield(Expt.Trials,'Eyevals')
         end
         if abs(Expt.Trials(k).Start(1) - cExpt.Trials(j).Start(1)) < 500 && starti(j) > -emlen
             cExpt.Trials(j).EyeData = [];
-            st = starti(j);
-            dst = 1;
+            st = starti(j); %where to read from in this trials Eyevals
+            dst = 1;  %Where to write to in aligned EyeData
             if st <= 0
                 dst = 1-st;
                 st = 1;
@@ -283,12 +385,21 @@ if isfield(Expt.Trials,'Eyevals')
             cExpt.Trials(j).EyeData(dst:emlen,2) = Expt.Trials(k).Eyevals.rh(st:emlen+st-dst)+softoff(2);
             cExpt.Trials(j).EyeData(dst:emlen,3) = Expt.Trials(k).Eyevals.lv(st:emlen+st-dst)+softoff(3);
             cExpt.Trials(j).EyeData(dst:emlen,4) = Expt.Trials(k).Eyevals.rv(st:emlen+st-dst)+softoff(4);
+            if dst > prepts;
+                cExpt.Trials(j).EyeData(1:dst-1,:) = NaN;
+            end
             else
                 fprintf('Missing data in Trial %d\n',k);
             end
             cExpt.Trials(j).goodem = 1;
             cExpt.Trials(j).ftime = Expt.Trials(k).ftime;
-            cExpt.Trials(j).emstarti = minprepts;
+            cExpt.Trials(j).emstarti = 1+ minprepts - dst;
+            if dst > prepts
+                cprintf('red','Missing samples in Trial %d (id%d)\n',cExpt.Trials(j).Trial,cExpt.Trials(j).id);
+            end
+            if dst > 50
+                fprintf('Missing %d samples for Trial %d\n',dst,j);
+            end
             Expt.Trials(k).id = cExpt.Trials(j).id;
         else
             cExpt.Trials(j).EyeData(1:emlen,1) = zeros(emlen,1);
@@ -321,10 +432,10 @@ else
         end
     end
 end
-end
 cExpt.Header.emlen = emlen;
 cExpt.Header.emtimes = ([1:emlen] .* 1./cExpt.Header.CRsamplerate) - pretime;
 cExpt.Header.emChannels = {'lh' 'rh' 'lv' 'rv'}; 
+end
 if suffix == 0
 evar = mean(var(cat(3,cExpt.Trials(usetrials).EyeData)),3);
 if length(sacargs)

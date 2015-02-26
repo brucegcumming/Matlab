@@ -1,0 +1,1 @@
+function Clusters = FixClusters(Clusters)    for k = 1:length(Clusters)        if ~isfield(Clusters{k},'next')            Clusters{k}.next = {};        elseif ~iscell(Clusters{k}.next)            last = rmfields(Clusters{k}.next,'next');            Clusters{k} = rmfield(Clusters{k},'next');            Clusters{k}.next{1} = last;        end    end    

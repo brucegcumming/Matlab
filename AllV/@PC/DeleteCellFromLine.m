@@ -1,0 +1,1 @@
+function DeleteCellFromLine(a,b, cluster, cell)    axdata = get(gca,'UserData');    DATA = get(axdata.toplevel,'UserData');        DATA = PC.DeleteCell(DATA, DATA.currentpoint(1),axdata.probe,cluster);    set(DATA.toplevel,'UserData',DATA);    PC.PlotCellList(DATA,'showfig');    

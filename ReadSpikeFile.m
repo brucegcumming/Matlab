@@ -26,7 +26,16 @@ if ~exist(spkfile)
         return;
     end
 end
-load(spkfile);
+ts = now;
+a = load(spkfile);
+if isfield(a,'Spikes')
+    Spikes = a.Spikes;
+else
+    f = fields(a);
+    if length(f) ==1
+        Spikes = a.(f{1});
+    end    
+end
 if size(Spikes.values,2) > 100
     Spikes.values = Spikes.values';
 end
@@ -61,6 +70,9 @@ end
         Spikes.VRange = double([min(Spikes.values(:))  max(Spikes.values(:))]).*Spikes.maxv./Spikes.maxint;
     end
     Spikes.Vscale = Spikes.maxv./Spikes.maxint;
+    if isfield(Spikes,'Vrange') && isempty(Spikes.Vrange)
+        
+    end
 if converttodouble && isinteger(Spikes.values)
     Spikes.values = double(Spikes.values) .* Spikes.Vscale;
 end
@@ -79,9 +91,16 @@ if loadallspikes
         else
             Spikes.xVrange = X.Spikes.xVrange;
         end
+        Spikes.xVscale = X.Spikes.maxv./X.Spikes.maxint;
         Spikes.xchans = X.Spikes.chspk;
         if isfield(X.Spikes,'TriggerV')
             Spikes.TriggerV = X.Spikes.TriggerV;
         end
+        if converttodouble && isinteger(Spikes.xvalues)
+            Spikes.xvalues = double(Spikes.xvalues) .* Spikes.xVscale;
+        end
+
     end
 end
+Spikes.Header.loaddur = mytoc(ts);
+Spikes.Header.loadtime = ts;

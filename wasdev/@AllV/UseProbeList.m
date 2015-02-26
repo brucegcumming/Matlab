@@ -1,0 +1,1 @@
+function chspk = UseProbeList(DATA, nprobes)        nx = floor(nprobes/2);    chspk = [-nx:nx] + DATA.probe(1);    chspk = chspk(chspk > 0 & chspk <= DATA.nprobes);                

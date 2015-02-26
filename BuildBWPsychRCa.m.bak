@@ -4,6 +4,9 @@ function [kernel, details] = BuildBWPsychRCa(Expt, varargin)
 % [kernel, details] = BuildBWPsychRC(Expt, 'sprc') to build the STA
 % [kernel, details] = BuildBWPsychRC(Expt) to build psych only
 %BuildBWPsychRC(details,kernel) to plot a previously calcualted result
+%
+%BuildBWPsychRC(Expt,'minseedcount',n) changes mininum numnbe of repeated
+%stim required to build kernel (default 200)
 
 
 rotate = 0;
@@ -315,8 +318,6 @@ if isfield(Expt.Trials,'imseed')
     seedoffset = median([Expt.Trials(zid).imseed]);
     [seedcounts, details.seedoffsets] = Counts([Expt.Trials(zid).imseed]);
     seedoffsets = details.seedoffsets;
-else
-    seedcounts = [];
 end
 
 if isempty(ftpwr)
@@ -329,7 +330,7 @@ if isempty(ftpwr)
     
 %restrict to trials with enough reps to be worth calculating images
 if length(seedcounts) > 1 
-    xid = find(seedcounts <= minseedcount);
+    xid = find(seedcounts < minseedcount);
     xxid = [];
     for j = 1:length(xid)
         xxid = [xxid find([Expt.Trials(zid).imseed] == seedoffsets(xid(j)))];
@@ -391,19 +392,17 @@ details.impx = px;
 details.seedoffset = seedoffset; %for 0 signal
 details.seedoffsets = seedoffsets; %all
 details.seedcounts = seedcounts; %all
-if isfield(Expt.Header,'Name')
-    details.filename = Expt.Header.Name;
-else
-    details.filename = Expt.Header.name;
-end
+details.filename = Expt.Header.name;
 
 %store enough in Trials so that can build PSFs with ExptPsych
 for j = length(Expt.Trials):-1:1
-    for f = {'or' 'ob' 'RespDir' 'se' 'Seedseq' 'imseed' 'id'}
-        if isfield(Expt.Trials,f{1})
-            Trials(j).(f{1}) = Expt.Trials(j).(f{1});
-        end
-    end
+    Trials(j).or = Expt.Trials(j).or;
+    Trials(j).ob = Expt.Trials(j).ob;
+    Trials(j).RespDir = Expt.Trials(j).RespDir;
+    Trials(j).se = Expt.Trials(j).se;
+    Trials(j).Seedseq = Expt.Trials(j).Seedseq;
+    Trials(j).imseed = Expt.Trials(j).imseed;
+    Trials(j).id = Expt.Trials(j).id;
 end
 for j = 1:length(zid)
     Trials(zid(j)).pkresp = details.pkaresp(j);
@@ -498,13 +497,11 @@ for p = permute:-1:1
     pperf(p) = a.predchoice(1);
     pvar(p) = var((ki(:)));
 end
-if noplot == 0
 oldf = gcf;
-end
 for p = nresample:-1:1
     E = Expt;
         id = Bresample(1:length(zid));
-        E.Trials = Expt.Trials(zid(id));s
+        E.Trials = Expt.Trials(zid(id));
         izid = 1:length(id);
     ichoices = choices(id);
 %    ichoices = ((rand(1,131) < pup)*2) - 1
@@ -528,7 +525,7 @@ for p = nresample:-1:1
     plot(x);
     [kor(p),c,kradius(p)] = GetAngle(x);
 end
-if nresample && noplot == 0
+if nresample
     hold off;
     plot(kradius.*cos(kor .*pi/180),kradius.*sin(kor .*pi/180),'o');
     hold on; plot(kradius.*cos(pi +(kor .*pi/180)),kradius.*sin(pi+(kor .*pi/180)),'o');
@@ -1003,7 +1000,7 @@ elseif strncmpi(plottype,'BWRCall',4)
         nr = 1;
         nc = 2;
     end
-    if length(plotrow) > 2
+    if length(plotrow)
         nr = plotrow(1);
         nc = plotrow(2);
         np = (plotrow(3)-1) * nc;

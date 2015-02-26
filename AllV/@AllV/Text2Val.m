@@ -1,0 +1,1 @@
+function value = Text2Val(F, tag)    it = findobj(F,'tag',tag);    if ~isempty(it)        value = str2num(get(it,'string'));    end  

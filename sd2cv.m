@@ -1,6 +1,6 @@
 function cv = sd2cv(sd)
 %
-% converts sd in degrees to vector length
+% converts sd in degrees to vector length (1-circular variance)
 % Turns out this mapping is a Gaussian with sd 28.64 degrees
 
 cv = exp(-(sd.^2)./(2 .* 28.6462^2));

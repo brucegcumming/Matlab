@@ -138,6 +138,8 @@ j = 1;
         type = varargin{j};
     elseif strncmpi(str,'showmu',5)
         showmu = 0;
+    elseif strncmpi(str,'box',3)
+        sdfargs = {sdfargs{:} varargin{j}};
     elseif strncmpi(str,'block',5)
       j = j+1;
       block = varargin{j};
@@ -379,6 +381,8 @@ elseif strncmpi(str,'Psych',4)
               if sethold == 0
               hold off;
               end
+              pres = ExptPsych(Expt,'forcecolor',colors{1});
+              showplot = 2;
           end
           if strcmp(Expt.Stimvals.e2,'Id') || strcmp(Expt.Stimvals.e2,'e0')
               for k = 1:size(dres.psum,2)
@@ -445,7 +449,7 @@ elseif strncmpi(str,'Psych',4)
               end
               if length(psf) > 1
                   fit = fitpsf(psf);
-                  if showplot
+                  if showplot == 1 %now plotted with ExptPsych
                       plot([psf.x],[psf.resp]./[psf.n],'o','color',colors{k});
                       h = fitpsf(fit.data,'showfit',fit,psfargs{:},'color',colors{1});
                       fit.fith = h.fith;
@@ -453,7 +457,7 @@ elseif strncmpi(str,'Psych',4)
                       title(sprintf('Bias %.1f, Slope %.3f',fit.fit(1),abs(fit.fit(2))));
                   end
               dres.psych = fit;
-              ures.psych = [];
+              ures.psych = fit;
               else
                   dres.psych = [];
                   ures.psych = [];
@@ -488,8 +492,6 @@ elseif strncmpi(str,'Psych',4)
               ures.psych = [];
 %              plot(sd2cv(dres.psychval) .*sgn,dres.presp./dres.psum,'o');
           else
-              if showplot
-                  plot(dres.psychval,dres.presp./dres.psum,'o');
                   for j = 1:size(dres.x,1)
                       pp(j).x = dres.x(j);
                       pp(j).n = dres.psum(j);
@@ -497,7 +499,9 @@ elseif strncmpi(str,'Psych',4)
                   end
                   fit = fitpsf(pp);
                   dres.psych = fit;
-                  ures.psych = [];
+                  ures.psych = fit;
+              if showplot == 1
+                  plot(dres.psychval,dres.presp./dres.psum,'o');
                   if isfield(fit,'data')
                       h = fitpsf(fit.data,'showfit',fit,psfargs{:},'color',colors{1});
                   end
@@ -556,6 +560,10 @@ elseif strncmpi(str,'Psych',4)
       elseif strncmpi(str,'lfpt',4)
           plotlfp = 2;
       end
+  elseif strncmpi(str,'Trialids',8)
+      j = j+1;
+      tid = find(ismember([Expt.Trials.id],varargin{j}));
+      Expt.Trials = Expt.Trials(tid);
   elseif strncmpi(str,'Trials',3)
       j = j+1;
       Expt.Trials = Expt.Trials(varargin{j});
@@ -702,7 +710,11 @@ Expt = FillExpt(Expt, type); %make sure stimval is set in case n == 1
 stimtype = GetEval(Expt,'st','mode');
 [eye, eyes] = GetEval(Expt,'me','mode');
 if isempty(duration)
-    duration = prctile([Expt.Trials.End] - [Expt.Trials.Start],50);
+    if isfield(Expt.Trials,'dur')
+        duration = prctile([Expt.Trials.dur],50);
+    else
+        duration = prctile([Expt.Trials.End] - [Expt.Trials.Start],50);
+    end
 else
     id = find([Expt.Trials.End]- [Expt.Trials.Start] > duration * 0.98);
     Expt.Trials = Expt.Trials(id);
@@ -830,6 +842,12 @@ for ie = 1:length(extraexp)
             extra.n(ie) = length(counts(idx));
             extra.sd(ie) = std(counts(idx));
             extra.id{ie} = idx;
+            if isfield(Expt.Trials,'id')
+            extra.ids{ie} = [Expt.Trials(idx).id];
+            end
+            if mksdf == 1
+                extra.sdfs{ie} = trigsdfa(Expt.Trials(idx),sdfw,times,sdfargs{:});
+            end
             extra.counts{ie} = counts(idx);
             extraidx = [extraidx idx];
             if gettimes
@@ -851,12 +869,13 @@ for ie = 1:length(extraexp)
 end
 
 
-if plotlfp  
+if plotlfp  && isfield(Expt.Trials,'FTlfp')
     if extra.n(1) > 0
         idx = extra.id{1};
         fts = abs([Expt.Trials(idx).FTlfp]);
         ft = mean(fts,2);
         aft = mean(fts,1);
+        if length(ft) >= max(agidx);
         blanklfpwr = mean(ft(gidx));
         ablanklfpwr = mean(ft(agidx));
         bblanklfpwr = mean(ft(bgidx));
@@ -882,6 +901,7 @@ if plotlfp
         cgidx = minf:maxf;
         cblanklfpwr = mean(ft(cgidx));
         lfpautof = [ftfrq(minf) ftfrq(maxf)];
+        end
     else
         blanklfpwr = 0;
         ablanklfpwr = 0;
@@ -906,16 +926,17 @@ if exist('btype','var')
 else
   bvals = NaN;
 end
-if GetEval(Expt,'st') == 10 & isfield(Expt.Trials,'st')
+if GetEval(Expt,'st') == 10 && isfield(Expt.Trials,'st') && isfield(Expt.Trials,'sf')
     id = find([Expt.Trials.st] == 3)
     sfs = unique([Expt.Trials(id).sf]);
-    
+    if ~isempty(id)
     ida = find([Expt.Trials(id).sf] == sfs(1));
     idb = find([Expt.Trials(id).sf] == sfs(2));
     bvals = [bvals -1001];
     [Expt.Trials(id(ida)).(btype)] = deal(-1001);
     bvals = [bvals -1002];
     [Expt.Trials(id(idb)).(btype)] = deal(-1002);
+    end
 end
 
 if exist('ctype','var')
@@ -1050,7 +1071,10 @@ for nc = 1:length(cvals)
                 end
                 result.flags(ix,ie,nc) = 0;
                 result.counts{ix,ie,nc} = counts(idx);
+                if isfield(Expt.Trials,'id')
                 result.ids{ix,ie,nc} = [Expt.Trials(idx).id];
+                else
+                end
                 result.tidx{ix,ie,nc} = idx;
                 if gettimes
                     result.spktimes{ix,ie,nc} = cat(1, spktimes{idx});
@@ -1104,6 +1128,9 @@ for nc = 1:length(cvals)
 
                 lfpch = 1;
                 if plotlfp
+                    if length(ft) == 0
+                        plotlfp = 2;
+                    end
                     subplot(2,1,2);
                     fts = abs([Expt.Trials(idx).FTlfp]);
                     ft = mean(abs([Expt.Trials(idx).FTlfp]),2);
@@ -1116,6 +1143,7 @@ for nc = 1:length(cvals)
                         fprintf('No Data for %s\n',stimlab);
                     else
                         if plotlfp == 2 %time domain
+                            addl = mod(addl,100);
                             ts = [1:size([Expt.Trials.LFP],1)] .* Expt.Header.LFPsamplerate;
                             lfph(nlfp) = plot(ts,mean([Expt.Trials(idx).LFP],2),'color',colors{ix+addn+addl});
                             result.lfpt(ix,ie,:) = mean([Expt.Trials(idx).LFP],2);
@@ -1124,6 +1152,7 @@ for nc = 1:length(cvals)
                         end
                         lfplabels{nlfp} = stimlab;
                         nlfp = nlfp + 1;
+                        if length(ft) > 1
                         result.lfpwr(ix,ie,nc) = mean(ft(gidx)) - blanklfpwr;
                         result.alfpwr(ix,ie,nc) = mean(ft(agidx)) - ablanklfpwr;
                         result.blfpwr(ix,ie,nc) = mean(ft(bgidx)) - bblanklfpwr;
@@ -1133,6 +1162,7 @@ for nc = 1:length(cvals)
                         result.blfpwrs{ix,ie,nc} = mean(fts(bgidx,:),1) - bblanklfpwr;
                         result.clfpwrs{ix,ie,nc} = mean(fts(cgidx,:),1) - cblanklfpwr;
                         result.lpfsnr = Expt.Header.LFPsnr;
+                        end
                         hold on;
                     end
                     if(laxis ~= 0)
@@ -1164,7 +1194,8 @@ for nc = 1:length(cvals)
             axes(laxis)
         end
 
-        if showplot & ~mksdf & isfield(result,'x') & ~plotsimple & ie <= size(result.x,2)
+% This test needs && so that no field x stops testing
+        if showplot && ~mksdf && isfield(result,'x') && ~plotsimple && ie <= size(result.x,2) && nc <= size(result.x,3)
             result.means(find(result.n == 0)) = NaN;
             is = mod(ie-1,length(symbols))+1;
             if isempty(colorids)
@@ -1214,7 +1245,7 @@ for nc = 1:length(cvals)
                 set(ber,'color',colors{ie+addn},'linestyle',linestyle{nc});
             end
 
-            if(plotlfp)
+            if(plotlfp ==1)
                 for li = 1:size(result.lfpwrs,1)
                     lstd(li) = std(result.lfpwrs{li,ie,nc}) ./ sqrt(length(result.lfpwrs{li,ie,nc}));
                     astd(li) = std(result.alfpwrs{li,ie,nc}) ./ sqrt(length(result.alfpwrs{li,ie,nc}));
@@ -1369,6 +1400,7 @@ if extra.n(ie) > 0 & ~plotsimple
       end
       fts = abs([Expt.Trials(idx).FTlfp]);
       ft = mean(abs([Expt.Trials(idx).FTlfp]),2);
+      if length(ft) > 1
       extra.lfpwr(ie) = mean(ft(gidx)) - blanklfpwr;
       extra.lfpwrs{ie} = mean(fts(gidx,:),1) - blanklfpwr;
       extra.alfpwrs{ie} = mean(fts(agidx,:),1) - ablanklfpwr;
@@ -1381,7 +1413,7 @@ if extra.n(ie) > 0 & ~plotsimple
       extra.alfpse(ie) = std(mean(fts(agidx,:),1))/sqrt(length(idx));
       extra.blfpse(ie) = std(mean(fts(bgidx,:),1))/sqrt(length(idx));
       extra.clfpse(ie) = std(mean(fts(cgidx,:),1))/sqrt(length(idx));
-
+      end
       if showplot & plotlfp == 1
           if ie ==1  %%Blank stimulus
               plot(ftfrq(fidx),ft(fidx),'color','k','linewidth',2);
@@ -1440,7 +1472,7 @@ end
 end
 
 
-if plotlfp & showplot
+if plotlfp == 1 & showplot
     subplot(2,1,2);
     if isempty(result.lfpautorange)
         title(sprintf('No Blank'));
@@ -1537,6 +1569,7 @@ if isfield(result,'acov')
     for j = 1:size(result.period,1)
         for k = 1:size(result.period,2)
             ts = [1:result.period(j,k)]+off(j,k);
+            ts = ts(ts<= size(result.acov,3));
             [a,b] = famp(ts,squeeze(result.acov(j,k,ts)),1/result.period(j,k));
             Fn(j,k,1) = real(b); 
             [a,b] = famp(ts,squeeze(result.acov(j,k,ts)),2/result.period(j,k));
@@ -1618,7 +1651,7 @@ if showplot
         end
     end
 end
-result.name = Expt.Header.Name;
+[result.name, result.expname] = GetEval(Expt, 'name');
 result.extras = extra;
 
 if triglfp
@@ -1677,7 +1710,7 @@ if showpcolor & size(result.x,2) > 1
     end
 end
 
-  if showcounts && showplot && isfield(result,'y'); 
+  if showcounts && showplot && isfield(result,'y') && size(result.x,3) >= nc 
       ystep = mean([diff(result.y(1,:)) diff(result.y(:,1))'])/2;
       for ie = 1:size(result.x,2)
       for j = 1:length(result.x(:,ie,nc))
@@ -1885,6 +1918,8 @@ xv = xvs(find(xvs > -1000));
 step = mean(diff(sort(xv)));
 mindiff = step/10;
 if strmatch(Ex.Stimvals.et,{'dx' 'dy'}) %can be very small if dual increment
+mindiff = range(xv)./200;
+elseif strmatch(Ex.Stimvals.et,{'sO'}) %can be different for different thinor, 
 mindiff = range(xv)./200;
 else
 mindiff = range(xv)./99;

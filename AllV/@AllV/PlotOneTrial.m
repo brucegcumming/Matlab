@@ -1,0 +1,1 @@
+function PlotOneTrial(DATA,id)[DATA.currenttrial, DATA.spklst] = AllV.PlotTrialSpikes(DATA,id,'showall'); T = DATA.Expt.Trials(DATA.currenttrial);c = AllV.TrialMarkChar(T);idstr = sprintf('(id%d)',T.id);fprintf('Trial %d%c%s: %.2f-%.2f\n',DATA.currenttrial,c,idstr,T.Start(1)./10000,T.End(end)./10000);set(DATA.toplevel,'UserData',DATA);    

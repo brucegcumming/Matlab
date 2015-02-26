@@ -10,6 +10,7 @@ function o = op2xy(x, angle,varargin)
 %              Ro=0 Op+ -> +v Y. Pp+ = +v x
 %              Ro=180 Op+ -> -v Y. Pp+ = -v x
 %
+%see also xy2op, and hv2op (for disparities)
 mirror = 0;
 j = 1;
 while j <= length(varargin)

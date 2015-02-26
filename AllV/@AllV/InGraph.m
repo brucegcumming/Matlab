@@ -1,0 +1,1 @@
+    function in = InGraph(pt, ax)        xl = get(ax,'Xlim');        yl = get(ax,'Ylim');      in = pt(1,1) > xl(1) & pt(1,1) < xl(2) & pt(1,2) > yl(1) & pt(1,2) < yl(2);      

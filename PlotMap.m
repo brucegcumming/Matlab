@@ -5,6 +5,18 @@ function DATA = PlotMap(varargin)
 %  reads in penetration data for a monkey, and plots RF locations, and
 %  the use grid
 %
+% PlotMap(fits)   plots data from rffits made by BuildRFFits
+% PlotMap(fits, fixes) applies fixes (normally saved with the fits);
+% PlotMap(dir)  if dir contains a file 'rffits.mat'  will load an plot it
+%                      typically contains fits and fixes for an animal.
+%
+% Also reads penetration log summary. Some exceptions are handled by this
+% Esp. if an array spans two areas.
+%
+% A line Boundary x Va Vb  says that above depth is area Va, below is Vb
+% depth is caclulcated from ed + probe spacing
+%
+
 
 name = 'RfMap';
 % Set defaults before reading varargin
@@ -12,6 +24,7 @@ name = 'RfMap';
 strings = [];
 tag = 'RfMap'; %need to change these.
 init = 0;
+
 MapDefs;
 
 if length(varargin) & isnumeric(varargin{1})
@@ -33,7 +46,8 @@ if ~isempty(toplevel)
     DATA = get(toplevel,'UserData');
   end
 else
-
+    DATA.monkeynames = {'duf' 'ruf' 'ica' 'lem'};
+    DATA.useautomap = 0;
     DATA.tags.toplevel = tag;
     DATA.plot.area = 1;
     DATA.plot.labelpts = 1;
@@ -46,6 +60,7 @@ else
     DATA.plot.auto = 0;
     DATA.plot.hemisphere = 0;
     DATA.plot.selecttype = 0;
+    DATA.fittype = 'planar'; %seems best
     DATA.reloadpens = 0;
     monkey = 1;
     init = 1;
@@ -194,6 +209,19 @@ if nargin
             RePlot(DATA);
         elseif strncmpi(varargin{j},'print',5)
             PrintPens(DATA,DATA.map);
+        elseif isdir(varargin{1})
+            mapfile = [varargin{1} '/rffits.mat'];              
+            if exist(mapfile);
+                if length(varargin) > 1
+                    args = varargin(2:end);
+                else
+                    args = {};
+                end
+                X = load(mapfile);
+                X.loadname = mapfile;
+                PlotMap(X,args{:});
+                return;
+            end
         else
             j = 1;
             init = 1;
@@ -205,13 +233,37 @@ if nargin
                 j = j+1;
             end
         end
+    elseif iscell(varargin{1})
+        DATA.map = rflist2map(DATA, varargin{j});
+        DATA.monkey = DATA.map.monkey;
+        DATA.map = ReadAllPens(DATA.map,DATA.map.monkeyname);
+        init = 1;
+    elseif isfield(varargin{1},'fits')
+        X = varargin{1};
+        args{1} = X.fits;
+        if isfield(X,'fixes') && isfield(X,'extras')
+            X.fixes = {X.fixes{:} X.extras{:}};
+        end
+        if isfield(X,'fixes')
+            args = {args{:} X.fixes};
+        end
+        PlotMap(args{:});
+        return;
     end
 end
 
 showgrid = 0;
 j = 2;
 while j <= length(varargin)
-    if strncmpi(varargin{j},'right',5) || strcmp(varargin{j},'R')
+    if isstruct(varargin{j})
+        if isfield(varargin{j},'area') % a set of corrections
+            DATA = FixMap(DATA,varargin{j});
+        end
+    elseif iscell(varargin{j})
+        if isfield(varargin{j}{1},'fix')
+            DATA.map = FixMap(DATA.map,varargin{j});
+        end
+    elseif strncmpi(varargin{j},'right',5) || strcmp(varargin{j},'R')
             DATA.plot.hemisphere = 1;
     elseif  strncmp(varargin{j},'grid',4)
         showgrid = 1;
@@ -237,7 +289,8 @@ if init & isempty(toplevel)
     cntrl_box = figure('Position', [10 scrsz(4)-220*wsc 300*wsc 200*wsc],...
         'NumberTitle', 'off', 'Tag',tag,'Name',name);
     DATA.top = cntrl_box;
-    top = num2str(DATA.top);
+    DATA.toplevel = cntrl_box;
+    top = num2str(double(DATA.top));
     DATA.tags.fig = ['RFMapPlot' top];
     DATA.tags.figb = ['RFGridPlot' top];
     if( ~isempty(strings))
@@ -275,7 +328,7 @@ if init & isempty(toplevel)
     bp(1) = bp(1) + bp(3)+ HSPACE;
     uicontrol(gcf,'Style', 'pushbutton','String','Plot','Callback',['PlotMap(' top ',''plot'');'],'Position', bp);
     bp(1) = bp(1)+bp(3)+HSPACE;
-    uicontrol(gcf,'style','pop','string','Map|Grid|GridVar|GridDepth|Contour|Xpcolor|Ypcolor|dZdX|Arrows|MeanArrow|GMdepth|GMsmooth', ...
+    uicontrol(gcf,'style','pop','string','Map|Grid|GridVar|GridDepth|Contour|Xpcolor|Ypcolor|dZdX|Arrows|MeanArrow|GMdepth|GMsmooth|Scatter|Fit|GridDate', ...
            'Callback', [' PlotMap(' top ',''plottype'');'], 'Tag','plottype',...
         'position',bp,'value',1); bp(1) = bp(1)+bp(3)+HSPACE;
     uicontrol(gcf,'Style', 'text','String','Monkey','Position', bp);
@@ -333,19 +386,24 @@ if init & isempty(toplevel)
     
   hm = uimenu(gcf,'Label','File');
   top = DATA.top;
-  uimenu(hm,'Label','Close','Callback',[' PlotMap(' num2str(DATA.top) ',''close'');']);
-  uimenu(hm,'Label','Reload','Callback',[' PlotMap(' num2str(DATA.top) ',''setmonkey'');']);
-  uimenu(hm,'Label','Choose','Callback',[' PlotMap(' top ',''choosepens'');']);
-  uimenu(hm,'Label','Exclude','Callback',[' PlotMap(' top ',''excludepen'');']);
-  uimenu(hm,'Label','Mark','Callback',[' PlotMap(' top ',''markpen'');']);
-  uimenu(hm,'Label','UnMark','Callback',[' PlotMap(' top ',''unmarkpen'');']);
-  uimenu(hm,'Label','Save Map','Callback',[' PlotMap(' num2str(top) ',''savemap'');']);
+  uimenu(hm,'Label','Close','Callback',[' PlotMap(' num2str(double(DATA.top)) ',''close'');']);
+  uimenu(hm,'Label','Reload','Callback',[' PlotMap(' num2str(double(DATA.top)) ',''setmonkey'');']);
+  uimenu(hm,'Label','Choose','Callback',[' PlotMap(' double(top) ',''choosepens'');']);
+  uimenu(hm,'Label','Exclude','Callback',[' PlotMap(' double(top) ',''excludepen'');']);
+  uimenu(hm,'Label','Mark','Callback',[' PlotMap(' double(top) ',''markpen'');']);
+  uimenu(hm,'Label','UnMark','Callback',[' PlotMap(' double(top) ',''unmarkpen'');']);
+  uimenu(hm,'Label','Save Map','Callback',[' PlotMap(' double(top) ',''savemap'');']);
+  hm = uimenu(gcf,'Label','Do');
+  uimenu(hm,'Label','Refit','Callback',@MakeFits);
     set(gcf,'Menubar','none');
+    if ~isfield(DATA,'map')
     [DATA.map, DATA.monkey] = GetMap(DATA);
+    end
     DATA.selected = ones(size(DATA.map.area));
     DATA.excluded = zeros(size(DATA.map.area));
     DATA.marked = zeros(size(DATA.map.area));
     DATA = update(DATA);
+    DATA.toplevel 
     DATA = ReBuild(DATA);
     set(gcf,'UserData',DATA);
     if showgrid
@@ -355,7 +413,122 @@ if init & isempty(toplevel)
     end
 end
 
+function DATA = MakeFits(a,b, varargin)
 
+DATA = GetDataFromFig(a);
+DATA.fit = FitTopography(DATA.xc, DATA.yc, DATA.px, DATA.py,'rotate');
+DATA.xyfit = FitTopography(DATA.xc, DATA.yc, DATA.px, DATA.py,'planar');
+x(1,:) = [DATA.xyfit.xfit 0 0];
+x(2,:) = [DATA.xyfit.yfit 0 0];
+DATA.qfit = FitTopography(DATA.xc, DATA.yc, DATA.px, DATA.py,'quadratic','guess',x);
+clear x;
+x(1,:) = [DATA.qfit.xfit 0 0];
+x(2,:) = [DATA.qfit.yfit 0 0];
+DATA.cubicfit = FitTopography(DATA.xc, DATA.yc, DATA.px, DATA.py,'cubic','guess',x);
+if strcmp(DATA.fittype,'planar')
+    DATA.usefit = DATA.xyfit;
+elseif strcmp(DATA.fittpe,'quadratic')
+    DATA.usefit = DATA.qfit;
+else
+    DATA.usefit = DATA.cubicfit;
+end
+SetData(DATA);
+
+function area = Name2Area(s)
+areanums = [1 1 2 1 10 10 10 10 2]; %currently all unknown* cases are V1c
+a = find(strcmp(s,{'V1' 'Vd' 'V2' 'unknown' 'Vc' 'unknown*' 'Vd*' 'V1*' 'V1Caclarine'}));
+        if ~isempty(a)
+            area = areanums(a);
+        else
+            area = 0;
+        end
+
+function map = rflist2map(DATA, R)
+MapDefs;
+areanums = [1 1 2 1 10 10 10 10]; %currently all unknown* cases are V1c
+readpenlogs = 0;
+for j = 1:length(R)
+if isfield(R{j},'rf') || isfield(R{j},'rfs') || isfield(R{j},'proberf')
+    good(j) = 1;
+end
+end
+R = R(find(good));
+nx = 0;
+
+for j = 1:length(R)
+    area = 1;
+    if isfield(R{j},'name')
+        name = R{j}.name;
+    elseif isfield(R{j},'dirname')
+        name = R{j}.dirname;
+    end
+    monk = GetMonkeyName(name);
+    if strcmp(R{j}.electrode,'uProbe')
+       etype = MULTICONTACT;
+    else
+        etype = NORMAL;
+    end
+    if isfield(R{j},'date')
+        datestrs = datestr(R{j}.date);
+        age = now-R{j}.date;
+    else
+        datestrs = 'unknown';
+        age = 0;
+    end
+    if isfield(R{j},'area')
+        area = Name2Area(R{j}.area);
+        map.area(j+nx) = area;
+    end
+    if isfield(R{j},'proberf') && ~isempty(R{j}.proberf)  %has good fits
+        for c = 1:size(R{j}.proberf,1)
+            if c > 1
+                nx = nx+1;
+            end
+            [mnk,mnkname,x,shortname] = GetMonkeyName(name);
+            map.cellname{j+nx} = shortname;
+            map.rf(j+nx,:) = R{j}.proberf(c,1:10);
+            map.depth(j+nx) = R{j}.proberf(c,11);
+            map.probe(j+nx) = R{j}.proberf(c,12);
+            map.area(j+nx) = area;
+            map.hemisphere(j+nx) = 0;
+            monkey{j+nx} = monk;
+            map.types(j+nx) = etype;
+            map.age(j+nx) = age;
+            map.datestr{j+nx} = datestrs;
+        end
+        etype = MULTICONTACT;
+    elseif isfield(R{j},'rf')
+        map.rf(j+nx,:) = R{j}.rf;
+        map.depth(j+nx) = R{j}.depth;
+        map.cellname{j+nx} = R{j}.name;
+        map.area(j+nx) = area;
+        map.hemisphere(j+nx) = 0;
+        monkey{j+nx} = monk;
+        map.types(j+nx) = etype;
+        map.probe(j+nx) = 0;
+        map.age(j+nx) = age;
+        map.datestr{j+nx} = datestrs;
+    else
+        monkey{j+nx} = monk;
+    end
+end
+[a,b] = Counts(monkey);
+[c,d] = max(a);
+map.monkey = b{d};
+map.monkeyname = b{d};
+if readpenlogs
+txt = scanlines(['/bgc/anal/' map.monkey '/pens.err']);
+for j = 1:length(txt)
+    a = sscanf(txt{j},'%f');
+    if length(a) > 2
+        id = find(map.rf(:,6) == a(1));
+        map.rf(id,7) = a(2);
+        map.rf(id,8) = a(3);
+    end
+end
+end
+map.monkey = find(strcmp(map.monkeyname, DATA.monkeynames));
+map.pen = map.rf(:,6:8);
 
 function [map, monkey] = GetMap(DATA, varargin)
 MapDefs;
@@ -377,7 +550,7 @@ elseif monkey == ICARUS
   nextfile = '/bgc/bgc/anal/icarus/penlist';
   monkeyname = 'icarus';
 elseif monkey == LEMIEUX
-  mapfile = '/bgc/bgc/anal/lem/lem.fixtab';
+  mapfile = '/bgc/bgc/anal/lem/lem.rftable';
   missfile = '/bgc/bgc/anal/lem/missed.pens';
   nextfile = '/bgc/bgc/anal/lem/penlist';
   monkeyname = 'lem';
@@ -390,6 +563,10 @@ elseif monkey == DAE
 elseif monkey == TESTMAP
   mapfile = '/bgc//bgc/anal/maps/test.tab';
   missfile = '/bgc/bgc/anal/lem/missed.pens';
+end
+automapfile = strrep(mapfile,'.rftable','.fixtab');
+if DATA.useautomap || (~exist(mapfile) && exist(automapfile))
+    mapfile = automapfile;
 end
 DATA.monkey = monkey;
 if exist('bgcfileprefix','var')
@@ -512,10 +689,15 @@ elseif DATA.plot.type == 12
 elseif DATA.plot.type == 4
     PlotGridDepths(DATA);
     return;
-elseif ismember(DATA.plot.type, [5 6 7]) %contour/pcolor plot
-    PlotRFContour(DATA, DATA.plot.type);
+elseif ismember(DATA.plot.type, [5 6 7 13 14]) %contour/pcolor plot
+    DATA = PlotRFContour(DATA, DATA.plot.type);
 elseif DATA.plot.type == 8
     PlotZX(DATA);
+elseif DATA.plot.type == 13
+    PlotRFScatter(DATA)
+elseif DATA.plot.type == 15
+    PlotGridImage(DATA,DATA.plot.type);
+    return;
 else
     PlotRFMap(DATA, gridlines);
     offset = range(DATA.xc)/60;
@@ -700,8 +882,8 @@ end
 tic;
 
 for j = idx;
-    xpos(j) = map.rf(j,1);
-    ypos(j) = map.rf(j,2);
+    xpos(j) = map.rf(j,1)-map.rf(j,9);
+    ypos(j) = map.rf(j,2)-map.rf(j,10);
     if map.pen(j,2) > -99 & DATA.selected(j)
         all.px(j) = map.pen(j,2);
         all.py(j) = map.pen(j,3);
@@ -759,6 +941,7 @@ DATA.ptype = []
 xvals = all.px(find(~isnan(all.px)));
 yvals = all.py(find(~isnan(all.py)));
 tic;
+allzs = [];
 for x= unique(xvals)
     rowstart = np;
     for y= unique(yvals);
@@ -767,7 +950,19 @@ for x= unique(xvals)
             idx = find(all.px == x & all.py == y);
         end
         if(length(idx) > 0)
-            
+            if length(idx) > 3 %remove outliers
+                xzs = abs(zscore(xpos(idx)));
+                yzs = abs(zscore(ypos(idx)));
+                badid = find(xzs > 3 | yzs > 3);
+                allzs = [allzs xzs(:)'];
+                if ~isempty(badid)
+                    for k = 1:length(badid)
+                        a = idx(badid(k));
+                        fprintf('Excluding %.2f,%.2f(%.2f) %s P%d\n',xpos(a),ypos(a),xzs(badid(k)),DATA.map.cellname{a},DATA.map.probe(a));
+                    end
+                    idx(badid) = [];
+                end
+            end
             if area == COMPAREV1V2
                 v1 = find(all.area(idx) == 1);
                 v2 = find(all.area(idx) ~= 1);
@@ -835,46 +1030,181 @@ end
     
 toc;
 
+DATA = MakeFits(DATA,[]);
 
 PlotMap(DATA.top,'store',DATA);
 
-RePlot(DATA);
+DATA = RePlot(DATA);
 
+function [ssq, p] = FitPlane(x, X,Y,Z)
 
-function PlotRFContour(DATA, type)
-[X,Y] =meshgrid(min(DATA.px):max(DATA.px),min(DATA.py):max(DATA.py));
+id = find(~isnan(Z));
+p = x(1) + x(2) .* X + x(3) .* Y;
+ssq = sum((Z(id) - p(id)).^2);
+
+function PlotGridImage(DATA, type)
+[X,Y] =meshgrid(floor(min(DATA.px)):ceil(max(DATA.px)),floor(min(DATA.py)):ceil(max(DATA.py)));
+rfxy(1,:) = DATA.map.rf(:,1)-DATA.map.rf(:,9);
+rfxy(2,:) = DATA.map.rf(:,2)-DATA.map.rf(:,10);
+rfxy(3,:) = DATA.map.rf(:,7);
+rfxy(4,:) = DATA.map.rf(:,8);
 for j = 1:size(X,1)
     for k = 1:size(X,2)
-        id = find(DATA.px == X(j,k) & DATA.py == Y(j,k));
+        id = find(abs(DATA.px - X(j,k)) < 0.7 & abs(DATA.py - Y(j,k)) < 0.7);
+        px = DATA.px(id);
+        py = DATA.py(id);
         if ~isempty(id)
-            Z(j,k) = DATA.xc(id);
-            ZY(j,k) = DATA.yc(id);
+            xid = find(DATA.map.pen(:,2) == X(j,k) & DATA.map.pen(:,3) == Y(j,k)) 
+            age = min(DATA.map.age(xid)); %age is days back from now
+            if type == 15 && ~isempty(xid)
+                Z(j,k) = age;
+            else
+                Z(j,k) = mean(DATA.xc(id));
+                ZY(j,k) = mean(DATA.yc(id));
+            end
         else
             Z(j,k) = NaN;
             ZY(j,k) = NaN;
         end
     end
 end
+GetFigure('PenAge','parent',DATA.top);
+[X,Y,Z] = fillpmesh(X,Y,Z);
+hold off;
+h = pcolor(X,Y,Z);
+set(h,'buttondownfcn',@HitImage);
+colorbar;
 
-if type == 5
-yrange = [floor(min(min(Y))) ceil(max(max(Y)))];
-xrange = [floor(min(min(X))) ceil(max(max(X)))];
-[Xi, Yi] = meshgrid(xrange(1):0.1:xrange(2), yrange(1):0.1:yrange(2));
-Zi = Interpf(X,Y, Z, Xi, Yi, 1, 0.5);
+
+
+
+function DATA = PlotRFContour(DATA, type)
+[X,Y] =meshgrid(floor(min(DATA.px)):ceil(max(DATA.px)),floor(min(DATA.py)):ceil(max(DATA.py)));
+rfxy(1,:) = DATA.map.rf(:,1)-DATA.map.rf(:,9);
+rfxy(2,:) = DATA.map.rf(:,2)-DATA.map.rf(:,10);
+rfxy(3,:) = DATA.map.rf(:,7);
+rfxy(4,:) = DATA.map.rf(:,8);
+for j = 1:size(X,1)
+    for k = 1:size(X,2)
+        id = find(abs(DATA.px - X(j,k)) < 0.7 & abs(DATA.py - Y(j,k)) < 0.7);
+        px = DATA.px(id);
+        py = DATA.py(id);
+        if ~isempty(id)
+            Z(j,k) = mean(DATA.xc(id));
+            ZY(j,k) = mean(DATA.yc(id));
+        else
+            Z(j,k) = NaN;
+            ZY(j,k) = NaN;
+        end
+        if type == 13 && ~isempty(id)
+            idx = find(abs(rfxy(3,:)-px) < 0.5 & abs(rfxy(4,:)-py) < 0.5 & DATA.selected);
+            if length(idx) > 1
+                r = abs((rfxy(1,idx)-DATA.xc(j)) + i .* (rfxy(2,idx)-DATA.yc(j)));
+                ZY(j,k) = std(r);
+                if ZY(j,k) > 1
+                    n = length(r);
+                end
+            else
+                ZY(j,k) = NaN;
+            end
+        end
+    end
+end
+
+if ismember(type,[5 14])
+    yrange = [floor(min(min(Y))) ceil(max(max(Y)))];
+    xrange = [floor(min(min(X))) ceil(max(max(X)))];
+    [Xi, Yi] = meshgrid(xrange(1):0.1:xrange(2), yrange(1):0.1:yrange(2));
+    if type == 5
+        Zi = Interpf(X,Y, Z, Xi, Yi, 1, 0.5);
+    elseif type == 14
+        GetFigure('Fitted Map');
+        hold off;
+        if strcmp(DATA.fittype,'planar')
+            [Z, ZY] = FitTopography(DATA.xyfit,X, Y);
+        elseif strcmp(DATA.fittype,'quadratic')
+            [Z, ZY] = FitTopography(DATA.qfit,X, Y);
+        else
+            [Z, ZY] = FitTopography(DATA.cubicfit,X, Y);
+        end
+    end
     [c, h] = contour(X,Y,Z,floor(min(min(Z))):ceil(max(max(Z))),'r');
-clabel(c,h,'color','r');
-hold on;
-[c, h] = contour(X,Y,ZY,floor(min(min(Z))):ceil(max(max(Z))),'b');
-clabel(c,h,'color','b');
+    clabel(c,h,'color','r');
+    hold on;
+    [c, h] = contour(X,Y,ZY,floor(min(min(ZY))):ceil(max(max(ZY))),'b');
+    clabel(c,h,'color','b');
 
 elseif type == 6
-    pcolor(X,Y,Z);
+    GetFigure('XPcolor','parent',DATA.top);
+    guess = [5 0.8 0.8];
+    [ssq, fitz] = FitPlane(guess,X,Y,Z);
+    options = optimset('MaxFunEvals',100000,'maxiter',1000,'display','off');
+    fit = fminsearch(@FitPlane, guess, options, X,Y,Z);
+    [ssq, fitz] = FitPlane(fit,X,Y,Z);
+    DATA.fitmap.X = X;
+    DATA.fitmap.Y = Y;
+    DATA.fitmap.xposfit = fit;
+
+    [X,Y,Z] = fillpmesh(X,Y,Z);
+    hold off;
+    h = pcolor(X,Y,Z);
+    set(h,'buttondownfcn',@HitImage);
     colorbar;
 elseif type == 7
-    pcolor(X,Y,ZY);
+    GetFigure('YPcolor','parent',DATA.top);
+    DATA.fitmap.X = X;
+    DATA.fitmap.Y = Y;
+    guess = [2 0.3 -0.5];
+    [ssq, fitz] = FitPlane(guess,X,Y,Z);
+    options = optimset('MaxFunEvals',100000,'maxiter',1000,'display','off');
+    fit = fminsearch(@FitPlane, guess, options, X,Y,Z);
+    [ssq, fitz] = FitPlane(fit,X,Y,Z);
+    DATA.fitmap.yposfit = fit;
+    
+    [X,Y,Z] = fillpmesh(X,Y,ZY);
+    hold off;
+    h = pcolor(X,Y,Z);
+    set(h,'buttondownfcn',@HitImage);
+    colorbar;
+elseif type == 13
+    GetFigure('RFscatter',DATA.top);
+    hold off; 
+    [X,Y,Z] = fillpmesh(X,Y,ZY)
+    h = pcolor(X,Y,Z);
+    set(h,'buttondownfcn',@HitImage);
     colorbar;
 end
 
+function HitImage(a,b)
+
+DATA = GetDataFromFig(a);
+c = get(gca,'CurrentPoint');
+px = floor(c(1));
+py = floor(c(1,2));
+if isfield(DATA,'fit')
+    xy = FitTopography(DATA.fit,px,py);
+    str = sprintf(' RF from map fit %.1f,%.1f',xy);
+else
+    str = '';
+end
+fprintf('At %d,%d %s\n',px,py,str);
+plotpen(DATA,px,py);
+
+
+function PlotRFScatter(DATA)
+
+map = DATA.map
+pens = map.pen;
+rfxy(1,:) = map.rf(:,1)-map.rf(:,9);
+rfxy(2,:) = map.rf(:,2)-map.rf(:,10);
+for j = 1:length(DATA.xc)
+ px = DATA.px(j);
+ py = DATA.py(j);
+    idx = find(abs(pens(:,2) - px) < 0.6 & abs(pens(:,3) - py) < 0.6);
+
+    if length(idx) >  1
+    end
+end
 
 function PlotRFMap(DATA,gridlines)
 
@@ -883,7 +1213,7 @@ MapDefs;
 GetFigure(DATA.tags.fig);
 hold off;
 area = DATA.plot.area;
-top = num2str(DATA.top);
+top = num2str(double(DATA.top));
 
 if gridlines
 %Draw blue lines for rows, and Red lines connecting columns
@@ -923,6 +1253,11 @@ for j = 1:length(DATA.xc)
 end
 
 axis('equal');
+if isfield(DATA.map,'drawlines')
+    for j = 1:length(DATA.map.drawlines)
+        plot(DATA.map.drawlines(j).x,DATA.map.drawlines(j).y,'-');
+    end
+end
 
 
 
@@ -930,14 +1265,14 @@ function PlotGrid(DATA)
 
 MapDefs;
 
-top = num2str(DATA.top);
+top = num2str(double(DATA.top));
 
 
 for j = 1:length(DATA.xc)
     if DATA.plot.labelpts
         text(DATA.px(j),DATA.py(j),sprintf('%.1f,%.1f',DATA.xc(j),DATA.yc(j)),'fontsiz',DATA.plot.fontsiz,'HorizontalAlignment','center','VerticalAlign','bottom');
     end
-    h = plot(DATA.px(j),DATA.py(j),'o','buttondownfcn',['PlotMap(' top ',''gridpoint'',' num2str(j) ',1);'],'MarkerFaceColor','b');
+    h = plot(DATA.px(j),DATA.py(j),'bo','buttondownfcn',['PlotMap(' top ',''gridpoint'',' num2str(j) ',1);'],'MarkerFaceColor','b');
     if DATA.penmarked(j)
         set(h, 'MarkerFaceColor','m');
     elseif DATA.ptype(j) == MULTICONTACT
@@ -965,10 +1300,33 @@ for j =1:length(DATA.missed)
     h = plot(DATA.map.pen(k,2),DATA.map.pen(k,3),'o','buttondownfcn',['PlotMap(' top ',''missedpoint'',' num2str(j) ',1);'],'color','k','MarkerFaceColor','none');
 end
 
+if isfield(DATA.map,'drawlines')
+    for j = 1:length(DATA.map.drawlines)
+        x = DATA.map.drawlines(j).x;
+        y = DATA.map.drawlines(j).y;
+        if length(x) < 100
+            [x,y] = SampleLine(x,y);
+        end
+        [fx, fy] = FitTopography(DATA.xyfit,x,y,'invert');
+        plot(fx,fy,'-');
+    end
+end
+
 
 xr = get(gca,'Xlim');
 yr = get(gca,'Ylim');
 set(gca,'Xtick',[xr(1):xr(2)],'YTick',[yr(1):yr(2)],'Xgrid','on','Ygrid','on');
+set(gca,'buttondownfcn',@HitImage);
+setappdata(gcf,'ParentFigure',DATA.top);
+
+function [sx,sy] = SampleLine(x,y, varargin)
+npts = 10;
+sx = [];
+sy = [];
+for j = 1:length(x)-1
+    sx = [sx linspace(x(j),x(j+1),npts)];
+    sy = [sy linspace(y(j),y(j+1),npts)];
+end
 
 
 
@@ -1243,6 +1601,38 @@ function ShowCell(map, id)
 fprintf('%s %d %s %.1f %.1f %.1f\n',map.cellname{id},map.pen(id,1),map.datestr{id},map.rf(id,1),map.rf(id,2),map.depth(id));
   
 
+function map = FixMap(map, fixes)
+
+
+for j = 1:length(map.cellname)
+    names{j} = GetName(map.cellname{j});
+end
+
+nl = 0;
+for j = 1:length(fixes)
+    name = GetName(fixes{j});
+    id = find(strncmp(name,names,length(name)));
+    for k = 1:length(id)
+        if isfield(fixes{j},'pe')
+            map.rf(id(k),6:8) = fixes{j}.pe(1:3);
+            map.pen(id(k),1:3) = fixes{j}.pe(1:3);
+        end
+    end
+    if isfield(fixes{j},'line')
+        nl = nl+1;
+        map.drawlines(nl).x = fixes{j}.line(1,:);
+        map.drawlines(nl).y = fixes{j}.line(2,:);
+        map.drawlines(nl).type = 'line';
+    end
+    if isfield(fixes{j},'circle')
+        nl = nl+1;
+        map.drawlines(nl).xyr = fixes{j}.circle;
+        map.drawlines(nl).type = 'circle';
+        [map.drawlines(nl).x, map.drawlines(nl).y] = DrawEllipse(fixes{j}.circle,'noplot');
+    end
+end
+
+
 function PrintPens(DATA,map)
 
 [idx, order] = sort(map.datenum)
@@ -1269,7 +1659,8 @@ while j <= length(varargin)
     j = j+1;
 end
 
-penfile = sprintf('/bgc/bgc/anal/%s/pens/pendata.mat',monkey);
+penfile = sprintf('/b/bgc/anal/%s/pens/pendata.mat',monkey);
+penfile = CheckNameBug(penfile);
 if exist(penfile,'file') && ~reload
     load(penfile);
     map.pens = pens;
@@ -1291,7 +1682,7 @@ else
 end
 for j = 1:length(newpes)
     pe = newpes(j);
-    if pe > 0
+    if pe >= 1
         name = sprintf('/bgc/anal/%s/pens/pen%d.log',monkey,pe);
     else
         name = sprintf('/bgc/anal/%s/pens/pen%d.log',monkey,9000-pe);
@@ -1303,10 +1694,23 @@ for j = 1:length(newpes)
     end
     if isfield(map.pens{pe},'missed')
         map.missed(pe) = map.pens{pe}.missed;
+    else
+        map.missed(pe) = 0;
     end
 end
 if length(newpes)
     pens = map.pens;
     missed = map.missed;
     save(penfile,'pens','missed');
+end
+pes = pes(pes > 0);
+for j = 1:length(pes)
+    pe = pes(j);
+    if isfield(map.pens{pe},'boundary')
+        B = map.pens{pe}.boundary;
+        id = find(map.rf(:,6) == pe & map.depth' > B.depth);
+        map.area(id) = Name2Area(B.below);
+        id = find(map.rf(:,6) == pe & map.depth' < B.depth);
+        map.area(id) = Name2Area(B.above);
+    end
 end

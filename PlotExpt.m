@@ -85,7 +85,6 @@ centerRFvals = 0;
 figbtag = [];
 consecpsych = [];
 CPtag = [];
-mainfig = gcf;
 
 while j  <= nvar
   str = varargin{j};
@@ -266,12 +265,17 @@ while j  <= nvar
   end
   j = j+1;
 end
+
+
+if showplot
+mainfig = gcf;
+
 if holdon
     hold on;
 elseif showplot
     hold off;
 end
-
+end
 
 result = [];
 if isempty(name)
@@ -279,8 +283,13 @@ if isempty(name)
 end
 if ischar(name)
     if ~exist(name,'file')
-        fprintf('No file %s\n',name);
+        aname = name2path(name);
+        if ~exist(aname)
+        fprintf('No file %s or \n',name,aname);
         return;
+        else
+            name = aname;
+        end
     end
 
     Expt = LoadExpt(name);
@@ -325,7 +334,7 @@ if length(Expt.Trials) < 1
 end
 
 norc = 0;
-if length(Expt.Trials(1).Start) > 2 
+if length(Expt.Trials(1).Start) > 2 || (isfield(Expt.Header,'rc') && Expt.Header.rc > 0)
     if condense || showseq
             Expt = CondenseRC(Expt);
             duration = prctile([Expt.Trials.End] - [Expt.Trials.Start],90);
@@ -636,30 +645,34 @@ if ignorename
     if ~isfield(Expt.Stimvals,'od')
         Expt.Stimvals.od = 0;
     end
-        if strcmp(Expt.Stimvals.e2,'Pd') & strcmp(Expt.Stimvals.et,'sM')
-            reverse = ~reverse;
+    if strcmp(Expt.Stimvals.e2,'e0') & isfield(Expt.Trials,'pi')
+        Expt.Stimvals.e2  = 'pi';
+    end
+    if strcmp(btype,'e0') && ~isempty(Expt.Stimvals.e2)
+        btype = Expt.Stimvals.e2;
+    end
+    if strcmp(btype,'Pd') & strcmp(Expt.Stimvals.et,'sM')
+        reverse = ~reverse;
+    end
+    if strcmp(btype,'or') &&  strcmp(Expt.Stimvals.et,'sO') &&  strcmp(Expt.Stimvals.e3,{'ar'})
+        Expt = FillTrials(Expt,'sO');
+        args = { 'stimxy', 'Type2', 'xydir', 'Type3','or'};
+        if length(unique([Expt.Trials.or])) > 3
+            colorids = [3 1 3 1 5 6 5 6; 4 2 4 2 7 8 7 8];
+            args = [args {'colorids'} {colorids}];
         end
-        if strcmp(Expt.Stimvals.e2,'e0') & isfield(Expt.Trials,'pi')
-            Expt.Stimvals.e2  = 'pi';
-        end
-        if strcmp(Expt.Stimvals.e2,'or') &&  strcmp(Expt.Stimvals.et,'sO') &&  strcmp(Expt.Stimvals.e3,{'ar'})
-            Expt = FillTrials(Expt,'sO');
-            args = { 'stimxy', 'Type2', 'xydir', 'Type3','or'};
-            if length(unique([Expt.Trials.or])) > 3
-                colorids = [3 1 3 1 5 6 5 6; 4 2 4 2 7 8 7 8];
-                args = [args {'colorids'} {colorids}]; 
-            end
-        elseif isempty(Expt.Stimvals.e2) | ~isempty(strmatch(Expt.Stimvals.e2,'e0')) | collapse == 2
+    elseif strcmp(btype,'e0') | collapse == 2
         args = {Expt.Stimvals.et};
-    elseif isempty(Expt.Stimvals.e2) | ~isempty(strmatch(Expt.Stimvals.e2,'e0')) | collapse == 1
-        args = {Expt.Stimvals.e2};
+    elseif  strcmp(Expt.Stimvals.et,'e0') | collapse == 1 %E1 not set
+        args = {btype};
     else
         if reverse
-            args = {Expt.Stimvals.e2,'Type2',Expt.Stimvals.et};
+            args = {btype,'Type2',Expt.Stimvals.et};
         else
-            args = {Expt.Stimvals.et,'Type2',Expt.Stimvals.e2};
+            args = {Expt.Stimvals.et,'Type2',btype};
         end
     end
+    
 %        fprintf('Dont know type for %s\n',name);
     if strcmp(Expt.Stimvals.et,'TwoCylDisp')
         Expt = FillTrials(Expt,'rd');
@@ -668,7 +681,7 @@ if ignorename
     if (isfield(Expt.Trials,'od')|| Expt.Stimvals.od ~= 0) && isfield(Expt.Trials,'me') && isfield(Expt.Trials,'or') 
         Expt= FillTrials(Expt,'or');
     end
-    if sum(strcmp(Expt.Stimvals.e3,{'sM' 'ce' 'mixac' 'a2'}))
+    if sum(strcmp(Expt.Stimvals.e3,{'sM' 'ce' 'mixac' 'a2' 'dd'}))
         args = {args{:} 'type3' Expt.Stimvals.e3};
     end
     args = CheckExpt(Expt, args);
@@ -687,13 +700,13 @@ if isfield(Expt.Trials,'ob')
         ormean = NaN;
     end
     if ~isnan(ormean)
-        if strcmp(Expt.Stimvals.e2, 'ob') && strcmp(Expt.Stimvals.et,'or')
+        if strcmp(btype, 'ob') && strcmp(Expt.Stimvals.et,'or')
             if ~reverse && length(nor) < 5
                 args = { 'cvsign' 'Type2' 'e0'};
                 type = 'cvsign';
                 type2 = 'e0';
             end
-        elseif strcmp(Expt.Stimvals.e2, 'ob') 
+        elseif strcmp(btype, 'ob') 
             type2 = 'ob';
         else %% NOT orXob, but multiple ob = added broadband
             args = {args{:} 'extra' 'ob] > 120' 'Broad'};
@@ -1067,7 +1080,9 @@ elseif showseq
     PlotSequence(result,find([Expt.Trials.Trial] > 0),[]);
 end
 end
-result(1).fig = gcf;
+if showplot
+    result(1).fig = gcf;
+end
 
 function PlotCPHist(result,fidx, nidx, varargin)
 
@@ -1520,7 +1535,7 @@ if isnumeric(Expt.Stimvals.et)
 end
  if stimtype == 2 | stimtype == 15  %% RDS or RLS
      if isfield(Expt.Trials,'ce')
-     ces = [Expt.Trials.ce];
+     ces = cat(1,Expt.Trials.ce);
      if sum(ces == 0) < length(ces)/2
      args = {args{:} 'Uncorr'};
      end

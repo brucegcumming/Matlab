@@ -1,5 +1,5 @@
 function mid = findmid(kernimg)
-
+%find center of a kernel
 guess=size(kernimg,1)/2;
 range=[(guess-5):(guess+5)];
 count=0;

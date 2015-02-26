@@ -1,0 +1,1 @@
+function PlotGauss2Fit(fits);        hist(AllV.Rprime(fits.r),fits.nbins);    hold on;    n = length(fits.fits{1}.fitted);    plot(fits.x(fits.xrange(1):fits.xrange(2)),fits.fits{1}.fitted,'r');    plot(fits.x(fits.xrange(2):fits.xrange(3)),fits.fits{2}.fitted,'r');        

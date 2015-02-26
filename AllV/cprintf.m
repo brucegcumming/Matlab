@@ -208,7 +208,7 @@ function count = cprintf(style,format,varargin)
       count1 = fprintf(2,format,varargin{:});
 
       %awtinvoke(cmdWinDoc,'remove',lastPos,1);   % TODO: find out how to remove the extra '_'
-      drawnow;  % this is necessary for the following to work properly (refer to Evgeny Pr in FEX comment 16/1/2011)
+ %     drawnow;  % this is necessary for the following to work properly (refer to Evgeny Pr in FEX comment 16/1/2011)
       docElement = cmdWinDoc.getParagraphElement(lastPos+1);
       if majorVersion<7 || (majorVersion==7 && minorVersion<13)
           if bolFlag && ~underlineFlag

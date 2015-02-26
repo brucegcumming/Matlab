@@ -1,11 +1,24 @@
 function result = BuildGridFullV(DATA, Expts, e, probes, varargin)
+%Called by ProcessGridFullV. Actuallly Builds the FullV files from .ns5
+%result = BuildGridFullV(DATA, Expts, e, probes, varargin)
+%  ... 'mklfp')
+%  ... 'nolfp')
+%  ... 'force')
+%  ... 'parallel') Normallly processgridfullv does expts in parallel. If
+%                   doing only one expt, this does probes in parallel.
+
 
 result = [];
 
 forcebuild =0;
 parallel = 0;
+verstr = '$Revision: 1.1 $';
+version = sscanf(verstr(12:end),'%f');
+
 starts = DATA.starts;
-ends = DATA.ends;
+if isfield(DATA,'ends')
+    ends = DATA.ends;
+end
 makelfp = 1;
 j = 1;
 while j <= length(varargin)
@@ -31,10 +44,14 @@ if makelfp
 end
         id = find(DATA.idx.expt == e);
 %        DATA.tfirst = tfirst; can't do this in parfor
-        
+        DATA.version = [DATA.version ' Build: ' num2str(version)];
         DATA.mcycle = [];
         xid = [];
         sumv = [];
+        result.loadtime = 0;
+        result.writedur = 0;
+        result.reload = 0;
+        functs = now;
         if ~forcebuild
             doprobes = [];
             for (p = probes)
@@ -48,20 +65,22 @@ end
         end
         result.askprobes = probes;
         Expts{e}.eid = e;
+        details = {};
         if parallel
             p = probes(1);
-            [FullV, Arrays{p}, DATA.mcycle] = BuildFullVProbe(DATA, Expts{e}, p, args{:});
+            [FullV, Arrays{p}, DATA.mcycle, details{p}] = BuildFullVProbe(DATA, Expts{e}, p, args{:});
             rawlfp{p} = FullV.LFP;
             parfor (p = probes(2:end))
-                [FullV, Arrays{p}] = BuildFullVProbe(DATA, Expts{e}, p,args{:});
+                [FullV, Arrays{p}, a, details{p}] = BuildFullVProbe(DATA, Expts{e}, p,args{:});
                 rawlfp{p} = FullV.LFP;
-            end
-            if makelfp
-                FullV2LFP(rawlfp,'expts',e); %need to tell it what expt this is
             end
         else
             for (p = probes)
-                [FullV, Arrays{p}] = BuildFullVProbe(DATA, Expts{e}, p);
+                [FullV, Arrays{p}, a, details{p}] = BuildFullVProbe(DATA, Expts{e}, p, args{:});
+                if p == probes(1) %store calculated ids for building mains cycle;
+                    DATA.mcycle = a;
+                end
+                rawlfp{p} = FullV.LFP;
                 if DATA.buildmean == 3
                     V = double(FullV.V);
                     if isempty(sumv)
@@ -72,7 +91,20 @@ end
                 end
             end
         end
-        
+%N.B. LFP is saved before any mean subtraction.  Easy to do this for LFP
+%files later as all channels are in one file.
+        if makelfp
+            FullV2LFP(rawlfp,'expts',e); %need to tell it what expt this is
+        else
+            fprintf('Not Making LFP for Expt %d\n',e);
+        end
+        result.probedetails = details;
+        for j = 1:length(details)
+            if isfield(details{j},'loadtime')
+            result.loadtime = result.loadtime+details{j}.loadtime;
+            result.writedur = result.writedur+details{j}.writedur;
+            end
+        end
         if DATA.buildmean == 3 %Build mean and subtract it.  N.B. if user has selected a subset
             %of probes, DO NOT remake the meanV file - load it from disk.
             ts = now;
@@ -84,14 +116,18 @@ end
             meanfile = sprintf('%s/Expt%dFullVmean.mat',DATA.idx.datdir,e);
             if reloadmean && exist(meanfile)
                 fprintf('Loading Mean from %s',meanfile);
+                tic;
                 load(meanfile);
             elseif isempty(sumv)
                 sumv = BuildMeanV(DATA.idx.datdir,e,probes, 'save');
             end
             sumsq = sumv*sumv';
+            savedur(1) = 0;
             for p = probes
                 outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p' num2str(p) 'FullV.mat'];
+                tic;
                 X = load(outfile);
+                result.reload = result.reload+toc;
                 FullV = CopyFields(FullV,X.FullV);  %Not sure if any new fields added to FullV after saving.....
                 FullV.V = double(X.FullV.V);
                 FullV.sumscale = (sumv(1:length(FullV.V))*FullV.V')./sumsq;
@@ -99,14 +135,17 @@ end
                 FullV.V = int16(FullV.V);
                 FullV.savetime(2) = now;
                 SaveFullV(outfile, FullV);
+                savedur(p) = mytoc(FullV.savetime(2));
             end
+            result.savedur = sum(savedur);
             MeanV.probes = probes;
             MeanV.savetime = now;
             if reloadmean == 0
-                fprintf('Saving %s\n',meanfile);
+                fprintf('Saving %s at %s',meanfile,datestr(now));
                 save(meanfile,'sumv','MeanV')
+                fprintf('Took %.2f sec\n',mytoc(MeanV.savetime));
             end
-            fprintf('Mean subtratction took %.1f at %s\n',mytoc(ts),datestr(now));
+            fprintf('Mean subtratction took %.1f (%1f writing) at %s\n',mytoc(ts),sum(savedur),datestr(now));
             comparenoise = 0;
             if comparenoise
             p = 1;
@@ -119,9 +158,12 @@ end
             end
             plot(sumtrig,onetrig)
             end
+        else
+            result.savedur = 0;
         end
+        result.builddur = mytoc(functs);
 
-function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
+function [FullV, Array, mcycle, details] = BuildFullVProbe(DATA, Expt,  p, varargin)
      xid = [];
      FullV.V = [];
      ts = now;
@@ -134,14 +176,20 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
          end
          j = j+1;
      end
+     functs = now;
      id = find(DATA.idx.expt == e);
      outvarname = 'FullV';
      tfirst = (Expt.Trials(1).Start(1) - DATA.preperiod)/10000;
      FullV.nsnames = DATA.idx.names(id);
      FullV.expname = Expt.loadname;
+     FullV.version = DATA.version;
      starts = DATA.starts;
+     if isfield(DATA,'ends')
      ends = DATA.ends;
-
+     end
+     details.loadtime = 0;
+     details.writedur = 0;
+     
      if isempty(xid)
          FullV.blklen = [];
          FullV.blkstart = [];
@@ -149,6 +197,7 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
      for k = 1:length(id)
          filename = [DATA.idx.nevdir '/' DATA.idx.names{id(k)}];
          filename = strrep(filename,'nev','ns5');
+         ta = now;
          if DATA.prebuild
              rawfile = strrep(filename,'.ns5',['rawp' num2str(p) '.mat']);
              v = load(rawfile);
@@ -157,6 +206,7 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
          else
              v = openNSx('read',filename,['e:' num2str(p)]);
          end
+         details.loadtime = details.loadtime+mytoc(ta);
          if DATA.smoothw > 0
              sm = smooth(v.Data,DATA.smoothw);
              v.Data = v.Data - sm;
@@ -209,15 +259,15 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
              npre = 1;
              firstsample = 2;
          end
-         bid = find(starts > tfirst & starts > tstart & starts < tlast);
+         bid = find(starts > tfirst & starts > tstart & starts < tlast); %starts in range
          for k = 1:length(bid)
-             b = round((starts(bid(k))-tstart)./FullV.samper);
-             a = round((ends(bid(k)-1)-tstart)./FullV.samper);
-             if (a>b)
+             b = round((starts(bid(k))-tstart)./FullV.samper);  %nearest next start sample
+             a = round((ends(bid(k)-1)-tstart)./FullV.samper); %preceding end sample
+             if (a>b) 
                  a = round((ends(bid(k)-1)-tstart)./FullV.samper);
              end
              if (a> 0)
-                 xid = [xid a:b];
+                 xid = [xid a:b]; %chpped points
                  if k+npre > 1
                      FullV.blklen(k+npre-1) = a-firstsample;
                  end
@@ -235,10 +285,16 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
          FullV.postperiod = DATA.postperiod;
          FullV.chopgap = DATA.gaplen;
          lengths(p) = length(vid);
+         for j = 1:length(FullV.blkstart)
+             FullV.blkend(j) = FullV.blkstart(j) +FullV.blklen(j).*FullV.samper;
+         end
+     end
+     outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p' num2str(p) 'FullV.mat'];
+     if isempty(FullV.V)
+         fprintf('Empty FullV.V in %s!!\n',outfile);
      end
      vm = max(abs(FullV.V.*vscale));
      FullV.intscale = [vm v.MetaTags.Resolution];
-     outfile = [DATA.idx.datdir '/Expt' num2str(e) '.p' num2str(p) 'FullV.mat'];
      FullV.samper = 1./30000.237;
      FullV.name = outfile;
      FullV.usealltrials = DATA.usealltrials;
@@ -271,6 +327,7 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
      FullV.kurtosis = kurtosis(FullV.V);
      FullV.intscale(4) = prctile(abs(FullV.V),99.9); %may use to check for bad outliers....
      FullV.highpass = DATA.highpass;
+     loadtime = details.loadtime;
      if isnan(DATA.highpass)
          [ratio, details] = HighLowRatio(FullV);
          if ratio > 10
@@ -283,6 +340,7 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
          FullV.HLratio = ratio;
          FullV.coilnoiseratio = details.coilratio;
      end
+     details.loadtime = loadtime;
      if makelfp
          LFP = FullV2LFP(FullV);
      end
@@ -293,13 +351,14 @@ function [FullV, Array, mcycle] = BuildFullVProbe(DATA, Expt,  p, varargin)
      res.workerid = t.ID;
      fprintf('Writing P%d(%d) %s (%s) (Worker %d took %.2f at %s)',p,FullV.chspk,outfile,outvarname,t.ID,mytoc(ts),datestr(now));
      ts = FullV.savetime;
-     SaveFullV(outfile, FullV);
+     details.writedur = SaveFullV(outfile, FullV);
      fprintf('+%.2f)\n',mytoc(ts));
      if makelfp
          FullV.LFP = LFP;
      else
          FullV.LFP = [];
      end
+    details.builddur = mytoc(functs);
         
 function [ratio, details] = HighLowRatio(FullV)
 w = FullV.blklen(1);
@@ -331,7 +390,6 @@ end
     details.pwr = x;
     details.freq = freqs;
     details.coilratio = a./mean(x(hid));
-    
 
 function took = SaveFullV(name, FullV)
 
@@ -419,15 +477,28 @@ if adjgain
 mmean = zeros(size(FullV.V));
 rawv = FullV.V;
 end
-for j = ns:-1:1
-    if newcycle
+if newcycle
+    for j = ns:-1:1
         MainsTrig.mids{j} = find(mcycle == j);
+        MainsTrig.nsamples(j) = length(MainsTrig.mids{j});
+    end
+end
+nmin = prctile(MainsTrig.nsamples,90)/2;
+%Sometime the final bin in the cycle average has very few points, so its
+%safer to use the adjacent bin
+for j = ns:-1:1
+    if MainsTrig.nsamples(j) >= nmin;
+        id = MainsTrig.mids{j};
+    else
+        if j > 1
+            id = MainsTrig.mids{j-1};
+        end
     end
     id = MainsTrig.mids{j};
     id = id(id < length(FullV.V));
     mtrig(j) = mean(FullV.V(id));
     mmean(id) = mtrig(j);
-    FullV.V(id) = FullV.V(id)-mtrig(j);
+    FullV.V(id) = FullV.V(id)-mtrig(j);    
 end
 FullV.mainsbuild(2) = mytoc(tst);
 FullV.mainsavg = mtrig; 

@@ -1,0 +1,1 @@
+function [sizes, d, quality] = SpikeDistance(DATA, eid)spk = 1;ids = [];PC.SetFigure(DATA, DATA.tag.clusters,'front');clf;C = Clusters{eid};for j = 1:length(C)    sizes(j,:) = std(C{j}.MeanSpike.ms')./std(C{j}.MeanSpike.ms(j,:));    d(j,:) = abs([1:length(C)]-j);    quality(j) = C{j}.mahal(1);end

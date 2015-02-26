@@ -1,0 +1,1 @@
+function S = SmallCluster(C)%remove fields from C that use memoryS = rmfields(C,'r','xy');if isfield(S,'next')    for j = 1:length(S.next)        S.next{j} = rmfields(S.next{j},'r','clst');    endelse    S.next = {};end

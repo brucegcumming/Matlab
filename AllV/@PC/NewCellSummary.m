@@ -1,0 +1,1 @@
+    function NewCellSummary(a,b,e,p)        DATA= GetDataFromFig(a);        PC.PlotCellSummary(DATA,e,p);

@@ -1,0 +1,1 @@
+function ScrollWheel(src, evnt)DATA = GetDataFromFig(src);DATA.elmousept.angle = DATA.elmousept.angle+0.02*evnt.VerticalScrollCount;fprintf('Angle %.2f\n',DATA.elmousept.angle);DATA.elmousept.h = PC.DrawEllipse(DATA.elmousept, DATA.elmousept.plotargs{:});set(DATA.toplevel,'UserData',DATA);

@@ -1,0 +1,1 @@
+ function HitShapePlot(a,b,id, c)     D = GetDataFromFig(a);     DATA = get(D.parent,'UserData');     DATA.currentpoint(1) = D.cells{id}.eid;     DATA.currentpoint(2) = D.cells{id}.probe;     PC.ShowData(DATA,DATA.currentpoint(1),DATA.currentpoint(2));          

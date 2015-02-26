@@ -1,0 +1,1 @@
+function csd = GetCSD(DATA, ndiff)    csd = getappdata(DATA.toplevel,'AllCSD');    currdiff = getappdata(DATA.toplevel,'plotcsd');    if isempty(csd) || ndiff ~= currdiff        AllVoltages = AllV.mygetappdata(DATA,'AllVoltages');        csd = diff(AllVoltages,3-ndiff,1);        setappdata(DATA.toplevel,'AllCSD',csd);    end    setappdata(DATA.toplevel,'plotcsd',ndiff);

@@ -71,7 +71,7 @@ if ismember(plottype,[COMMENTS])
             plot([pen.times(id)-lw pen.times(id)+lw],[pen.depths(id) pen.depths(id)],'k:');
         end
     end
-    if isfield(pen,'enterdepth')
+    if isfield(pen,'enterdepth') && ~isempty(t)
     plot([t(1) t(end)],[pen.enterdepth pen.enterdepth],'k:');
     end
     if showcells

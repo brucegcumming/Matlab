@@ -1,0 +1,1 @@
+function DATA = FlipLineCrit(a,b)    DATA = GetDataFromFig(a);        if DATA.NewCut.probe > 0        DATA.elmousept.pos = DATA.NewCut.pos    else    end    C =  PC.ClassifySpikes(DATA,DATA.elmousept,'flip');    DATA = get(DATA.toplevel,'UserData');    DATA = PC.ConditionalPlotXY(DATA, C, 1);

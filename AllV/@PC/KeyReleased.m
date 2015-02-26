@@ -1,0 +1,1 @@
+function KeyReleased(src, ks, fcn)      if strcmp(ks.Key, 'control')          setappdata(0,'control_is_down',0);          return;      elseif strmatch(ks.Key,{'alt'})          setappdata(0,'alt_is_down',0);          return;      end      

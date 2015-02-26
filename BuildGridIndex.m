@@ -1,6 +1,6 @@
-function idx = BuildGridIndex(name, Expts, varargin)
+function idx =BuildGridIndex(name, Expts, varargin)
+%BUILDGRIDINDEX idx = BuildGridIndex(name, Expts, ...)
 %idx = BuildGridIndex(name, Expts, ...)
-%Build an index of which neV files match Expt .mat files
 %name is a filename or direcotry where the .mat file lives (used to
 %construct path for where .nev files live
 % Expts is a cell array of Expts, as returned by APlaySpkFile
@@ -12,11 +12,13 @@ function idx = BuildGridIndex(name, Expts, varargin)
 % BuildGridIndex(filename, [], 'update') checks to see if the existing
 % index was built the old way. If so, it makes a copy of the old file, rebuilds and compares the two.
 % The returned structure has a filed oldidx with the oldx indices
+% BuildGridIndex(filename, [], 'forcematches','jbeG086005.ns5',5, 1)  Forces the mathing expt for an ns5 file, with a 1 event offset
 
 
     idx = [];
    datdir = 'F:/Utah/jbe/';
    reindex = 0;
+   nevdir = [];
    plotexpts = [];
    checktag = 'TrialCheck';
    preperiod = 5000;
@@ -27,6 +29,15 @@ function idx = BuildGridIndex(name, Expts, varargin)
    plottype = 0;
    Trials = [];
    VERSION = 2.0;
+   forcematches = {};
+   forceexpts = [];
+   forcebsoff = [];
+   showerr = 1;
+   aargs = {};
+   usealltrials = 0;
+if nargin == 1
+    Expts = [];
+end
    
 j = 1;
 while j <= length(varargin)
@@ -37,21 +48,37 @@ while j <= length(varargin)
     elseif strncmpi(varargin{j},'digmark',5)
         j = j+1;
         DigMark = varargin{j};
+    elseif strncmpi(varargin{j},'forcematches',8)
+        j = j+1;
+        forcematches = {forcematches{:} varargin{j}};
+        j = j+1;
+        forceexpts = [forceexpts varargin{j}];
+        j = j+1;
+        forcebsoff = [forcebsoff varargin{j}];
+    elseif strncmpi(varargin{j},'nevdir',5)
+        j = j+1;
+        nevdir = varargin{j};
     elseif strncmpi(varargin{j},'plotfiles',5)
         plottype = 1;
     elseif strncmpi(varargin{j},'plotexpts',5)
         j = j+1;
         plotexpts = varargin{j};
+    elseif strncmpi(varargin{j},'noerrs',5)
+        showerr = 0;
     elseif strncmpi(varargin{j},'plotidx',5)
         plottype = 3;
     elseif strncmpi(varargin{j},'reindex',5)
         reindex = 1;
+    elseif strncmpi(varargin{j},'usealltr',8) %remake the new way (V.2)
+        aargs= {aargs{:} varargin{j}};
+        usealltrials =1;
     elseif strncmpi(varargin{j},'update',5) %remake the new way (V.2)
         reindex = 2;        
     end
     j = j+1;
 end
-   
+
+
 if isstruct(name)
     PlotIdx(name);
     return;
@@ -59,11 +86,15 @@ elseif isdir(name)
        datdir = name;
    else
        datdir = fileparts(name);
-   end
+end
+if isempty(nevdir)
+    nevdir = datdir;
+end
+
    plotsummary = 2;
 
    if isempty(strfind(path,'BlackRock'))
-       path(path,'/bgc/bgc/matlab/BlackRock');
+      addpath([GetFilePath('bgcmatlab') '/BlackRock']);
    end
    idxfile = [datdir '/FileIdx.mat'];
    
@@ -88,6 +119,7 @@ elseif isdir(name)
        a = load(idxfile);
        idx = a.idx;
        idx.datdir = datdir;
+       idx.nevdir = nevdir;
        nidx = length(idx.names);
        if plottype == 1
            PlotExptFiles(idx, Expts, Trials);
@@ -97,14 +129,21 @@ elseif isdir(name)
        nidx = 0;
    end
    
-   
+   if exist(idxfile,'file') && reindex
+       BackupFile(idxfile,'print');
+   end
    if isempty(Expts)
-       if isdir(name)
-           idx = BuildMatFiles(datdir);
-           save(idxfile,'idx');
-           return;
+       if isdir(name) %online files
+           [Expts, Trials] = ReadExptDir(name, 'online', 'noerrs');
+           if iscell(Trials)
+               for nex = 1:length(Expts)
+                   Expts{nex}.bstimes = Trials{nex}.Trials.bstimes';
+                   Expts{nex}.gridstoreon = Trials{nex}.Trials.bstimes(1);
+               end
+           end
+           idx = BuildMatFiles(nevdir);
        else
-           Expts = GetExpts(name);
+           Expts = GetExpts(name, aargs{:});
        end
    end
    
@@ -123,7 +162,7 @@ elseif isdir(name)
        starts(j) = Expts{j}.Header.CreationDate + Expts{j}.Header.Start./(10000 * 60 *60 *24);
        ebstimes{j} = Expts{j}.bstimes;
        id = find(Expts{j}.DigMark.codes ==1);
-       if isempty(Expts{j}.gridstoreon)
+       if ~isfield(Expts{j},'gridstoreon') || isempty(Expts{j}.gridstoreon)
            Expts{j}.gridstoreon = Expts{j}.bstimes(1);;
        end
        if isempty(id)
@@ -158,7 +197,7 @@ elseif isdir(name)
        end
        nson = length(sampleon);
        sampleons = [sampleons sampleon(1)];
-
+       exptids(j) = Expts{j}.Header.idrange(end);
        id = find(Expts{j}.DigMark.codes ==2);
        
  %Nov 2012 Onwards, use Trial Isis to do matching, so start/end times are less critical
@@ -196,7 +235,7 @@ elseif isdir(name)
    
 %First Build a list of Nev files and their times
 %This works for multiple files per expt. 
-   d = dir([datdir]);
+   d = dir([nevdir]);
    filenames = {d.name};
    %d = dir([datdir '/*.nev']);
    newf = 0;
@@ -204,7 +243,7 @@ elseif isdir(name)
    usenev = 1;
    for j = 1:length(d)
        if ~isempty(strfind(d(j).name,'.nev')) && usenev %this has starttime and Dig Events
-           nevfile = [datdir '/' d(j).name];
+           nevfile = [nevdir '/' d(j).name];
            matfile = strrep(d(j).name,'.nev','.mat');
            mid = strmatch(matfile,filenames);
            if length(mid)
@@ -212,7 +251,7 @@ elseif isdir(name)
            else
                agediff = 1;
            end
-           if reindex || isempty(idx) || isempty(strmatch(d(j).name,idx.names)) || ...
+           if reindex || ~isfield(idx,'names') || isempty(strmatch(d(j).name,idx.names)) || ...
                    agediff > 0
                if  agediff > 0
                    nev = openNEV('read','nomat','noparse','nowarning',nevfile);
@@ -231,6 +270,10 @@ elseif isdir(name)
                    bstimes = nev.Data.SerialDigitalIO.TimeStampSec(id+1).*10000;
                    id = find(onoff < 0);
                    estimes = nev.Data.SerialDigitalIO.TimeStampSec(id+1).*10000;
+                   if diff(size(bstimes)) > 1
+                       bstimes = bstimes';
+                       estimes = estimes';
+                   end
                end
                    ns = length(bstimes);
                ts = nev.MetaTags.DateTimeRaw;
@@ -298,10 +341,32 @@ elseif isdir(name)
                        else
                            amindt(e,nnev) = NaN;
                        end
-                   else
-                       mindt(e,nnev) = NaN;
+                   elseif length(ebstimes{e}) == length(bstimes)-1 && length(bstimes) > 1
+                       xsc = std(diff(ebstimes{e})-dx(2:end)); %can get one extra in nev...
+                       mindt(e,nnev) = xsc;
+                       bsoffset(e,nnev) = -1;
                        amindt(e,nnev) = NaN;
-                       bsoffset(e,nnev) = NaN;
+                   elseif length(bstimes) > 1 %if more trials in nev that expt, can't be  a match.  
+%But if some trials have been deleted from Expt (e.g. because of missing RC sequnece, can get this
+%So add calculation.  But shouldn't need this, so for now, set mindt to Nan
+                       xid = 1:length(ebstimes(e));
+                       xsc = [];
+                       for dt = 0:length(bstimes)-length(ebstimes{e});
+                           xsc(dt+1) = std(diff(ebstimes{e}-dx(xid+dt)));
+                       end
+                       [mindt(e,nnev), bsoffset(e,nnev)] = min(xsc);
+                       bsoffset(e, nnev) = bsoffset(e, nnev) * -1;
+                       if length(xsc) > 1
+                           xsc = sort(xsc);
+                           amindt(e,nnev) = xsc(2);
+                       else
+                           amindt(e,nnev) = NaN;
+                       end
+                       mindt(e,nnev) = NaN;
+                   else
+                       bsoffset(e, nnev) = NaN;
+                       amindt(e,nnev) = NaN;
+                       mindt(e,nnev) = NaN;
                    end
                end
                nidx = nnev;
@@ -312,8 +377,12 @@ elseif isdir(name)
                    newf = newf+1;
                    idx.names{nidx} = d(j).name;
                    idx.expt(nidx) = b;
-                   idx.toff(nidx) = ebstimes{b}(bsoff)-bstimes(1);
-                   idx.bsstd(nidx) = std(bestdt);
+                   if bsoff < 0
+                       idx.toff(nidx) = ebstimes{b}(1)-bstimes(1-bsoff);
+                   else
+                       idx.toff(nidx) = ebstimes{b}(bsoff)-bstimes(1);
+                   end
+                   idx.bsstd(nidx) = bestdt;
                    nt = length(bstimes);
                    idx.firstbs(nidx) = bsoff;
                    idx.start(nidx) = tstart + bstimes(1)./(10000 * 60 * 24); %datenum
@@ -336,6 +405,25 @@ elseif isdir(name)
                    idx.digdt(nidx) = NaN;
                    end
                    needed(j) = 0;
+               end
+               id = find(strcmp(d(j).name,forcematches))
+               if length(id) ==1
+                   b = forceexpts(id);
+                   idx.expt(nidx) = b;
+                   bsoff = forcebsoff(id);
+                   figure;
+                   if bsoff < 0
+                       idx.toff(nidx) = ebstimes{b}(1)-bstimes(1-bsoff);
+                       plot(diff(ebstimes{b}));
+                       hold on;
+                       plot(diff(bstimes(1-bsoff:end)),'r');
+                   else
+                       idx.toff(nidx) = ebstimes{b}(bsoff)-bstimes(1);
+                       plot(diff(ebstimes{b}(bsoff:end)));
+                       hold on;
+                       plot(diff(bstimes),'r');
+                   end
+                   title(sprintf('Expt %d and %s, bso offset %d',b,d(j).name,bsoff));
                end
                idx.stds(nidx,1) = bestdt;
                idx.stds(nidx,2) = nextstd;
@@ -368,17 +456,23 @@ elseif isdir(name)
            end
        end
    end
+   idx.exbstimes = ebstimes;
    idx.version = VERSION;
+   idx.builddate = now;
+   idx.usealltrials = usealltrials;
    
-   if isempty(idx)
+   if  nidx == 0
        fprintf('Missing NeV Data Filesin %s\n',name);
        return;
    end
    
    missing = setdiff(1:length(Expts),idx.expt);
-   if length(missing)
+   if length(missing) 
        idx.missing = missing;
-       warndlg(sprintf('Missing Expts %s',sprintf('%d ',missing)),'Expts Missing');
+       idx = AddError(idx, sprintf('Missing NEV for Expts %s',sprintf('%d ',missing)));
+       if showerr
+           warndlg(idx.errs{end},'Expts Missing');
+       end
    end
    eid = find(idx.expt > 0);
    badsd = find(idx.bsstd(eid) > 100);
@@ -391,16 +485,17 @@ elseif isdir(name)
        end
    end
    
+idx.datdir = datdir;
+idx.nevdir = nevdir;
+idx.exptstarts = sampleons;
+idx.exptends = sampleoffs;
+idx.exptids = exptids;
    if compareidxs || reindex == 2
        cmpdiffs = CompareGridIdx(idx, oldidx.idx);
        idx.exptdiffs = length(cmpdiffs);
    elseif newf > 0 
        save(idxfile,'idx');
    end
-idx.datdir = datdir;
-idx.exptstarts = sampleons;
-idx.exptends = sampleoffs;
-
 if length(plotexpts)
     GetFigure(checktag);
     hold off;
@@ -561,7 +656,7 @@ for j = 1:length(d)
     end
 end
 idx.datdir = datdir;
-
+idx.nevdir = datdir;
 
 function PlotIdx(idx)
 
@@ -578,6 +673,11 @@ for j = 1:length(idx.starttime)
 end
 set(gca,'ylim',[0 3]);
 datetick('x','HH:SS');
+
+
+
+
+
 function Expts = GetExpts(name, varargin)
 
 args = varargin;

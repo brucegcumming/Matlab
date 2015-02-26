@@ -1,0 +1,1 @@
+function h= testDrawEllipse(E,varargin)if E.shape(1) == 1 || E.shape(1) == 2    h = PC.testDrawLine(E,varargin{:});    return;end

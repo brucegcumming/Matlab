@@ -1,0 +1,1 @@
+function Q = Cell2Cluster(cell,Clusters) Q = Clusters{cell.p};triggerV = [];if isfield(Q,'triggerV')    triggerV = Q.triggerV(Q.clst == cell.cl+1);endif cell.cl > 1    Q = Q.next{cell.cl-1};elseif isfield(Q,'clst') && length(Q.clst) == length(Q.times)    Q.times = Q.times(Q.clst == 2);endif ~isempty(triggerV)    Q.triggerV = triggerV;end
